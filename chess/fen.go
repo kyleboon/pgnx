@@ -50,7 +50,7 @@ func FromFEN(fen string) (*Board, error) {
 		return nil, fmt.Errorf("fen: bad side to move %q", fields[1])
 	}
 
-	castling, err := parseCastling(fields[2])
+	castling, err := parseCastling(fields[2], b)
 	if err != nil {
 		return nil, err
 	}
@@ -143,14 +143,16 @@ func fenCharFromPiece(p Piece) rune {
 // standard "KQkq" notation (which implies rook start files 7 and 0) and
 // Shredder-FEN style file letters (A-H/a-h), which record the actual rook
 // starting file for Chess960 positions. "-" means no castling rights.
-func parseCastling(field string) (CastlingRights, error) {
+// The board's piece placement must already be parsed so the king squares
+// are available for classifying Shredder letters.
+func parseCastling(field string, b *Board) (CastlingRights, error) {
 	if field == "-" {
 		return CastlingRights{}, nil
 	}
 	// KQkq is the standard notation; ABCDEFGHabcdefgh (Shredder-FEN) records
 	// actual rook files for Chess960. A field cannot mix the two styles.
 	if strings.ContainsAny(field, "ABCDEFGHabcdefgh") {
-		return parseShredderCastling(field)
+		return parseShredderCastling(field, b)
 	}
 
 	var c CastlingRights
@@ -177,49 +179,50 @@ func parseCastling(field string) (CastlingRights, error) {
 
 // parseShredderCastling parses Shredder-FEN style castling rights, where
 // each letter names the file of a castling-rook. Uppercase letters are
-// White's rooks, lowercase are Black's. Per side, the rook on the higher
-// file is treated as kingside and the lower file as queenside (matching
-// standard chess when files are h/a).
-func parseShredderCastling(field string) (CastlingRights, error) {
+// White's rooks, lowercase are Black's. A rook file greater than the
+// king's file is a kingside right; a smaller file is queenside. A letter
+// equal to the king's file is invalid, as is naming a right for a side
+// whose king is not on the board.
+func parseShredderCastling(field string, b *Board) (CastlingRights, error) {
 	var c CastlingRights
-	var whiteFiles, blackFiles []int
-	for _, ch := range field {
-		switch {
-		case ch >= 'A' && ch <= 'H':
-			whiteFiles = append(whiteFiles, int(ch-'A'))
-		case ch >= 'a' && ch <= 'h':
-			blackFiles = append(blackFiles, int(ch-'a'))
-		default:
-			return CastlingRights{}, fmt.Errorf("fen: bad castling char %q", ch)
+	set := func(color Color, file int, kingside, queenside *bool, kFile, qFile *int) error {
+		kingSq := b.KingSquare(color)
+		if b.PieceAt(kingSq) != (Piece{Type: King, Color: color}) {
+			return fmt.Errorf("fen: castling rights for side with no king")
 		}
-	}
-	assign := func(files []int, kingside, queenside *bool, kFile, qFile *int) error {
-		switch len(files) {
-		case 0:
-			return nil
-		case 1:
-			*kingside = true
-			*kFile = files[0]
-			return nil
-		case 2:
-			lo, hi := files[0], files[1]
-			if lo > hi {
-				lo, hi = hi, lo
+		switch {
+		case file > kingSq.File:
+			if *kingside {
+				return fmt.Errorf("fen: duplicate kingside castling file")
 			}
 			*kingside = true
-			*kFile = hi
+			*kFile = file
+		case file < kingSq.File:
+			if *queenside {
+				return fmt.Errorf("fen: duplicate queenside castling file")
+			}
 			*queenside = true
-			*qFile = lo
-			return nil
+			*qFile = file
 		default:
-			return fmt.Errorf("fen: too many castling rook files")
+			return fmt.Errorf("fen: castling rook file %c equals king file", 'a'+file)
 		}
+		return nil
 	}
-	if err := assign(whiteFiles, &c.WhiteKingside, &c.WhiteQueenside, &c.WhiteKRookFile, &c.WhiteQRookFile); err != nil {
-		return CastlingRights{}, err
-	}
-	if err := assign(blackFiles, &c.BlackKingside, &c.BlackQueenside, &c.BlackKRookFile, &c.BlackQRookFile); err != nil {
-		return CastlingRights{}, err
+	for _, ch := range field {
+		var err error
+		switch {
+		case ch >= 'A' && ch <= 'H':
+			err = set(White, int(ch-'A'),
+				&c.WhiteKingside, &c.WhiteQueenside, &c.WhiteKRookFile, &c.WhiteQRookFile)
+		case ch >= 'a' && ch <= 'h':
+			err = set(Black, int(ch-'a'),
+				&c.BlackKingside, &c.BlackQueenside, &c.BlackKRookFile, &c.BlackQRookFile)
+		default:
+			err = fmt.Errorf("fen: bad castling char %q", ch)
+		}
+		if err != nil {
+			return CastlingRights{}, err
+		}
 	}
 	return c, nil
 }
