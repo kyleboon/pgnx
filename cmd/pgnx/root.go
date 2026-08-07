@@ -4,6 +4,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -28,6 +29,20 @@ func exitCode(err error) int {
 		return 2
 	}
 	return 1
+}
+
+// execute runs root and maps its error to a process exit status. Because
+// the command tree sets SilenceErrors, cobra never prints errors itself;
+// execute prints any non-sentinel error to the command's error stream with
+// a "pgnx: " prefix. The errProblems sentinel stays silent: the per-game
+// error lines and the summary have already been written to the log writer,
+// so printing the sentinel too would only duplicate that report.
+func execute(root *cobra.Command) int {
+	err := root.Execute()
+	if err != nil && !errors.Is(err, errProblems) {
+		fmt.Fprintf(root.ErrOrStderr(), "pgnx: %v\n", err)
+	}
+	return exitCode(err)
 }
 
 // NewRootCmd builds the pgnx root command and its subcommands. It is a

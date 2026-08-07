@@ -7,7 +7,5 @@ func main() {
 }
 
 func run() int {
-	root := NewRootCmd()
-	err := root.Execute()
-	return exitCode(err)
+	return execute(NewRootCmd())
 }

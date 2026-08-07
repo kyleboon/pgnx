@@ -16,11 +16,10 @@ func runCLI(t *testing.T, stdin string, args ...string) (stdout, stderr string, 
 	root.SetErr(&errb)
 	root.SetIn(strings.NewReader(stdin))
 	root.SetArgs(args)
-	err := root.Execute()
-	code = 0
-	if err != nil {
-		code = exitCode(err) // helper mapping our sentinel errors to 2, usage errors to 1
-	}
+	// execute maps our sentinel errors to 2 and usage errors to 1 (via
+	// exitCode), and prints non-sentinel errors to the error stream —
+	// the same path main()'s run() uses.
+	code = execute(root)
 	return out.String(), errb.String(), code
 }
 
@@ -68,6 +67,36 @@ func TestConvertFormatFlag(t *testing.T) {
 	out, _, _ := runCLI(t, fools, "convert", "--quiet", "-f", "uci")
 	if !strings.Contains(out, "f2f3 e7e5 g2g4 d8h4") {
 		t.Errorf("uci out: %q", out)
+	}
+}
+
+func TestUnknownFlagErrorPrinted(t *testing.T) {
+	_, errOut, code := runCLI(t, "", "convert", "--badflag")
+	if code != 1 {
+		t.Fatalf("exit = %d, want 1", code)
+	}
+	if !strings.Contains(errOut, "badflag") {
+		t.Errorf("stderr should name the unknown flag: %q", errOut)
+	}
+}
+
+func TestInvalidFormatErrorPrinted(t *testing.T) {
+	_, errOut, code := runCLI(t, fools, "convert", "-f", "bogus")
+	if code != 1 {
+		t.Fatalf("exit = %d, want 1", code)
+	}
+	if !strings.Contains(errOut, "bogus") {
+		t.Errorf("stderr should mention the bad format value: %q", errOut)
+	}
+}
+
+func TestBrokenGameNoDuplicateSentinelLine(t *testing.T) {
+	_, errOut, code := runCLI(t, "1. e4 e4 *\n", "convert", "--quiet")
+	if code != 2 {
+		t.Fatalf("exit = %d, want 2", code)
+	}
+	if strings.Contains(errOut, errProblems.Error()) {
+		t.Errorf("sentinel must not be printed on top of per-game errors: %q", errOut)
 	}
 }
 

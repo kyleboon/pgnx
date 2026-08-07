@@ -27,6 +27,9 @@ func openLogFile(path string) (*os.File, error) {
 // in the form "<file>:<line>: game <n>: <error>", and returns the total
 // number of games seen and the number that succeeded. It does not itself
 // decide the process exit code; callers compare succeeded to total.
+//
+// ioErr retains only the last file-open error (each one is already logged
+// to w as it occurs); callers treat any non-nil ioErr as "problems seen".
 func forEachGame(cmd *cobra.Command, files []string, w io.Writer, fn func(src string, n int, g *pgn.Game) error) (total, succeeded int, ioErr error) {
 	if len(files) == 0 {
 		total, succeeded = scanGames(cmd, "stdin", cmd.InOrStdin(), w, total, succeeded, fn)
