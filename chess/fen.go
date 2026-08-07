@@ -1,0 +1,321 @@
+package chess
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
+// FromFEN parses a FEN (or 4-field EPD-style position) string into a Board.
+func FromFEN(fen string) (*Board, error) {
+	fields := strings.Fields(fen)
+	if len(fields) != 4 && len(fields) != 6 {
+		return nil, fmt.Errorf("fen: want 4 or 6 fields, got %d", len(fields))
+	}
+
+	b := &Board{}
+
+	ranks := strings.Split(fields[0], "/")
+	if len(ranks) != 8 {
+		return nil, fmt.Errorf("fen: want 8 ranks, got %d", len(ranks))
+	}
+	for r := 0; r < 8; r++ {
+		file := 0
+		for _, ch := range ranks[7-r] { // FEN lists rank 8 first
+			if ch >= '1' && ch <= '8' {
+				file += int(ch - '0')
+				if file > 8 {
+					return nil, fmt.Errorf("fen: rank %d overflows", r+1)
+				}
+			} else {
+				p, ok := pieceFromFENChar(ch)
+				if !ok || file > 7 {
+					return nil, fmt.Errorf("fen: bad char %q", ch)
+				}
+				b.setPiece(Square{file, r}, p)
+				file++
+			}
+		}
+		if file != 8 {
+			return nil, fmt.Errorf("fen: rank %d has %d files", r+1, file)
+		}
+	}
+
+	switch fields[1] {
+	case "w":
+		b.SideToMove = White
+	case "b":
+		b.SideToMove = Black
+	default:
+		return nil, fmt.Errorf("fen: bad side to move %q", fields[1])
+	}
+
+	castling, err := parseCastling(fields[2])
+	if err != nil {
+		return nil, err
+	}
+	b.Castling = castling
+
+	if fields[3] == "-" {
+		b.HasEP = false
+	} else {
+		sq, err := ParseSquare(fields[3])
+		if err != nil {
+			return nil, fmt.Errorf("fen: bad en passant square %q: %w", fields[3], err)
+		}
+		b.HasEP = true
+		b.EPSquare = sq
+	}
+
+	if len(fields) == 6 {
+		hm, err := strconv.Atoi(fields[4])
+		if err != nil {
+			return nil, fmt.Errorf("fen: bad halfmove clock %q: %w", fields[4], err)
+		}
+		b.HalfmoveClock = hm
+
+		fm, err := strconv.Atoi(fields[5])
+		if err != nil {
+			return nil, fmt.Errorf("fen: bad fullmove number %q: %w", fields[5], err)
+		}
+		b.FullmoveNumber = fm
+	} else {
+		b.HalfmoveClock = 0
+		b.FullmoveNumber = 1
+	}
+
+	return b, nil
+}
+
+func pieceFromFENChar(ch rune) (Piece, bool) {
+	var color Color
+	if ch >= 'a' && ch <= 'z' {
+		color = Black
+	} else if ch >= 'A' && ch <= 'Z' {
+		color = White
+	} else {
+		return Piece{}, false
+	}
+
+	var pt PieceType
+	switch ch {
+	case 'p', 'P':
+		pt = Pawn
+	case 'n', 'N':
+		pt = Knight
+	case 'b', 'B':
+		pt = Bishop
+	case 'r', 'R':
+		pt = Rook
+	case 'q', 'Q':
+		pt = Queen
+	case 'k', 'K':
+		pt = King
+	default:
+		return Piece{}, false
+	}
+	return Piece{Type: pt, Color: color}, true
+}
+
+func fenCharFromPiece(p Piece) rune {
+	var ch rune
+	switch p.Type {
+	case Pawn:
+		ch = 'p'
+	case Knight:
+		ch = 'n'
+	case Bishop:
+		ch = 'b'
+	case Rook:
+		ch = 'r'
+	case Queen:
+		ch = 'q'
+	case King:
+		ch = 'k'
+	}
+	if p.Color == White {
+		ch = ch - 'a' + 'A'
+	}
+	return ch
+}
+
+// parseCastling parses the FEN castling-availability field. It accepts the
+// standard "KQkq" notation (which implies rook start files 7 and 0) and
+// Shredder-FEN style file letters (A-H/a-h), which record the actual rook
+// starting file for Chess960 positions. "-" means no castling rights.
+func parseCastling(field string) (CastlingRights, error) {
+	if field == "-" {
+		return CastlingRights{}, nil
+	}
+	// KQkq is the standard notation; ABCDEFGHabcdefgh (Shredder-FEN) records
+	// actual rook files for Chess960. A field cannot mix the two styles.
+	if strings.ContainsAny(field, "ABCDEFGHabcdefgh") {
+		return parseShredderCastling(field)
+	}
+
+	var c CastlingRights
+	for _, ch := range field {
+		switch ch {
+		case 'K':
+			c.WhiteKingside = true
+			c.WhiteKRookFile = 7
+		case 'Q':
+			c.WhiteQueenside = true
+			c.WhiteQRookFile = 0
+		case 'k':
+			c.BlackKingside = true
+			c.BlackKRookFile = 7
+		case 'q':
+			c.BlackQueenside = true
+			c.BlackQRookFile = 0
+		default:
+			return CastlingRights{}, fmt.Errorf("fen: bad castling char %q", ch)
+		}
+	}
+	return c, nil
+}
+
+// parseShredderCastling parses Shredder-FEN style castling rights, where
+// each letter names the file of a castling-rook. Uppercase letters are
+// White's rooks, lowercase are Black's. Per side, the rook on the higher
+// file is treated as kingside and the lower file as queenside (matching
+// standard chess when files are h/a).
+func parseShredderCastling(field string) (CastlingRights, error) {
+	var c CastlingRights
+	var whiteFiles, blackFiles []int
+	for _, ch := range field {
+		switch {
+		case ch >= 'A' && ch <= 'H':
+			whiteFiles = append(whiteFiles, int(ch-'A'))
+		case ch >= 'a' && ch <= 'h':
+			blackFiles = append(blackFiles, int(ch-'a'))
+		default:
+			return CastlingRights{}, fmt.Errorf("fen: bad castling char %q", ch)
+		}
+	}
+	assign := func(files []int, kingside, queenside *bool, kFile, qFile *int) error {
+		switch len(files) {
+		case 0:
+			return nil
+		case 1:
+			*kingside = true
+			*kFile = files[0]
+			return nil
+		case 2:
+			lo, hi := files[0], files[1]
+			if lo > hi {
+				lo, hi = hi, lo
+			}
+			*kingside = true
+			*kFile = hi
+			*queenside = true
+			*qFile = lo
+			return nil
+		default:
+			return fmt.Errorf("fen: too many castling rook files")
+		}
+	}
+	if err := assign(whiteFiles, &c.WhiteKingside, &c.WhiteQueenside, &c.WhiteKRookFile, &c.WhiteQRookFile); err != nil {
+		return CastlingRights{}, err
+	}
+	if err := assign(blackFiles, &c.BlackKingside, &c.BlackQueenside, &c.BlackKRookFile, &c.BlackQRookFile); err != nil {
+		return CastlingRights{}, err
+	}
+	return c, nil
+}
+
+// FEN returns the FEN string for the board.
+func (b *Board) FEN() string {
+	var sb strings.Builder
+
+	for r := 7; r >= 0; r-- {
+		empty := 0
+		for f := 0; f < 8; f++ {
+			p := b.squares[f][r]
+			if p.Type == NoPiece {
+				empty++
+				continue
+			}
+			if empty > 0 {
+				sb.WriteString(strconv.Itoa(empty))
+				empty = 0
+			}
+			sb.WriteRune(fenCharFromPiece(p))
+		}
+		if empty > 0 {
+			sb.WriteString(strconv.Itoa(empty))
+		}
+		if r > 0 {
+			sb.WriteByte('/')
+		}
+	}
+
+	sb.WriteByte(' ')
+	if b.SideToMove == Black {
+		sb.WriteByte('b')
+	} else {
+		sb.WriteByte('w')
+	}
+
+	sb.WriteByte(' ')
+	sb.WriteString(castlingFEN(b.Castling))
+
+	sb.WriteByte(' ')
+	if b.HasEP {
+		sb.WriteString(b.EPSquare.String())
+	} else {
+		sb.WriteByte('-')
+	}
+
+	sb.WriteByte(' ')
+	sb.WriteString(strconv.Itoa(b.HalfmoveClock))
+	sb.WriteByte(' ')
+	sb.WriteString(strconv.Itoa(b.FullmoveNumber))
+
+	return sb.String()
+}
+
+// castlingFEN renders castling rights. When the rook files match the
+// standard chess start (7 for kingside, 0 for queenside) it emits the usual
+// KQkq notation; otherwise (Chess960) it emits Shredder-FEN file letters.
+func castlingFEN(c CastlingRights) string {
+	if !c.WhiteKingside && !c.WhiteQueenside && !c.BlackKingside && !c.BlackQueenside {
+		return "-"
+	}
+
+	standard := (!c.WhiteKingside || c.WhiteKRookFile == 7) &&
+		(!c.WhiteQueenside || c.WhiteQRookFile == 0) &&
+		(!c.BlackKingside || c.BlackKRookFile == 7) &&
+		(!c.BlackQueenside || c.BlackQRookFile == 0)
+
+	var sb strings.Builder
+	if standard {
+		if c.WhiteKingside {
+			sb.WriteByte('K')
+		}
+		if c.WhiteQueenside {
+			sb.WriteByte('Q')
+		}
+		if c.BlackKingside {
+			sb.WriteByte('k')
+		}
+		if c.BlackQueenside {
+			sb.WriteByte('q')
+		}
+		return sb.String()
+	}
+
+	if c.WhiteKingside {
+		sb.WriteByte(byte('A' + c.WhiteKRookFile))
+	}
+	if c.WhiteQueenside {
+		sb.WriteByte(byte('A' + c.WhiteQRookFile))
+	}
+	if c.BlackKingside {
+		sb.WriteByte(byte('a' + c.BlackKRookFile))
+	}
+	if c.BlackQueenside {
+		sb.WriteByte(byte('a' + c.BlackQRookFile))
+	}
+	return sb.String()
+}
