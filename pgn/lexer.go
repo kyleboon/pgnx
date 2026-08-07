@@ -348,10 +348,16 @@ func (l *lexer) lexNumberOrResult(first rune) (token, error) {
 			return token{kind: tokResult, text: "0-1", line: line}, nil
 		}
 		if l.matchAhead("-0-0") {
-			return token{kind: tokMove, text: "0-0-0", line: line}, nil
+			var sb strings.Builder
+			sb.WriteString("0-0-0")
+			l.consumeMoveTail(&sb)
+			return token{kind: tokMove, text: sb.String(), line: line}, nil
 		}
 		if l.matchAhead("-0") {
-			return token{kind: tokMove, text: "0-0", line: line}, nil
+			var sb strings.Builder
+			sb.WriteString("0-0")
+			l.consumeMoveTail(&sb)
+			return token{kind: tokMove, text: sb.String(), line: line}, nil
 		}
 	} else if first == '1' {
 		if l.matchAhead("-0") {
@@ -402,10 +408,20 @@ func (l *lexer) lexMove(first rune) (token, error) {
 	line := l.line
 	var sb strings.Builder
 	sb.WriteRune(first)
+	l.consumeMoveTail(&sb)
+	return token{kind: tokMove, text: sb.String(), line: line}, nil
+}
+
+// consumeMoveTail appends to sb the remaining characters of a move token:
+// first any characters from the SAN move alphabet (moveChars), then any
+// trailing '!'/'?' annotation glyphs. Shared by lexMove and the zero-form
+// castling cases of lexNumberOrResult so that e.g. "0-0-0+" keeps its
+// check suffix.
+func (l *lexer) consumeMoveTail(sb *strings.Builder) {
 	for {
 		ch, ok := l.peekRune()
 		if !ok {
-			break
+			return
 		}
 		if isMoveChar(ch) {
 			l.readRune()
@@ -417,16 +433,15 @@ func (l *lexer) lexMove(first rune) (token, error) {
 	for {
 		ch, ok := l.peekRune()
 		if !ok {
-			break
+			return
 		}
 		if ch == '!' || ch == '?' {
 			l.readRune()
 			sb.WriteRune(ch)
 			continue
 		}
-		break
+		return
 	}
-	return token{kind: tokMove, text: sb.String(), line: line}, nil
 }
 
 // matchAhead reports whether the upcoming input matches s exactly; if so it

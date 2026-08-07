@@ -81,6 +81,26 @@ func TestLexResults(t *testing.T) {
 	}
 }
 
+func TestLexCastling(t *testing.T) {
+	// Zero-form and letter-form castling must each lex as a single move
+	// token with the text preserved exactly as written, including a check
+	// suffix. Guards the 0-0/0-0-0 special-casing in lexNumberOrResult
+	// (cf. gather_possible_numeric in pgn-extract's lex.c).
+	for _, s := range []string{"0-0", "0-0-0", "O-O", "O-O-O", "0-0-0+"} {
+		toks := lexAll(t, s, ParserOptions{})
+		if len(toks) != 1 || toks[0].kind != tokMove || toks[0].text != s {
+			t.Errorf("%q lexed as %v", s, toks)
+		}
+	}
+	// The castling special-casing must not shadow digit-led results.
+	for _, s := range []string{"1-0", "0-1", "1/2-1/2"} {
+		toks := lexAll(t, s, ParserOptions{})
+		if len(toks) != 1 || toks[0].kind != tokResult || toks[0].text != s {
+			t.Errorf("%q lexed as %v", s, toks)
+		}
+	}
+}
+
 func TestLexNestedComments(t *testing.T) {
 	src := "{outer {inner} back} *"
 	flat := lexAll(t, src, ParserOptions{})
