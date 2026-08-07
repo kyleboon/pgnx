@@ -149,8 +149,12 @@ func NewWriter(w io.Writer, opts Options) *Writer {
 //
 // r may be nil only when opts.Format == Source, since Source rendering
 // uses only the pgn.Game data (the SAN exactly as written) and never
-// consults replay output.
+// consults replay output; any other format returns an error when r is
+// nil, before anything is written.
 func (w *Writer) WriteGame(g *pgn.Game, r *replay.Result) error {
+	if r == nil && w.opts.Format != Source {
+		return fmt.Errorf("output: replay result required for format %v", w.opts.Format)
+	}
 	switch w.opts.Format {
 	case SAN, Source:
 		return w.writeSANOrSource(g, r)

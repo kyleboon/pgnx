@@ -274,6 +274,62 @@ func TestSourceFormatNilReplay(t *testing.T) {
 	}
 }
 
+// TestNilReplayRequiresSource pins that WriteGame refuses a nil
+// replay.Result for any format other than Source, erroring before
+// anything is written.
+func TestNilReplayRequiresSource(t *testing.T) {
+	g, _ := gameAndReplay(t, fools)
+	var buf bytes.Buffer
+	w := NewWriter(&buf, Options{Format: SAN})
+	if err := w.WriteGame(g, nil); err == nil {
+		t.Error("expected error for nil replay with Format SAN, got nil")
+	}
+	if buf.Len() != 0 {
+		t.Errorf("expected no output on error, got:\n%q", buf.String())
+	}
+}
+
+// TestCommentWordWrap pins that long comments word-wrap: the comment text
+// is split into individually wrappable words, and the black move after the
+// wrapped comment still gets its "N..." renumber. Oracle:
+//
+//	printf '[Result "*"]\n\n1. e4 {this is a fairly long plain ascii comment that should wrap across several lines when width is small} e5 *\n' \
+//	  | pgn-extract --quiet -w40
+func TestCommentWordWrap(t *testing.T) {
+	src := "[Result \"*\"]\n\n1. e4 {this is a fairly long plain ascii comment that should wrap across several lines when width is small} e5 *\n"
+	g, r := gameAndReplay(t, src)
+	var buf bytes.Buffer
+	w := NewWriter(&buf, Options{Format: SAN, LineWidth: 40})
+	if err := w.WriteGame(g, r); err != nil {
+		t.Fatal(err)
+	}
+	want := "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n" +
+		"1. e4 { this is a fairly long plain\nascii comment that should wrap across\nseveral lines when width is small } 1...\ne5 *\n\n"
+	if buf.String() != want {
+		t.Errorf("got:\n%q\nwant:\n%q", buf.String(), want)
+	}
+}
+
+// TestCommentWordWrapDefaultWidth pins the same word-wrapping at the
+// default line width of 75. Oracle:
+//
+//	printf '[Result "*"]\n\n1. e4 {this is a fairly long plain ascii comment that should wrap across several lines when width is small at default width too maybe} e5 *\n' \
+//	  | pgn-extract --quiet
+func TestCommentWordWrapDefaultWidth(t *testing.T) {
+	src := "[Result \"*\"]\n\n1. e4 {this is a fairly long plain ascii comment that should wrap across several lines when width is small at default width too maybe} e5 *\n"
+	g, r := gameAndReplay(t, src)
+	var buf bytes.Buffer
+	w := NewWriter(&buf, Options{Format: SAN})
+	if err := w.WriteGame(g, r); err != nil {
+		t.Fatal(err)
+	}
+	want := "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n" +
+		"1. e4 { this is a fairly long plain ascii comment that should wrap across\nseveral lines when width is small at default width too maybe } 1... e5 *\n\n"
+	if buf.String() != want {
+		t.Errorf("got:\n%q\nwant:\n%q", buf.String(), want)
+	}
+}
+
 // TestUnimplementedFormat pins that unimplemented Format values return a
 // clear, typed error rather than panicking or silently emitting nothing.
 func TestUnimplementedFormat(t *testing.T) {

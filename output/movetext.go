@@ -2,6 +2,7 @@ package output
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/kyleboon/pgnx/pgn"
 	"github.com/kyleboon/pgnx/replay"
@@ -65,9 +66,7 @@ func emitLine(lw *lineWriter, moves []*pgn.Move, infos []replay.MoveInfo, startW
 
 		if !opts.NoComments {
 			for _, c := range mv.Comments {
-				lw.WriteToken("{")
-				lw.WriteToken(c)
-				lw.WriteToken("}")
+				emitComment(lw, c)
 			}
 			if len(mv.Comments) > 0 {
 				blackNeedsNumber = true
@@ -98,9 +97,7 @@ func emitVariation(lw *lineWriter, v *pgn.Variation, infos []replay.MoveInfo, st
 	lw.WriteToken("(")
 	if !opts.NoComments && len(v.PrefixComments) > 0 {
 		for _, c := range v.PrefixComments {
-			lw.WriteToken("{")
-			lw.WriteToken(c)
-			lw.WriteToken("}")
+			emitComment(lw, c)
 		}
 	} else {
 		lw.SuppressSpace()
@@ -111,6 +108,19 @@ func emitVariation(lw *lineWriter, v *pgn.Variation, infos []replay.MoveInfo, st
 	emitLine(lw, v.Moves, infos, startWhite, true, opts)
 	lw.SuppressSpace()
 	lw.WriteToken(")")
+}
+
+// emitComment writes a comment as "{", each whitespace-separated word of
+// its text, and "}" — all as individual tokens, so long comments word-wrap
+// at the configured line width exactly like the C oracle (which splits
+// comment text into individually wrappable words). The single spaces
+// inside the braces ("{ text }") fall out of normal token separation.
+func emitComment(lw *lineWriter, c string) {
+	lw.WriteToken("{")
+	for _, word := range strings.Fields(c) {
+		lw.WriteToken(word)
+	}
+	lw.WriteToken("}")
 }
 
 // sanFor returns the token to emit for mv, using replay's normalized SAN
