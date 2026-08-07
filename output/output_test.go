@@ -330,12 +330,13 @@ func TestCommentWordWrapDefaultWidth(t *testing.T) {
 	}
 }
 
-// TestUnimplementedFormat pins that unimplemented Format values return a
-// clear, typed error rather than panicking or silently emitting nothing.
+// TestUnimplementedFormat pins that an out-of-range Format value (all nine
+// defined formats are implemented) returns a clear, typed error rather than
+// panicking or silently emitting nothing.
 func TestUnimplementedFormat(t *testing.T) {
 	g, r := gameAndReplay(t, "[Result \"*\"]\n\n1. e4 *\n")
 	var buf bytes.Buffer
-	w := NewWriter(&buf, Options{Format: FEN})
+	w := NewWriter(&buf, Options{Format: Format(999)})
 	if err := w.WriteGame(g, r); err == nil {
 		t.Error("expected error for unimplemented format, got nil")
 	}

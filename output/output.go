@@ -156,21 +156,27 @@ func (w *Writer) WriteGame(g *pgn.Game, r *replay.Result) error {
 		return fmt.Errorf("output: replay result required for format %v", w.opts.Format)
 	}
 	switch w.opts.Format {
-	case SAN, Source:
-		return w.writeSANOrSource(g, r)
+	case SAN, Source, LAlg, HAlg, ELAlg, XLAlg, UCI:
+		return w.writeMovetextGame(g, r)
+	case EPD, FEN:
+		return w.writePositionGame(g, r)
 	default:
 		return fmt.Errorf("output: format %v not implemented", w.opts.Format)
 	}
 }
 
-func (w *Writer) writeSANOrSource(g *pgn.Game, r *replay.Result) error {
+// writeMovetextGame renders the tag section, an optional prefix-comment
+// block, and the movetext (via emitMovetext/renderMove) for every
+// movetext-shaped format: SAN, Source, and the long-algebraic family
+// (LAlg, HAlg, ELAlg, XLAlg, UCI).
+func (w *Writer) writeMovetextGame(g *pgn.Game, r *replay.Result) error {
 	if err := w.writeTags(g); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w.w, "\n"); err != nil {
 		return err
 	}
-	if len(g.PrefixComments) > 0 && !w.opts.NoComments {
+	if len(g.PrefixComments) > 0 && !w.opts.NoComments && !isUCI(w.opts.Format) {
 		for _, c := range g.PrefixComments {
 			if _, err := io.WriteString(w.w, "{ "+c+" }\n"); err != nil {
 				return err
