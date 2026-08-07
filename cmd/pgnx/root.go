@@ -60,6 +60,8 @@ func NewRootCmd() *cobra.Command {
 	root.PersistentFlags().String("log", "", "write log/summary output to FILE instead of stderr")
 
 	root.AddCommand(newConvertCmd())
+	root.AddCommand(newValidateCmd())
+	root.AddCommand(newInfoCmd())
 
 	return root
 }
