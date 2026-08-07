@@ -41,7 +41,18 @@ func runValidate(cmd *cobra.Command, args []string) error {
 		findings = io.Discard
 	}
 
-	total, succeeded, ioErr := forEachGame(cmd, args, findings, func(src string, n int, g *pgn.Game) error {
+	// I/O errors (unreadable input files) are not findings: they must stay
+	// visible even under --summary, and they belong on the log writer
+	// (stderr, or --log) so stdout carries only findings and the tally.
+	logW, logCloser, err := logWriter(cmd)
+	if err != nil {
+		return err
+	}
+	if logCloser != nil {
+		defer logCloser.Close()
+	}
+
+	total, succeeded, ioErr := forEachGame(cmd, args, findings, logW, func(src string, n int, g *pgn.Game) error {
 		_, err := replay.Game(g, replay.Options{})
 		return err
 	})

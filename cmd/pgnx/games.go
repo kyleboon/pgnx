@@ -23,14 +23,20 @@ func openLogFile(path string) (*os.File, error) {
 //
 // fn is expected to attempt whatever processing it needs (typically a
 // replay) and return an error describing why the game failed, or nil on
-// success. forEachGame logs failures (and I/O errors opening a file) to w
-// in the form "<file>:<line>: game <n>: <error>", and returns the total
-// number of games seen and the number that succeeded. It does not itself
-// decide the process exit code; callers compare succeeded to total.
+// success. forEachGame logs per-game failures to w in the form
+// "<file>:<line>: game <n>: <error>", and I/O errors opening a file to
+// ioW as "<file>: <error>", and returns the total number of games seen
+// and the number that succeeded. The two writers are separate so a caller
+// can suppress or redirect per-game findings (as validate --summary does)
+// without also silencing file-open errors, which must always stay
+// visible; callers with no such split simply pass the same writer twice.
+// It does not itself decide the process exit code; callers compare
+// succeeded to total.
 //
 // ioErr retains only the last file-open error (each one is already logged
-// to w as it occurs); callers treat any non-nil ioErr as "problems seen".
-func forEachGame(cmd *cobra.Command, files []string, w io.Writer, fn func(src string, n int, g *pgn.Game) error) (total, succeeded int, ioErr error) {
+// to ioW as it occurs); callers treat any non-nil ioErr as "problems
+// seen".
+func forEachGame(cmd *cobra.Command, files []string, w, ioW io.Writer, fn func(src string, n int, g *pgn.Game) error) (total, succeeded int, ioErr error) {
 	if len(files) == 0 {
 		total, succeeded = scanGames(cmd, "stdin", cmd.InOrStdin(), w, total, succeeded, fn)
 		return total, succeeded, nil
@@ -39,7 +45,7 @@ func forEachGame(cmd *cobra.Command, files []string, w io.Writer, fn func(src st
 	for _, path := range files {
 		f, err := os.Open(path)
 		if err != nil {
-			fmt.Fprintf(w, "%s: %v\n", path, err)
+			fmt.Fprintf(ioW, "%s: %v\n", path, err)
 			ioErr = err
 			continue
 		}

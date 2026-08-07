@@ -38,7 +38,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	var plies int
 	var win, loss, draw, unknown int
 
-	total, _, ioErr := forEachGame(cmd, args, logW, func(src string, n int, g *pgn.Game) error {
+	total, _, ioErr := forEachGame(cmd, args, logW, logW, func(src string, n int, g *pgn.Game) error {
 		plies += len(g.Moves)
 		switch g.Result {
 		case "1-0":

@@ -131,7 +131,7 @@ func runConvert(cmd *cobra.Command, args []string) error {
 	w := output.NewWriter(out, opts)
 	sourceWriter := output.NewWriter(out, output.Options{Format: output.Source, LineWidth: opts.LineWidth})
 
-	total, succeeded, ioErr := forEachGame(cmd, args, logW, func(src string, n int, g *pgn.Game) error {
+	total, succeeded, ioErr := forEachGame(cmd, args, logW, logW, func(src string, n int, g *pgn.Game) error {
 		r, replayErr := replay.Game(g, replay.Options{})
 		if replayErr != nil {
 			if keepBroken {

@@ -24,6 +24,35 @@ func TestValidateGoodAndBad(t *testing.T) {
 	}
 }
 
+func TestValidateSummaryFileErrorVisible(t *testing.T) {
+	out, errOut, code := runCLI(t, "", "validate", "--summary", "/nonexistent/file.pgn")
+	if code != 2 {
+		t.Fatalf("exit = %d, want 2", code)
+	}
+	if !strings.Contains(errOut, "/nonexistent/file.pgn") {
+		t.Errorf("file-open error must be visible on stderr under --summary: %q", errOut)
+	}
+	if !strings.Contains(out, "0 of 0 games valid") {
+		t.Errorf("tally line missing from stdout: %q", out)
+	}
+	if strings.Contains(out, "/nonexistent/file.pgn") {
+		t.Errorf("stdout should carry only the tally under --summary: %q", out)
+	}
+}
+
+func TestValidateFileErrorVisibleNoSummary(t *testing.T) {
+	out, errOut, code := runCLI(t, "", "validate", "/nonexistent/file.pgn")
+	if code != 2 {
+		t.Fatalf("exit = %d, want 2", code)
+	}
+	if !strings.Contains(errOut, "/nonexistent/file.pgn") {
+		t.Errorf("file-open error must be visible on stderr: %q", errOut)
+	}
+	if strings.Contains(out, "/nonexistent/file.pgn") {
+		t.Errorf("I/O errors belong on stderr, not stdout: %q", out)
+	}
+}
+
 func TestInfo(t *testing.T) {
 	out, _, code := runCLI(t, "1. e4 e5 *\n\n1. f3 e5 2. g4 Qh4# 0-1\n", "info")
 	if code != 0 {
