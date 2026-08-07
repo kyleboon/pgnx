@@ -177,10 +177,17 @@ func (w *Writer) writeMovetextGame(g *pgn.Game, r *replay.Result) error {
 		return err
 	}
 	if len(g.PrefixComments) > 0 && !w.opts.NoComments && !isUCI(w.opts.Format) {
+		// Prefix comments go through the same word-splitting token
+		// emission as move comments (emitComment), so their internal
+		// whitespace is normalized to single spaces and they word-wrap at
+		// the configured line width, matching the C oracle. Multiple
+		// prefix comments share one token stream.
+		plw := newLineWriter(w.w, w.opts.LineWidth)
 		for _, c := range g.PrefixComments {
-			if _, err := io.WriteString(w.w, "{ "+c+" }\n"); err != nil {
-				return err
-			}
+			emitComment(plw, c)
+		}
+		if err := plw.Close(); err != nil {
+			return err
 		}
 		if _, err := io.WriteString(w.w, "\n"); err != nil {
 			return err
@@ -219,7 +226,18 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 	for _, rt := range sevenTagRoster {
 		rosterSet[rt.name] = true
 		value, ok := g.Tag(rt.name)
-		if !ok || value == "" {
+		switch {
+		case rt.name == "Result" && (!ok || value == ""):
+			// Result is special: the oracle fills an absent OR empty
+			// Result tag from the game's actual result (the movetext
+			// terminator), falling back to "*" when that is unknown.
+			value = g.Result
+			if value == "" {
+				value = rt.deflt
+			}
+		case !ok:
+			// A present-but-empty roster tag is preserved as ""; only a
+			// genuinely missing tag gets the standard default.
 			value = rt.deflt
 		}
 		if _, err := fmt.Fprintf(w.w, "[%s %q]\n", rt.name, value); err != nil {

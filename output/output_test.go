@@ -179,6 +179,106 @@ func TestNoResultsKeepsTag(t *testing.T) {
 	}
 }
 
+// TestEmptyVsMissingRosterTags pins that a roster tag that is present but
+// empty in the source is preserved as empty, while a genuinely missing tag
+// gets the standard default — the oracle does NOT conflate the two. The
+// Result tag is the exception: absent or empty, it is filled from the
+// game's actual result (movetext terminator). Oracle:
+//
+//	printf '[Round ""]\n[Result "*"]\n\n1. e4 *\n' | pgn-extract --quiet
+//	printf '[Result "*"]\n\n1. e4 *\n' | pgn-extract --quiet
+//	printf '[Event ""]\n[Site ""]\n[Date ""]\n[Round ""]\n[White ""]\n[Black ""]\n[Result ""]\n\n1. e4 *\n' | pgn-extract --quiet
+//	printf '[Result ""]\n\n1. e4 e5 1-0\n' | pgn-extract --quiet
+func TestEmptyVsMissingRosterTags(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "empty Round preserved",
+			src:  "[Round \"\"]\n[Result \"*\"]\n\n1. e4 *\n",
+			want: "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n1. e4 *\n\n",
+		},
+		{
+			name: "missing Round defaults",
+			src:  "[Result \"*\"]\n\n1. e4 *\n",
+			want: "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n1. e4 *\n\n",
+		},
+		{
+			name: "all empty preserved except Result",
+			src:  "[Event \"\"]\n[Site \"\"]\n[Date \"\"]\n[Round \"\"]\n[White \"\"]\n[Black \"\"]\n[Result \"\"]\n\n1. e4 *\n",
+			want: "[Event \"\"]\n[Site \"\"]\n[Date \"\"]\n[Round \"\"]\n[White \"\"]\n[Black \"\"]\n[Result \"*\"]\n\n1. e4 *\n\n",
+		},
+		{
+			name: "empty Result takes game result",
+			src:  "[Result \"\"]\n\n1. e4 e5 1-0\n",
+			want: "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"1-0\"]\n\n1. e4 e5 1-0\n\n",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			g, r := gameAndReplay(t, tc.src)
+			var buf bytes.Buffer
+			w := NewWriter(&buf, Options{Format: SAN})
+			if err := w.WriteGame(g, r); err != nil {
+				t.Fatal(err)
+			}
+			if buf.String() != tc.want {
+				t.Errorf("got:\n%q\nwant:\n%q", buf.String(), tc.want)
+			}
+		})
+	}
+}
+
+// TestPrefixCommentSpacing pins that game-level prefix comments are
+// whitespace-normalized (single spaces inside "{ text }"), word-wrapped at
+// the configured line width, and joined into one token stream when there
+// are several — exactly like the C oracle. Oracle:
+//
+//	printf '[Result "*"]\n\n{  padded   internal    spacing  }\n\n1. e4 *\n' | pgn-extract --quiet
+//	printf '[Result "*"]\n\n{this is a fairly long game level prefix comment that should wrap across lines}\n\n1. e4 *\n' | pgn-extract --quiet -w40
+//	printf '[Result "*"]\n\n{first comment}\n{second comment}\n\n1. e4 *\n' | pgn-extract --quiet
+func TestPrefixCommentSpacing(t *testing.T) {
+	const tags = "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n"
+	cases := []struct {
+		name  string
+		src   string
+		width int
+		want  string
+	}{
+		{
+			name: "internal padding normalized",
+			src:  "[Result \"*\"]\n\n{  padded   internal    spacing  }\n\n1. e4 *\n",
+			want: tags + "{ padded internal spacing }\n\n1. e4 *\n\n",
+		},
+		{
+			name:  "long prefix comment wraps",
+			src:   "[Result \"*\"]\n\n{this is a fairly long game level prefix comment that should wrap across lines}\n\n1. e4 *\n",
+			width: 40,
+			want:  tags + "{ this is a fairly long game level\nprefix comment that should wrap across\nlines }\n\n1. e4 *\n\n",
+		},
+		{
+			name: "multiple prefix comments share a line",
+			src:  "[Result \"*\"]\n\n{first comment}\n{second comment}\n\n1. e4 *\n",
+			want: tags + "{ first comment } { second comment }\n\n1. e4 *\n\n",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			g, r := gameAndReplay(t, tc.src)
+			var buf bytes.Buffer
+			w := NewWriter(&buf, Options{Format: SAN, LineWidth: tc.width})
+			if err := w.WriteGame(g, r); err != nil {
+				t.Fatal(err)
+			}
+			if buf.String() != tc.want {
+				t.Errorf("got:\n%q\nwant:\n%q", buf.String(), tc.want)
+			}
+		})
+	}
+}
+
 // TestBlackRenumberNAGvsComment pins the distinction: a NAG on white's move
 // does NOT force a black move renumber, but a comment does. Oracle:
 //
