@@ -7,6 +7,9 @@ var (
 	bishopDirs   = [][2]int{{1, 1}, {1, -1}, {-1, 1}, {-1, -1}}
 )
 
+// IsAttacked reports whether sq is attacked by any piece of color by,
+// considering knight, king, pawn, and sliding (rook/bishop/queen) attacks.
+// It does not consider whose turn it is to move.
 func (b *Board) IsAttacked(sq Square, by Color) bool {
 	for _, d := range knightDeltas {
 		if b.pieceIs(Square{sq.File + d[0], sq.Rank + d[1]}, Knight, by) {
@@ -55,6 +58,7 @@ func (b *Board) pieceIs(sq Square, pt PieceType, c Color) bool {
 	return sq.Valid() && b.PieceAt(sq) == Piece{pt, c}
 }
 
+// InCheck reports whether color c's king is currently attacked.
 func (b *Board) InCheck(c Color) bool {
 	return b.IsAttacked(b.KingSquare(c), c.Opponent())
 }

@@ -1,3 +1,7 @@
+// Package pgn implements a lexer, parser, and scanner for Portable Game
+// Notation (PGN) chess game text, turning a stream of PGN source into a
+// sequence of Game values that other packages (replay, output) can
+// consume.
 package pgn
 
 import "io"

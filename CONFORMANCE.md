@@ -102,6 +102,45 @@ documented differences above.
   now applies the same rule: a parsed unit with zero tags, zero moves, and
   an empty result is skipped rather than returned. Verified: pgnx's output
   over `eco.pgn` is now byte-identical to the C oracle's.
+- **Open divergence — tags-only game (no moves, no result) is emitted by
+  pgnx, discarded by the C oracle.** A "game" consisting of a complete tag
+  section but no movetext and no result token — a stub record some
+  real-world PGN collections contain, e.g. a placeholder entry with
+  `[Event]`/`[Site]`/etc. filled in but the game itself never played out —
+  is dropped entirely by pgn-extract (`grammar.c`'s `parse_game` requires
+  at least one move or a result token, in addition to tags, before it will
+  emit a game), but pgnx's parser has no such check for the tags-only case
+  and emits a full seven-tag header plus a bare `*` result line. This is
+  the mirror image of the comment-only phantom-game case fixed above
+  (there: no tags, no moves, no result, discarded on both sides now; here:
+  tags present, no moves, no result, discarded only by the C oracle).
+  Repro:
+
+  ```sh
+  cat > tagsonly.pgn <<'EOF'
+  [Event "Test"]
+  [Site "?"]
+  [Date "????.??.??"]
+  [Round "?"]
+  [White "?"]
+  [Black "?"]
+  [Result "*"]
+
+  EOF
+
+  # C oracle: emits nothing.
+  pgn-extract -7 --quiet tagsonly.pgn
+
+  # pgnx: emits the full seven-tag header plus "*".
+  pgnx convert --quiet --seven-tag-roster tagsonly.pgn
+  ```
+
+  Not fixed in this pass — `pgn.parser.parseGame`'s existing skip rule
+  (`len(g.Tags) == 0 && len(g.Moves) == 0 && g.Result == ""`) would need
+  to be loosened to also skip when tags are non-empty but moves and result
+  are both empty, which risks silently dropping legitimate tag-only
+  records other callers may rely on parsing; flagged here for a
+  deliberate decision rather than folded into this fix wave.
 - **Open concern — invalid-UTF-8 bytes are corrupted to U+FFFD.** Several
   `odds.pgn` tag values contain raw Latin-1 bytes (e.g. `0xE7`, `0xE9` for
   "Fran\xe7ois", "Andr\xe9"). pgn-extract passes these bytes through

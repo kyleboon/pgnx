@@ -17,6 +17,9 @@ import (
 // reporting failure at the end.
 var errProblems = errors.New("pgnx: one or more games failed")
 
+// version is pgnx's release version, reported by "pgnx --version".
+const version = "0.1.0-dev"
+
 // exitCode maps an error returned by (*cobra.Command).Execute to a process
 // exit status: 0 for no error (handled by the caller before calling
 // exitCode), 2 for errProblems, and 1 for anything else (usage errors,
@@ -52,6 +55,7 @@ func NewRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "pgnx",
 		Short:         "pgnx manipulates collections of chess games in PGN format",
+		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}

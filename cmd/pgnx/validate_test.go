@@ -54,11 +54,16 @@ func TestValidateFileErrorVisibleNoSummary(t *testing.T) {
 }
 
 func TestInfo(t *testing.T) {
-	out, _, code := runCLI(t, "1. e4 e5 *\n\n1. f3 e5 2. g4 Qh4# 0-1\n", "info")
+	input := "[Event \"E\"]\n[Site \"S\"]\n[White \"W\"]\n[Black \"B\"]\n\n1. e4 e5 *\n\n" +
+		"[Event \"E2\"]\n\n1. f3 e5 2. g4 Qh4# 0-1\n"
+	out, _, code := runCLI(t, input, "info")
 	if code != 0 {
 		t.Fatalf("exit %d", code)
 	}
-	for _, want := range []string{"games:   2", "plies:   6 (avg 3.0)", "0-1 1", "* 1"} {
+	for _, want := range []string{
+		"games:   2", "plies:   6 (avg 3.0)", "0-1 1", "* 1",
+		"tags:    Event 2, Site 1, Date 0, Round 0, White 1, Black 1, Result 0",
+	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("info missing %q in:\n%s", want, out)
 		}

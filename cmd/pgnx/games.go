@@ -38,8 +38,8 @@ func openLogFile(path string) (*os.File, error) {
 // seen".
 func forEachGame(cmd *cobra.Command, files []string, w, ioW io.Writer, fn func(src string, n int, g *pgn.Game) error) (total, succeeded int, ioErr error) {
 	if len(files) == 0 {
-		total, succeeded = scanGames(cmd, "stdin", cmd.InOrStdin(), w, total, succeeded, fn)
-		return total, succeeded, nil
+		total, succeeded, ioErr = scanGames(cmd, "stdin", cmd.InOrStdin(), w, ioW, total, succeeded, fn)
+		return total, succeeded, ioErr
 	}
 
 	for _, path := range files {
@@ -49,7 +49,11 @@ func forEachGame(cmd *cobra.Command, files []string, w, ioW io.Writer, fn func(s
 			ioErr = err
 			continue
 		}
-		total, succeeded = scanGames(cmd, path, f, w, total, succeeded, fn)
+		var scanErr error
+		total, succeeded, scanErr = scanGames(cmd, path, f, w, ioW, total, succeeded, fn)
+		if scanErr != nil {
+			ioErr = scanErr
+		}
 		f.Close()
 	}
 	return total, succeeded, ioErr
@@ -57,8 +61,14 @@ func forEachGame(cmd *cobra.Command, files []string, w, ioW io.Writer, fn func(s
 
 // scanGames scans all games out of r (sourced from src), invoking fn for
 // each and logging failures to w, accumulating onto the running total and
-// succeeded counters.
-func scanGames(cmd *cobra.Command, src string, r io.Reader, w io.Writer, total, succeeded int, fn func(src string, n int, g *pgn.Game) error) (int, int) {
+// succeeded counters. If the scan stops early because of a fatal scanner
+// error (a lexer/parser error such as an unterminated comment, as opposed
+// to an ordinary end of input), that error is written to ioW as
+// "<src>: <error>" and also returned, so callers treat it the same as a
+// file-open failure: visible on the I/O-error writer and sufficient to
+// fail the run, even though any games already scanned (and any output
+// already produced for them) stand.
+func scanGames(cmd *cobra.Command, src string, r io.Reader, w, ioW io.Writer, total, succeeded int, fn func(src string, n int, g *pgn.Game) error) (int, int, error) {
 	opts := pgn.ParserOptions{}
 	if nested, err := cmd.Flags().GetBool("nested-comments"); err == nil {
 		opts.NestedComments = nested
@@ -73,5 +83,9 @@ func scanGames(cmd *cobra.Command, src string, r io.Reader, w io.Writer, total, 
 		}
 		succeeded++
 	}
-	return total, succeeded
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintf(ioW, "%s: %v\n", src, err)
+		return total, succeeded, err
+	}
+	return total, succeeded, nil
 }

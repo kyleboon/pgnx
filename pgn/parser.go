@@ -18,8 +18,7 @@ type parser struct {
 
 	// pending holds a single pushed-back token, used when a tokTagName
 	// terminates the previous game and must start the next one.
-	pending    *token
-	pendingErr error
+	pending *token
 }
 
 func newParser(lex *lexer) *parser {

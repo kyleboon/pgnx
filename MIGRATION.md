@@ -18,7 +18,7 @@ to their pgnx equivalents, and lists what is not yet ported.
 | `-o F` | `pgnx convert -o F` |
 | `-a F` | `pgnx convert -o F --append` |
 | `-r` | `pgnx validate` |
-| `-s` / `--quiet` | `pgnx convert --quiet` / `pgnx validate --quiet` / `pgnx info --quiet` |
+| `-s` / `--quiet` | `pgnx convert --quiet` |
 | `-l F` | `pgnx convert --log F` (or `validate`/`info --log F`) |
 | `-R tagorder` | `pgnx convert --roster TAG,TAG,...` (explicit comma-separated list instead of a file) |
 | `--nestedcomments` | `pgnx convert --nested-comments` (also on `validate`, `info`) |
@@ -37,6 +37,11 @@ Notes:
 - pgn-extract's `-r` only reports errors; it does not extract PGN output.
   `pgnx validate` is the direct equivalent — findings go to stdout, with
   `--summary` to collapse them to a single tally line.
+- `--quiet` is accepted as a persistent flag on every subcommand but only
+  has an effect on `convert`, where it suppresses the "N games matched out
+  of M." summary line. `validate` and `info` accept `--quiet` without
+  error but it changes nothing about their output; use `validate
+  --summary` for validate's equivalent output-collapsing option.
 - pgn-extract's diagnostics (per-game errors, the run summary) go to
   stderr by default, or to a file with `-l`/`-L`. pgnx's equivalent is
   `--log FILE`; wording differs from the C tool (see CONFORMANCE.md).

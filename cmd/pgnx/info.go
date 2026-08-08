@@ -7,12 +7,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// rosterTagNames is the seven mandatory PGN header tags (the Seven Tag
+// Roster), in their canonical order, used by "pgnx info" to report how
+// many games in the input carry each one.
+var rosterTagNames = []string{"Event", "Site", "Date", "Round", "White", "Black", "Result"}
+
 // newInfoCmd builds the "pgnx info" subcommand: it reports aggregate
-// statistics (game count, ply count, result breakdown) over its input
-// (files, or stdin when none are given). Unlike validate, info never
-// replays games — it only needs what the parser already recorded (the
-// main-line move list and the result token), so a game with illegal moves
-// still contributes to the counts instead of being reported as broken.
+// statistics (game count, ply count, result breakdown, and seven-tag-
+// roster coverage) over its input (files, or stdin when none are given).
+// Unlike validate, info never replays games — it only needs what the
+// parser already recorded (the main-line move list, the result token, and
+// the tags), so a game with illegal moves still contributes to the counts
+// instead of being reported as broken.
 func newInfoCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "info [file...]",
@@ -37,6 +43,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 
 	var plies int
 	var win, loss, draw, unknown int
+	tagCounts := make(map[string]int, len(rosterTagNames))
 
 	total, _, ioErr := forEachGame(cmd, args, logW, logW, func(src string, n int, g *pgn.Game) error {
 		plies += len(g.Moves)
@@ -50,6 +57,11 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		default:
 			unknown++
 		}
+		for _, name := range rosterTagNames {
+			if _, found := g.Tag(name); found {
+				tagCounts[name]++
+			}
+		}
 		return nil
 	})
 
@@ -61,6 +73,14 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(out, "games:   %d\n", total)
 	fmt.Fprintf(out, "plies:   %d (avg %.1f)\n", plies, avg)
 	fmt.Fprintf(out, "results: 1-0 %d, 0-1 %d, 1/2-1/2 %d, * %d\n", win, loss, draw, unknown)
+	fmt.Fprint(out, "tags:    ")
+	for i, name := range rosterTagNames {
+		if i > 0 {
+			fmt.Fprint(out, ", ")
+		}
+		fmt.Fprintf(out, "%s %d", name, tagCounts[name])
+	}
+	fmt.Fprintln(out)
 
 	if ioErr != nil {
 		return errProblems

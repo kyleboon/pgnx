@@ -4,6 +4,7 @@
 // These are the Polyglot book format random constants, originally released
 // into the public domain by Michel Van den Bergh as part of the Polyglot
 // source code (http://hardy.uhasselt.be/Toga/book_format.html).
+
 package chess
 
 var polyglotRandom = [781]uint64{
