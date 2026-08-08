@@ -47,7 +47,36 @@ func (p *parser) nextToken() (token, error) {
 // returns (nil, nil) at a clean EOF with nothing left to parse, and
 // (nil, err) on a fatal lexer/IO error. Otherwise it returns a non-nil
 // Game, possibly with recoverable errors recorded via Game.errs.
+//
+// A "game" consisting of nothing but a comment (no tags, no moves, no
+// result) before the next real game's tag section is not a game at all: it
+// is skipped and parsing continues, mirroring the C oracle's parse_game
+// (grammar.c), which discards any prefix comment seen before the tag list
+// ("It is better to put game comments after the tags") and, when a game
+// ends up with no moves and no result, returns nothing to emit rather than
+// a phantom empty game. This matters for real files such as pgn-extract's
+// own eco.pgn, whose leading file-header comment precedes the first game's
+// tags with no tag section, moves, or result of its own.
 func (p *parser) parseGame() (*Game, error) {
+	for {
+		g, err := p.parseOneGame()
+		if err != nil || g == nil {
+			return g, err
+		}
+		if len(g.Tags) == 0 && len(g.Moves) == 0 && g.Result == "" {
+			// Nothing found: nothing but a discarded prefix comment (or
+			// nothing at all) before the next game's tags or EOF. Not a
+			// game; move on.
+			continue
+		}
+		return g, nil
+	}
+}
+
+// parseOneGame parses a single game's worth of tokens starting at the
+// current position, without the "was anything actually found" filtering
+// parseGame applies. See parseGame for that logic and its rationale.
+func (p *parser) parseOneGame() (*Game, error) {
 	g := &Game{}
 
 	tok, err := p.nextToken()
@@ -87,12 +116,19 @@ func (p *parser) parseGame() (*Game, error) {
 		return nil, err
 	}
 	g.Moves = moves
-	g.PrefixComments = prefixComments
 	g.Result = result
 	g.EndLine = terminator.line
 
-	if result == "" {
-		g.errs = append(g.errs, &ParseError{Line: terminator.line, Msg: "missing result"})
+	if len(g.Tags) > 0 || len(moves) > 0 || result != "" {
+		// Only attach prefix comments (those seen between the tag section
+		// and the first move) to a game that is otherwise real. A comment
+		// with no preceding tag section belongs to no game (see parseGame);
+		// keeping it off g here means parseGame's "nothing found" check
+		// does not need to special-case it separately.
+		g.PrefixComments = prefixComments
+		if result == "" {
+			g.errs = append(g.errs, &ParseError{Line: terminator.line, Msg: "missing result"})
+		}
 	}
 
 	// If the game ended at a tokTagName (recoverable end-of-game), push it

@@ -80,3 +80,34 @@ func TestScannerEmptyInput(t *testing.T) {
 		t.Fatal("empty input is not an error")
 	}
 }
+
+// TestScannerLeadingFileCommentIsNotAGame guards against a real divergence
+// found differential-testing against pgn-extract's own eco.pgn: a comment
+// with no preceding tag section, no moves, and no result (a file-level
+// header comment before the first game's tags) must not be surfaced as a
+// phantom empty game. The C oracle (grammar.c's parse_game) discards a
+// prefix comment seen before the tag list and emits nothing when a "game"
+// turns out to have no tags, no moves, and no result; pgn.parser mirrors
+// that. Contrast with TestScannerTwoGames's "{Start}" case, a legitimate
+// prefix comment that appears after a tag section and must still attach.
+func TestScannerLeadingFileCommentIsNotAGame(t *testing.T) {
+	src := "{ file header comment, not part of any game }\n\n" +
+		"[Event \"Real\"]\n[Result \"*\"]\n\n1. e4 *\n"
+	s := NewScanner(strings.NewReader(src), ParserOptions{})
+	var games []*Game
+	for s.Next() {
+		games = append(games, s.Game())
+	}
+	if err := s.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if len(games) != 1 {
+		t.Fatalf("got %d games, want 1 (leading file comment must not become a phantom game): %+v", len(games), games)
+	}
+	if ev, _ := games[0].Tag("Event"); ev != "Real" {
+		t.Fatalf("wrong game survived: %+v", games[0])
+	}
+	if len(games[0].PrefixComments) != 0 {
+		t.Errorf("leading file comment should not be attached as a prefix comment: %v", games[0].PrefixComments)
+	}
+}
