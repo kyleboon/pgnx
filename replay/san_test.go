@@ -33,6 +33,27 @@ func TestDecodeSAN(t *testing.T) {
 		{"r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "O-O", "e1g1"},
 		{"r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "0-0-0", "e1c1"},
 		{"rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq g3 0 2", "Qh4#", "d8h4"},
+		// lowercase long-algebraic promotion letters (C oracle: is_piece is
+		// case-insensitive for K/Q/D/R/T/N/S, and 'b' is specially allowed as
+		// a trailing promotion letter per decode.c's "allow a trailing 'b' as
+		// a Bishop promotion").
+		{"7k/3P4/7K/8/8/8/8/8 w - - 0 1", "d7d8r", "d7d8r"},
+		{"7k/3P4/7K/8/8/8/8/8 w - - 0 1", "d7d8n", "d7d8n"},
+		{"7k/3P4/7K/8/8/8/8/8 w - - 0 1", "d7d8b", "d7d8b"},
+		{"7k/3P4/7K/8/8/8/8/8 w - - 0 1", "d7d8q", "d7d8q"},
+		// bare (no '=') SAN promotion also accepts lowercase.
+		{"7k/3P4/7K/8/8/8/8/8 w - - 0 1", "d8q", "d7d8q"},
+		// bare long-algebraic PIECE move: full from-square hint (file+rank)
+		// disambiguates by square alone, regardless of piece type, so a
+		// leading square that happens to look like "no piece letter" must
+		// not be forced to mean "pawn move" when no pawn is present there.
+		{"rnbqkbnr/pppppppp/8/8/8/1P6/P1PPPPPP/RNBQKBNR w KQkq - 0 1", "c1b2", "c1b2"},
+		// bare long-algebraic castling: king's own from/to squares happen
+		// to equal the castle move's, and the C oracle accepts this form
+		// (not just O-O) - see test-o.txt/test-a.txt's "e1g1"/"e8g8".
+		{"r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "e1g1", "e1g1"},
+		{"r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1", "e8g8", "e8g8"},
+		{"r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "e1c1", "e1c1"},
 	}
 	for _, c := range cases {
 		m, err := decodeSAN(c.san, board(t, c.fen))

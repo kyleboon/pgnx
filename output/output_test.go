@@ -349,6 +349,25 @@ func TestVariationStartsOnBlack(t *testing.T) {
 	}
 }
 
+// TestMoveNumberFromFEN pins that a game starting from a FEN tag with a
+// nonzero fullmove field (an endgame study, not a game from the start
+// position) numbers its first move from that field rather than always
+// starting at 1. Oracle:
+//
+//	printf '[FEN "7k/3P4/7K/8/8/8/8/8 w - - 6 55"]\n[SetUp "1"]\n[Result "*"]\n\nd8=Q *\n' | pgn-extract --quiet
+func TestMoveNumberFromFEN(t *testing.T) {
+	src := "[FEN \"7k/3P4/7K/8/8/8/8/8 w - - 6 55\"]\n[SetUp \"1\"]\n[Result \"*\"]\n\nd8=Q *\n"
+	g, r := gameAndReplay(t, src)
+	var buf bytes.Buffer
+	w := NewWriter(&buf, Options{Format: SAN})
+	if err := w.WriteGame(g, r); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "55. d8=Q") {
+		t.Errorf("got:\n%q\nwant a line containing \"55. d8=Q\"", buf.String())
+	}
+}
+
 // TestSourceFormatNilReplay pins that Format == Source works with r == nil,
 // using pgn.Move.SAN verbatim (as written) rather than normalized SAN.
 func TestSourceFormatNilReplay(t *testing.T) {

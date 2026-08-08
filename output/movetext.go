@@ -9,6 +9,22 @@ import (
 	"github.com/kyleboon/pgnx/replay"
 )
 
+// fullmoveNumberFromFEN returns the fullmove field (the 6th, 1-based) of
+// fen, or 1 if fen is empty, malformed, or lacks that field (matching
+// chess.FromFEN's own default for a 4-field position and output.c's
+// initial move_number default when there is no FEN tag at all).
+func fullmoveNumberFromFEN(fen string) int {
+	fields := strings.Fields(fen)
+	if len(fields) < 6 {
+		return 1
+	}
+	n, err := strconv.Atoi(fields[5])
+	if err != nil || n < 1 {
+		return 1
+	}
+	return n
+}
+
 // isUCI reports whether f is the UCI format, which the C oracle renders by
 // forcibly disabling move numbers, comments, NAGs, variations, and check
 // suffixes (argsfile.c: selecting -Wuci sets keep_NAGs/keep_comments/
@@ -27,8 +43,21 @@ func emitMovetext(lw *lineWriter, g *pgn.Game, r *replay.Result, opts Options) {
 		moveInfos = r.Moves
 		positions = r.Positions
 	}
+	// When no move in the game carries an explicit move number (the usual
+	// case), numbering falls back to counting plies from move 1 — except
+	// the C oracle actually seeds that count from the starting position's
+	// fullmove number (output.c's print_game: "move_number =
+	// initial_board->move_number", set from the FEN tag's 6th field when
+	// one is present). Without this, a game starting from a FEN with a
+	// nonzero fullmove count (e.g. an endgame study "[FEN \"... w - - 6
+	// 55\"]") would wrongly renumber its first move as "1." instead of
+	// "55.".
+	baseMoveNumber := 1
+	if len(positions) > 0 {
+		baseMoveNumber = fullmoveNumberFromFEN(positions[0].FEN)
+	}
 	// The main line always starts with white to move.
-	emitLine(lw, g.Moves, moveInfos, positions, true, true, opts)
+	emitLine(lw, g.Moves, moveInfos, positions, true, true, baseMoveNumber, opts)
 
 	if !opts.NoResults {
 		result := g.Result
@@ -52,8 +81,11 @@ func emitMovetext(lw *lineWriter, g *pgn.Game, r *replay.Result, opts Options) {
 // begins on that same side to move). blackNeedsNumber tracks whether the
 // very next move, if it is black's, must be given an explicit "N..." number
 // because of a preceding interruption (comment/variation) or because this
-// line starts with black to move.
-func emitLine(lw *lineWriter, moves []*pgn.Move, infos []replay.MoveInfo, positions []replay.Position, startWhite, blackNeedsNumber bool, opts Options) {
+// line starts with black to move. baseMoveNumber is the full-move number
+// that ply 0 of moves belongs to when no move carries an explicit number
+// (normally 1, or the starting position's FEN fullmove field for a game
+// that begins mid-sequence); see emitMovetext.
+func emitLine(lw *lineWriter, moves []*pgn.Move, infos []replay.MoveInfo, positions []replay.Position, startWhite, blackNeedsNumber bool, baseMoveNumber int, opts Options) {
 	uci := isUCI(opts.Format)
 	noMoveNumbers := opts.NoMoveNumbers || uci
 	noNAGs := opts.NoNAGs || uci
@@ -74,9 +106,9 @@ func emitLine(lw *lineWriter, moves []*pgn.Move, infos []replay.MoveInfo, positi
 
 		if !noMoveNumbers {
 			if isWhite {
-				lw.WriteToken(strconv.Itoa(moveNumberOf(moves, i, startWhite)) + ".")
+				lw.WriteToken(strconv.Itoa(moveNumberOf(moves, i, startWhite, baseMoveNumber)) + ".")
 			} else if blackNeedsNumber {
-				lw.WriteToken(strconv.Itoa(moveNumberOf(moves, i, startWhite)) + "...")
+				lw.WriteToken(strconv.Itoa(moveNumberOf(moves, i, startWhite, baseMoveNumber)) + "...")
 			}
 		}
 
@@ -99,6 +131,9 @@ func emitLine(lw *lineWriter, moves []*pgn.Move, infos []replay.MoveInfo, positi
 		}
 
 		if !noVariations && len(mv.Variations) > 0 {
+			// The variation is an alternative to mv, so it starts on the
+			// same side to move, and the same full-move number, as mv.
+			vBaseMoveNumber := moveNumberOf(moves, i, startWhite, baseMoveNumber)
 			for vi, v := range mv.Variations {
 				var vInfos []replay.MoveInfo
 				var vPositions []replay.Position
@@ -106,9 +141,7 @@ func emitLine(lw *lineWriter, moves []*pgn.Move, infos []replay.MoveInfo, positi
 					vInfos = info.Variations[vi].Moves
 					vPositions = info.Variations[vi].Positions
 				}
-				// The variation is an alternative to mv, so it starts on
-				// the same side to move as mv.
-				emitVariation(lw, v, vInfos, vPositions, isWhite, opts)
+				emitVariation(lw, v, vInfos, vPositions, isWhite, vBaseMoveNumber, opts)
 			}
 			blackNeedsNumber = true
 		}
@@ -120,7 +153,7 @@ func emitLine(lw *lineWriter, moves []*pgn.Move, infos []replay.MoveInfo, positi
 // there are no prefix comments; when the variation opens with a comment,
 // the C oracle inserts a space between "(" and the comment. The closing
 // paren is always glued to the immediately preceding token.
-func emitVariation(lw *lineWriter, v *pgn.Variation, infos []replay.MoveInfo, positions []replay.Position, startWhite bool, opts Options) {
+func emitVariation(lw *lineWriter, v *pgn.Variation, infos []replay.MoveInfo, positions []replay.Position, startWhite bool, baseMoveNumber int, opts Options) {
 	lw.WriteToken("(")
 	if !opts.NoComments && len(v.PrefixComments) > 0 {
 		for _, c := range v.PrefixComments {
@@ -132,7 +165,7 @@ func emitVariation(lw *lineWriter, v *pgn.Variation, infos []replay.MoveInfo, po
 	// A variation always starts with an explicit move number: white moves
 	// get "N.", and black moves (the variation's first move being black's)
 	// get "N...".
-	emitLine(lw, v.Moves, infos, positions, startWhite, true, opts)
+	emitLine(lw, v.Moves, infos, positions, startWhite, true, baseMoveNumber, opts)
 	lw.SuppressSpace()
 	lw.WriteToken(")")
 }
@@ -282,8 +315,10 @@ func isWhiteMove(startWhite bool, i int) bool {
 // moveNumberOf returns the full-move number for moves[i] in a line that
 // begins with startWhite to move, computed from the nearest preceding move
 // that carries an explicit pgn.Move.MoveNumber (falling back to counting
-// forward/backward across the ply sequence when none is set).
-func moveNumberOf(moves []*pgn.Move, i int, startWhite bool) int {
+// forward/backward across the ply sequence when none is set). baseMoveNumber
+// is ply 0's full-move number to use when no move in the line carries an
+// explicit number at all (see emitMovetext).
+func moveNumberOf(moves []*pgn.Move, i int, startWhite bool, baseMoveNumber int) int {
 	if moves[i].MoveNumber > 0 {
 		return moves[i].MoveNumber
 	}
@@ -301,10 +336,11 @@ func moveNumberOf(moves []*pgn.Move, i int, startWhite bool) int {
 		}
 	}
 	// No move in the line carries an explicit number at all: derive from
-	// scratch, using ply 0's number as 1 (or, if the line starts on
-	// black's move, black's first move is still full-move 1).
+	// scratch, using ply 0's number as baseMoveNumber (or, if the line
+	// starts on black's move, black's first move is still full-move
+	// baseMoveNumber).
 	if startWhite {
-		return i/2 + 1
+		return i/2 + baseMoveNumber
 	}
-	return (i+1)/2 + 1
+	return (i+1)/2 + baseMoveNumber
 }

@@ -35,6 +35,23 @@ var pieceSANLetters = map[chess.PieceType]string{
 	chess.Bishop: "B",
 }
 
+// promotionLetters maps the accepted trailing promotion letters to their
+// PieceType, mirroring decode.c's is_piece (called on the promotion suffix)
+// plus its explicit "allow a trailing 'b' as a Bishop promotion" case.
+// is_piece is case-insensitive only for K/k, Q/q, R/r, N/n; its other
+// Dutch/German letters (D, T, S) are uppercase-only there, since lowercase
+// 'd' is a file letter and must not be captured as a promotion suffix.
+// Lowercase 'b' is separately special-cased in decode.c as a Bishop
+// promotion (but not lowercase 'l'). This covers long-algebraic
+// d7d8r/d7d8n/d7d8b/d7d8q and bare SAN d8q.
+var promotionLetters = map[byte]chess.PieceType{
+	'K': chess.King, 'k': chess.King,
+	'Q': chess.Queen, 'q': chess.Queen, 'D': chess.Queen,
+	'R': chess.Rook, 'r': chess.Rook, 'T': chess.Rook,
+	'N': chess.Knight, 'n': chess.Knight, 'S': chess.Knight,
+	'B': chess.Bishop, 'b': chess.Bishop, 'L': chess.Bishop,
+}
+
 // decodeSAN parses text (SAN or long-algebraic move notation) and returns
 // the unique legal move on b that it identifies. It strips trailing
 // annotation characters, handles castling, and otherwise filters
@@ -73,7 +90,7 @@ func decodeSAN(text string, b *chess.Board) (chess.Move, error) {
 	}
 
 	// Step 3: core parse.
-	pt, fromFile, fromRank, dest, promo, ok := parseCore(s)
+	pt, fromFile, fromRank, dest, promo, anyPiece, ok := parseCore(s)
 	if !ok {
 		return chess.Move{}, fmt.Errorf("illegal or unknown move %q", orig)
 	}
@@ -81,12 +98,20 @@ func decodeSAN(text string, b *chess.Board) (chess.Move, error) {
 	// Step 4: filter legal moves.
 	var matches []chess.Move
 	for _, m := range b.LegalMoves() {
-		if m.Castle != chess.NoCastle {
+		if m.Castle != chess.NoCastle && !anyPiece {
+			// Castling is normally matched only via O-O/O-O-O text (Step
+			// 2); King moves can't otherwise land on a castle move's
+			// King.To. The exception is bare long-algebraic notation with
+			// no leading piece letter (e.g. "e1g1", "e8c8"), which the C
+			// oracle also accepts as castling since the king's own
+			// from/to squares happen to match the rook-side castle move.
 			continue
 		}
-		p := b.PieceAt(m.From)
-		if p.Type != pt {
-			continue
+		if !anyPiece {
+			p := b.PieceAt(m.From)
+			if p.Type != pt {
+				continue
+			}
 		}
 		if m.To != dest {
 			continue
@@ -133,7 +158,16 @@ func castleSide(s string) chess.CastleSide {
 // (or, for long algebraic notation, a full from-square), an optional capture
 // separator, the destination square, and an optional promotion suffix. It
 // returns ok=false if s cannot be parsed into this shape.
-func parseCore(s string) (pt chess.PieceType, fromFile, fromRank int, dest chess.Square, promo chess.PieceType, ok bool) {
+//
+// anyPiece reports that no leading piece letter was present and the from
+// hint turned out to be a full square (both file and rank), e.g. "c1b2":
+// bare long-algebraic notation for a non-pawn move, which the C oracle
+// (decode.c) accepts by locating the piece from the from-square rather
+// than requiring a leading letter. In that case pt is left as chess.Pawn
+// only as a zero value; callers must not filter on piece type and should
+// instead rely on the from-square (which alone disambiguates a legal
+// move) — see decodeSAN's Step 4.
+func parseCore(s string) (pt chess.PieceType, fromFile, fromRank int, dest chess.Square, promo chess.PieceType, anyPiece, ok bool) {
 	fromFile, fromRank = -1, -1
 	pt = chess.Pawn
 
@@ -145,6 +179,7 @@ func parseCore(s string) (pt chess.PieceType, fromFile, fromRank int, dest chess
 			i++
 		}
 	}
+	hadLeadingLetter := i > 0
 
 	// Remaining characters up to an optional promotion suffix are square /
 	// disambiguation / capture-separator characters.
@@ -156,7 +191,7 @@ func parseCore(s string) (pt chess.PieceType, fromFile, fromRank int, dest chess
 	promo = chess.NoPiece
 	if len(rest) >= 2 {
 		last := rest[len(rest)-1]
-		if promoPT, isPiece := pieceLetters[last]; isPiece && promoPT != chess.King {
+		if promoPT, isPiece := promotionLetters[last]; isPiece && promoPT != chess.King {
 			// Try stripping a promotion suffix of 1, 2 ("=Q"), or 2 ("/Q") chars.
 			switch {
 			case rest[len(rest)-2] == '=' || rest[len(rest)-2] == '/':
@@ -180,13 +215,13 @@ func parseCore(s string) (pt chess.PieceType, fromFile, fromRank int, dest chess
 	// capture separator, all optionally preceded by a leading from-square
 	// for long algebraic notation.
 	if len(rest) < 2 {
-		return 0, 0, 0, chess.Square{}, 0, false
+		return 0, 0, 0, chess.Square{}, 0, false, false
 	}
 
 	destStr := rest[len(rest)-2:]
 	destSq, err := chess.ParseSquare(destStr)
 	if err != nil {
-		return 0, 0, 0, chess.Square{}, 0, false
+		return 0, 0, 0, chess.Square{}, 0, false, false
 	}
 	dest = destSq
 
@@ -201,7 +236,7 @@ func parseCore(s string) (pt chess.PieceType, fromFile, fromRank int, dest chess
 	pre = strings.TrimSuffix(pre, ":")
 
 	if pre == "" {
-		return pt, fromFile, fromRank, dest, promo, true
+		return pt, fromFile, fromRank, dest, promo, false, true
 	}
 
 	// A leading full square (long algebraic from-square), e.g. "e2" in
@@ -209,7 +244,13 @@ func parseCore(s string) (pt chess.PieceType, fromFile, fromRank int, dest chess
 	if len(pre) == 2 && pre[0] >= 'a' && pre[0] <= 'h' && pre[1] >= '1' && pre[1] <= '8' {
 		from, err := chess.ParseSquare(pre)
 		if err == nil {
-			return pt, from.File, from.Rank, dest, promo, true
+			// No leading piece letter and a full from-square: bare
+			// long-algebraic notation for any piece (e.g. "c1b2" for a
+			// bishop). The from-square alone disambiguates, so the piece
+			// type must not be forced to pawn (decode.c locates the piece
+			// from the from-square rather than requiring a letter).
+			anyPiece = !hadLeadingLetter
+			return pt, from.File, from.Rank, dest, promo, anyPiece, true
 		}
 	}
 
@@ -222,11 +263,11 @@ func parseCore(s string) (pt chess.PieceType, fromFile, fromRank int, dest chess
 		case c >= '1' && c <= '8' && fromRank == -1:
 			fromRank = int(c - '1')
 		default:
-			return 0, 0, 0, chess.Square{}, 0, false
+			return 0, 0, 0, chess.Square{}, 0, false, false
 		}
 	}
 
-	return pt, fromFile, fromRank, dest, promo, true
+	return pt, fromFile, fromRank, dest, promo, false, true
 }
 
 // sanFor returns the normalized SAN text for move m on board b, computed

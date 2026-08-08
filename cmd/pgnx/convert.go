@@ -42,6 +42,17 @@ func newConvertCmd() *cobra.Command {
 	return cmd
 }
 
+// forcedUCILineWidth is the line width pgn-extract's C oracle silently
+// substitutes when -Wuci is given. argsfile.c's OUTPUT_FORMAT_ARGUMENT case
+// calls set_output_line_length(5000) specifically for UCI ("@@@ Warning:
+// arbitrary value." per its own comment) because UCI movetext is emitted as
+// one token per ply with no natural wrap points; -w (LINE_WIDTH_ARGUMENT)
+// overrides it only when given later on the command line. pgnx's convert
+// mirrors this: it applies the same forced default for uci, unless -w/
+// --line-width was explicitly passed (cobra's Changed flag stands in for
+// "given later" since pgnx has no analogous ordering effect to replicate).
+const forcedUCILineWidth = 5000
+
 // convertOptions builds the output.Options that runConvert's Writer uses,
 // from cmd's convert-specific flags.
 func convertOptions(cmd *cobra.Command) (output.Options, error) {
@@ -54,6 +65,9 @@ func convertOptions(cmd *cobra.Command) (output.Options, error) {
 	}
 
 	lineWidth, _ := flags.GetInt("line-width")
+	if format == output.UCI && !flags.Changed("line-width") {
+		lineWidth = forcedUCILineWidth
+	}
 	sevenTagRoster, _ := flags.GetBool("seven-tag-roster")
 	rosterCSV, _ := flags.GetString("roster")
 	noComments, _ := flags.GetBool("no-comments")
