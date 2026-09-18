@@ -87,9 +87,11 @@ held to parity; see below.
 `scripts/difftest.sh` was run over every file in
 `cmd/pgnx/testdata/golden/infiles/*.pgn` (56 files, default `san` format)
 and over pgn-extract's own `eco.pgn` (2,014 games, ~12k lines) as a
-larger real-world corpus. See `.superpowers/sdd/2026-08-07-pgnx-phase1/task-16-report.md`
-for the full per-file table. Two findings were fixed; the rest are the
-documented differences above.
+larger real-world corpus. The full per-file table lived in an uncommitted
+working-session report and was not preserved; to regenerate it, run
+`for f in cmd/pgnx/testdata/golden/infiles/*.pgn; do scripts/difftest.sh "$f"; done`
+(requires the C binary — see the script's `C_BIN` variable). Two findings
+were fixed; the rest are the documented differences above.
 
 - **Fixed:** a leading file-level comment with no tag section, no moves,
   and no result before it (e.g. `eco.pgn`'s opening `{ ... }` credits
