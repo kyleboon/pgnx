@@ -149,10 +149,15 @@ func runConvert(cmd *cobra.Command, args []string) error {
 		defer logCloser.Close()
 	}
 
+	// One registry shared by both writers, fed every parsed game so that
+	// unrecognised tags are ordered as the C oracle orders them (run-wide
+	// first-seen), even when a game is skipped.
+	opts.Tags = output.NewTagRegistry()
 	w := output.NewWriter(out, opts)
-	sourceWriter := output.NewWriter(out, output.Options{Format: output.Source, LineWidth: opts.LineWidth})
+	sourceWriter := output.NewWriter(out, output.Options{Format: output.Source, LineWidth: opts.LineWidth, Tags: opts.Tags})
 
 	total, succeeded, ioErr := forEachGame(cmd, args, logW, logW, func(src string, n int, g *pgn.Game) error {
+		opts.Tags.Observe(g)
 		r, replayErr := replay.Game(g, replay.Options{})
 		if replayErr != nil {
 			if keepBroken {

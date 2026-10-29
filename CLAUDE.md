@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-pgnx is a Go port of pgn-extract (David J. Barnes' C tool for processing chess PGN files) — a from-scratch re-architecture, not a transliteration. It ships a reusable library (`chess`, `pgn`, `replay`, `output`) and a cobra-based CLI (`cmd/pgnx`) with subcommands `convert`, `validate`, and `info`. GPL-3.0, same as the original. Currently Phase 1 (parsing, replay/validation, output formatting); filtering, position matching, ECO classification, and dedup are later phases — see `docs/superpowers/specs/` for the design spec and phasing plan.
+pgnx is a Go port of pgn-extract (David J. Barnes' C tool for processing chess PGN files) — a from-scratch re-architecture, not a transliteration. It ships a reusable library (`chess`, `pgn`, `replay`, `filter`, `output`) and a cobra-based CLI (`cmd/pgnx`) with subcommands `convert`, `filter`, `validate`, and `info`. GPL-3.0, same as the original. Phases 1 (parsing, replay/validation, output formatting) and 2 (game selection: `pgnx filter`) are complete; position matching, ECO classification, and dedup are later phases — see `docs/superpowers/specs/` for the design specs and phasing plan.
 
 ## Commands
 
@@ -19,16 +19,20 @@ go vet ./...
 # Differential test against the C implementation (requires the C binary,
 # default $HOME/code/pgn-extract/build/bin/pgn-extract; override with C_BIN):
 scripts/difftest.sh <input.pgn> [format]
+# Filter runs: PGNX_CMD selects the subcommand, C_FLAGS/PGNX_FLAGS add
+# verbatim arguments to each binary:
+PGNX_CMD=filter C_FLAGS='-TpFischer' PGNX_FLAGS='--player Fischer' scripts/difftest.sh <input.pgn>
 ```
 
 ## Architecture
 
-The library is four layers with a strict dependency direction; the CLI sits on top:
+The library is five layers with a strict dependency direction; the CLI sits on top:
 
 1. **`chess`** — self-contained chess engine: board representation, move generation, legality, check/mate/draw status, FEN, Zobrist hashing. Has *no* PGN knowledge and is independently usable.
 2. **`pgn`** — lexer → parser → `Scanner`, producing `*pgn.Game`. Preserves source fidelity: SAN exactly as written, comments, NAGs, variations, tag order. It does **not** validate move legality. `pgn.Scanner` streams one game at a time (`bufio.Scanner`-style) so million-game files run in constant memory — keep that property when touching the parse path.
 3. **`replay`** — applies a parsed game's moves to a `chess.Board`, resolving SAN against legal moves and producing a `replay.Result` with per-move detail (FEN, checks, captures, from/to squares) that non-Source output formats need. A game that fails replay is "broken" and only emittable in Source format.
-4. **`output`** — renders a `*pgn.Game` + `replay.Result` into the supported formats (`san`, `halg`, `lalg`, `elalg`, `xlalg`, `uci`, `epd`, Source) with line-wrapping rules that match the C tool.
+4. **`filter`** — game selection: tag criteria (`-t` line grammar, `TagMatcher`), length bounds, end-state/property predicates, material-balance patterns, result-tag consistency, and the `Selector` behind `--select-only`/`--stop-after` etc. `Evaluate` runs the checks in the C tool's `deal_with_game` order and is the only place that mutates a parsed game (Result/SetUp/MaterialMatch tags, `--mark-matches` comments). Imports `chess`, `pgn`, `replay`; only `cmd/pgnx` imports it.
+5. **`output`** — renders a `*pgn.Game` + `replay.Result` into the supported formats (`san`, `halg`, `lalg`, `elalg`, `xlalg`, `uci`, `epd`, Source) with line-wrapping rules that match the C tool. `output.TagRegistry` orders unrecognised tags in run-wide first-seen order, as the C tool does; the CLI feeds it every parsed game.
 
 CLI exit codes: 0 = success, 1 = usage/flag error, 2 = one or more games failed to parse/validate/convert (intentionally unlike the C tool, which mostly exits 0).
 

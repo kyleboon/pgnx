@@ -1,3 +1,8 @@
 /pgnx
 /build/
 *.test
+.DS_Store
+# local differential-test corpora (not vendored)
+/kyle_b81.pgn
+/testdata/local/
+/twic/

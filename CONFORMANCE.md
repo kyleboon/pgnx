@@ -82,6 +82,74 @@ held to parity; see below.
   ordering that spans a variation boundary. Confirmed divergent on
   `testdata/golden/infiles/test-splitvariants.pgn`.
 
+## Filtering (Phase 2: `pgnx filter`)
+
+`pgnx filter` ports pgn-extract's game-selection criteria (`lists.c`,
+`taglines.c`, `end.c`, the bounds/end-state checks in `moves.c` and
+`apply.c`, repetition counting in `hashing.c`) and evaluates them in the
+same order as `grammar.c`'s `deal_with_game` chain, so which games reach
+`--output` versus `--unmatched`, where `--mark-matches` comments land, and
+what `--result` criteria see relative to `--fix-result-tags` all match the
+oracle. Every in-scope target of the C test suite is a golden row
+(`cmd/pgnx/conformance_test.go`), and a differential sweep of 33 flag
+combinations over 15 inputs (every relevant golden input plus a 31-game
+Chess.com export) produced byte-identical output. Known, intentional
+differences:
+
+- **`=~` uses Go RE2 syntax, not POSIX basic regular expressions.**
+  pgn-extract compiles `=~` criteria with `regcomp(..., 0)` (POSIX BRE,
+  where `+`, `?`, `|`, `(`, `)` are literals unless backslash-escaped).
+  pgnx uses Go's `regexp` (RE2, Perl-like syntax). Patterns using only
+  `.`, `*`, `^`, `$` and character classes behave the same; patterns
+  relying on BRE-specific escaping differ. The golden corpus has no `=~`
+  case.
+- **Malformed criteria files are an error, not silently truncated.** The
+  C tool stops reading a `-t` file at the first line that does not start
+  with a tag name (`taglines.c` `process_tag_line` returns FALSE, and
+  reading ends), and merely logs a line with a missing quoted value.
+  pgnx's `--tag-file`/`--tag` reject any line that does not parse
+  (`filter.ReadCriteria` names the line number) with exit status 1.
+  `FEN`, `FENPattern` and `FENPatternI` lines are rejected with a
+  "positional criteria are not supported yet" error (Phase 3).
+- **A length bound of 0 is a usage error.** `-bl0`/`-b0` in C compute
+  `2*(0-1)+1` in unsigned arithmetic and silently match nothing; `-bu`
+  below `-bl` is logged and ignored. pgnx rejects `--moves`/`--min-moves`/
+  etc. of 0, and a lower bound above the upper bound, with exit status 1.
+- **pgnx always replays, so broken games that fail tag criteria are still
+  reported.** The C tool skips `apply_move_list` for a game that fails the
+  tag checks (unless `-n` is given), so an illegal move in such a game is
+  never noticed. pgnx replays every game before evaluating criteria; a
+  broken game is logged and makes the exit status 2 whether or not it
+  would have matched. Output is unaffected (broken games are emitted
+  nowhere unless `--keep-broken`).
+- **`--stop-after`, `--select-only` and `--game-limit` stop before reading
+  the next game.** The C tool parses one more game after the stop
+  condition is met and discards it (`parse_opt_game_list` tests
+  `finished_processing` after `parse_game`), so its "games processed"
+  diagnostic is one higher and a parse error in that next game is still
+  reported. pgnx stops after the game that triggers the condition. Output
+  is identical.
+- **`--keep-broken` evaluates the criteria against the partial replay.**
+  A game whose replay fails is evaluated (length, end state, repetition,
+  material) against the moves that did replay, then emitted in Source
+  format wherever a matching/unmatched game would go, and still counted as
+  broken (exit 2). The C tool with `--keepbroken` likewise evaluates what
+  it managed to play, modulo the ordering notes above.
+- **The summary line counts matched games.** `filter` prints
+  `"N game(s) matched out of M."` where N counts every game that satisfied
+  the criteria (including games held back by `--select-only`/
+  `--skip-matching`, as `num_games_matched` does in C) and M is the number
+  of games read. It is suppressed by `--quiet` and by `--suppress-matched`.
+- **`--mark-matches FEN` uses pgnx's FEN rendering.** The C tool inserts
+  `get_FEN_string(board)`; pgnx inserts `chess.Board.FEN()`. Both are
+  standard six-field FEN; castling-right spelling for Chess960 positions
+  may differ.
+- **Chess960 `Variant` tag is not added.** `consistent_FEN_tags` in the C
+  tool also adds `[Variant "chess 960"]` to a FEN game whose start position
+  looks like a Chess960 setup but has no `Variant` tag. pgnx adds only the
+  `SetUp "1"` tag. Flagged as a gap (no golden case); revisit with the
+  Chess960 work.
+
 ## Differential-testing findings (2026-08-07 run)
 
 `scripts/difftest.sh` was run over every file in
@@ -166,3 +234,44 @@ were fixed; the rest are the documented differences above.
   pgn-extract — the flag combination the golden harness actually uses —
   output is byte-identical. Not a real divergence; the plain differential
   script simply doesn't thread per-file flags.
+
+## Differential-testing findings (2026-10-29 run, Phase 2)
+
+`scripts/difftest.sh` gained `PGNX_CMD`, `C_FLAGS` and `PGNX_FLAGS` so
+filter runs can be diffed. The sweep described under "Filtering" above
+surfaced three Phase 1 (`convert`) divergences; two were fixed with the
+oracle as justification and one is documented.
+
+- **Fixed:** unrecognised tags were emitted in each game's source order.
+  pgn-extract's lexer assigns an unknown tag name an index the first time
+  it is seen anywhere in the run (any game, matched or not, or a `-t`
+  file), and `output.c` emits leftover tags by index — i.e. in run-wide
+  first-seen order. On a Chess.com export where some games list
+  `Tournament` before `CurrentPosition` and others after, the two tools
+  disagreed. `output.TagRegistry` now records first-seen order; `convert`
+  and `filter` share one registry per run, fed every parsed game (and the
+  tag names in criteria files) before writing. The five tags pgn-extract
+  predefines but leaves out of its default order (`BlackFideId`,
+  `HashCode`, `MatchLabel`, `TotalPlyCount`, `WhiteFideId`) are emitted
+  ahead of unknown tags, in that order, as their fixed indices dictate.
+- **Fixed:** `convert` emitted `[Result "1/2"]`, `[Result "?"]` and
+  invalid Result tags (e.g. `"1:0"`) unchanged. The C parser's
+  `check_result` (`grammar.c`) rewrites `"1/2"` to `"1/2-1/2"` and fills an
+  absent, empty or `"?"` tag from the terminating token, and `play_moves`
+  (`apply.c`) replaces any remaining non-PGN value with `"*"`. The output
+  writer now applies the same normalisation to the Result roster tag;
+  `filter` applies it before tag matching as well.
+- **Open divergence — a game with moves but no result token.** When a
+  game's movetext is not terminated by a result token, pgn-extract reports
+  "Missing result" and, if the game is the last in the file, emits nothing
+  for it; if another game follows, it emits the tag section with
+  `[Result "*"]` and a bare `*` with the moves discarded. pgnx emits the
+  moves followed by `*` in both cases. The C behaviour loses data and
+  looks like a parser-recovery artefact rather than a design choice, so it
+  is documented rather than copied. Repro:
+
+  ```sh
+  printf '[Event "first"]\n\n1. e4 e5 2. Nf3\n\n[Event "second"]\n\n1. d4 *\n' > noresult.pgn
+  pgn-extract --quiet noresult.pgn   # first game: tags + "*" only
+  pgnx convert --quiet noresult.pgn  # first game: "1. e4 e5 2. Nf3 *"
+  ```

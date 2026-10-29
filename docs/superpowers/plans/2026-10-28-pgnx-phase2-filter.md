@@ -1,7 +1,7 @@
 # pgnx Phase 2 Implementation Plan — `pgnx filter`
 
-> **Status: NOT STARTED.** Spec: [`docs/superpowers/specs/2026-10-28-pgnx-phase2-filter-design.md`](../specs/2026-10-28-pgnx-phase2-filter-design.md).
-> Tick checkboxes as tasks land; each task ends in a commit.
+> **Status: COMPLETE** (verified 2026-10-29; commits `32ca42a`..`HEAD` on `main`). Spec: [`docs/superpowers/specs/2026-10-28-pgnx-phase2-filter-design.md`](../specs/2026-10-28-pgnx-phase2-filter-design.md).
+> All 36 in-scope golden targets byte-match the oracle; a 33-combination differential sweep over the golden inputs and a Chess.com export is clean. Two Phase 1 `convert` divergences surfaced by the sweep (run-wide unknown-tag order, Result-tag normalisation) were fixed; see CONFORMANCE.md.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -83,10 +83,10 @@ Excluded (later phases, see spec): test-tFEN, test-Te, test-x/-v/-y-positional, 
   - `func (r *Result) FinalBoard() (*chess.Board, error)` — `chess.FromFEN(r.Positions[len-1].FEN)`. (Reconstructing avoids storing a Board per ply; the Writer already pays for the FEN string.)
   - `replay.MoveInfo` already has `Move.Promotion`; confirm it is populated for promotions and add a test that an underpromotion replay reports `Promotion == chess.Knight`.
 
-- [ ] **Step 1: Write failing tests.** `InsufficientMaterial` table: `K v K`, `KB v K`, `KN v K`, `KNN v K` (true, C quirk), `KB v KB` same colour (true) / opposite colour (false), `KBN v K` (false), `KNN v KN` (false), `KP v K` (false), `KR v K` (false). `PlyCount`: a 3-ply game → 3; fools mate (4 ply) → 4; empty game → 0; game from FEN `... b - - 0 40` with one move → 80. `FinalBoard` round-trips `Positions[last].FEN`.
-- [ ] **Step 2: Implement.** Pure functions; no API removed.
-- [ ] **Step 3: `go test ./chess ./replay ./output ./cmd/...` all green** (output's EPD/FEN tests exercise `Position`; they must not change).
-- [ ] **Step 4: Commit** — `feat: insufficient material, per-position clocks and ply count for filtering`
+- [x] **Step 1: Write failing tests.** `InsufficientMaterial` table: `K v K`, `KB v K`, `KN v K`, `KNN v K` (true, C quirk), `KB v KB` same colour (true) / opposite colour (false), `KBN v K` (false), `KNN v KN` (false), `KP v K` (false), `KR v K` (false). `PlyCount`: a 3-ply game → 3; fools mate (4 ply) → 4; empty game → 0; game from FEN `... b - - 0 40` with one move → 80. `FinalBoard` round-trips `Positions[last].FEN`.
+- [x] **Step 2: Implement.** Pure functions; no API removed.
+- [x] **Step 3: `go test ./chess ./replay ./output ./cmd/...` all green** (output's EPD/FEN tests exercise `Position`; they must not change).
+- [x] **Step 4: Commit** — `feat: insufficient material, per-position clocks and ply count for filtering`
 
 ---
 
@@ -105,9 +105,9 @@ Excluded (later phases, see spec): test-tFEN, test-Te, test-x/-v/-y-positional, 
   - Reserved names recognised but rejected in Phase 2 with a clear error: `FEN`, `FENPattern`, `FENPatternI` ("positional criteria are not supported yet").
   - Pseudo-tags accepted as ordinary names: `Player`, `Elo`, `EloDiff` (`lex.c:132-147`).
 
-- [ ] **Step 1: Write failing tests** (table): `White "Fischer"` → prefix; `WhiteElo >= "800"`; `BlackTitle <> "BOT"`; `Date<"1962"` (no spaces); `Event =~ "^World.*"` compiles; `TimeControl >= "180"\r` (CRLF); `% comment` skipped; blank skipped; `[Event "x"]` → error naming line 1; `White Fischer` (unquoted) → error; `Difficulty "5"` (unknown tag) → accepted; `FEN "..."` → unsupported error; escaped quote inside value preserved.
-- [ ] **Step 2: Implement.**
-- [ ] **Step 3: Test, vet, commit** — `feat(filter): tag criterion grammar and criteria file reader`
+- [x] **Step 1: Write failing tests** (table): `White "Fischer"` → prefix; `WhiteElo >= "800"`; `BlackTitle <> "BOT"`; `Date<"1962"` (no spaces); `Event =~ "^World.*"` compiles; `TimeControl >= "180"\r` (CRLF); `% comment` skipped; blank skipped; `[Event "x"]` → error naming line 1; `White Fischer` (unquoted) → error; `Difficulty "5"` (unknown tag) → accepted; `FEN "..."` → unsupported error; escaped quote inside value preserved.
+- [x] **Step 2: Implement.**
+- [x] **Step 3: Test, vet, commit** — `feat(filter): tag criterion grammar and criteria file reader`
 
 ---
 
@@ -135,9 +135,9 @@ Excluded (later phases, see spec): test-tFEN, test-Te, test-x/-v/-y-positional, 
   - **TimeControl (`lists.c:522-610`)**: first control before `:`; forms `N+inc`→N, `*N`→N, `moves/secs`→secs, digits→N; `""`, `?`, `-` ⇒ false; **criteria ORed including relational** (unlike Elo).
   - Across tags: AND, first failure stops.
 
-- [ ] **Step 1: Write failing tests.** Hand-built `pgn.Game`s with tag sets; a table per rule above, including: `-Tr1` matches both `1-0` and `1/2-1/2`; `Fischer` matches `Fischer, Robert J.` but not `Robert Fischer` unless `Substring`; date `1960`+`1962` ORs; `b1962` vs `1962.05.05`; Elo range on one player; EloDiff ≤ 50; reltags.txt criteria vs. a bot game and a human game; rated-winner on draws/equal ratings; soundex pairs Nimzovich/Nimsowitsch, Tal/Talj, Yusupov/Jusupov equal, Janosevic/Nimzovich different.
-- [ ] **Step 2: Implement.**
-- [ ] **Step 3: Test, vet, commit** — `feat(filter): tag criteria matching with date, Elo, time-control and soundex rules`
+- [x] **Step 1: Write failing tests.** Hand-built `pgn.Game`s with tag sets; a table per rule above, including: `-Tr1` matches both `1-0` and `1/2-1/2`; `Fischer` matches `Fischer, Robert J.` but not `Robert Fischer` unless `Substring`; date `1960`+`1962` ORs; `b1962` vs `1962.05.05`; Elo range on one player; EloDiff ≤ 50; reltags.txt criteria vs. a bot game and a human game; rated-winner on draws/equal ratings; soundex pairs Nimzovich/Nimsowitsch, Tal/Talj, Yusupov/Jusupov equal, Janosevic/Nimzovich different.
+- [x] **Step 2: Implement.**
+- [x] **Step 3: Test, vet, commit** — `feat(filter): tag criteria matching with date, Elo, time-control and soundex rules`
 
 ---
 
@@ -158,9 +158,9 @@ Excluded (later phases, see spec): test-tFEN, test-Te, test-x/-v/-y-positional, 
   - `func matchUnderpromotion(r) bool` — any mainline `Move.Promotion` not `NoPiece` and not `Queen` (`apply.c:1066`).
   - `func matchCommented(g) bool` — prefix comment, or any comment on any move at any variation depth (`grammar.c:238`).
 
-- [ ] **Step 1: Write failing tests.** Bounds conversion table (`bl45`→89, `bu45`→90, `b30`→59..60, `pl90`, `pu90`, `p60`); end-state predicates on hand-written games (fools mate; a stalemate; `K v K`; a 50-move clock game built from a FEN with clock 98 plus two quiet moves ⇒ marks exactly on the plies where clock ≥ 100; a threefold repetition `Nf3 Nf6 Ng1 Ng8 ...` ⇒ marks on the plies where the count reaches 3, and a `--repetition=5` variant; underpromotion `e8=N`; comments nested in a variation).
-- [ ] **Step 2: Implement.**
-- [ ] **Step 3: Test, vet, commit** — `feat(filter): length bounds and end-state predicates with match marking`
+- [x] **Step 1: Write failing tests.** Bounds conversion table (`bl45`→89, `bu45`→90, `b30`→59..60, `pl90`, `pu90`, `p60`); end-state predicates on hand-written games (fools mate; a stalemate; `K v K`; a 50-move clock game built from a FEN with clock 98 plus two quiet moves ⇒ marks exactly on the plies where clock ≥ 100; a threefold repetition `Nf3 Nf6 Ng1 Ng8 ...` ⇒ marks on the plies where the count reaches 3, and a `--repetition=5` variant; underpromotion `e8=N`; comments nested in a variation).
+- [x] **Step 2: Implement.**
+- [x] **Step 3: Test, vet, commit** — `feat(filter): length bounds and end-state predicates with match marking`
 
 ---
 
@@ -181,9 +181,9 @@ Excluded (later phases, see spec): test-tFEN, test-Te, test-x/-v/-y-positional, 
 
   Use `chess.Board` piece counts from `FinalBoard()`-style reconstruction only where needed; the walk should derive counts from `MoveInfo.Captured` and `Move.Promotion` incrementally from the start position to stay O(plies).
 
-- [ ] **Step 1: Write failing tests.** Grammar table: `q*r*p*b2n2< q=r=p=b2<n2` (zmatch.txt) parses to the expected occurs/num per piece; `3 kr k` depth 3; `KQ` (lone king opponent); `L2` minor pieces; bad piece letter ⇒ error. Matching: a hand-built game where a queen trade produces `R v R` and a pattern `r r` matches after the stability depth, with the mark comment on the right move; start-position match goes to the prefix comment; `WhiteFirst` vs `EitherColour` on a colour-asymmetric pattern. Piece count: a game reaching exactly 7 pieces.
-- [ ] **Step 2: Implement.**
-- [ ] **Step 3: Test, vet, commit** — `feat(filter): material balance patterns and piece-count matching`
+- [x] **Step 1: Write failing tests.** Grammar table: `q*r*p*b2n2< q=r=p=b2<n2` (zmatch.txt) parses to the expected occurs/num per piece; `3 kr k` depth 3; `KQ` (lone king opponent); `L2` minor pieces; bad piece letter ⇒ error. Matching: a hand-built game where a queen trade produces `R v R` and a pattern `r r` matches after the stability depth, with the mark comment on the right move; start-position match goes to the prefix comment; `WhiteFirst` vs `EitherColour` on a colour-asymmetric pattern. Piece count: a game reaching exactly 7 pieces.
+- [x] **Step 2: Implement.**
+- [x] **Step 3: Test, vet, commit** — `feat(filter): material balance patterns and piece-count matching`
 
 ---
 
@@ -205,9 +205,9 @@ Excluded (later phases, see spec): test-tFEN, test-Te, test-x/-v/-y-positional, 
     - `fix`: (a) final move is mate ⇒ Result `1-0`/`0-1` by mating side; (b) else if Result doesn't start with `1/2` and final position is stalemate or insufficient material ⇒ `1/2-1/2`; (c) then if tag and terminating result differ and either is `*` ⇒ tag := terminating result (even if `*`). Both `g.Result` and the tag are overwritten in (a)/(b).
     - `reject`: if tag ≠ terminating result and terminating result ≠ `*` ⇒ `ErrBadResult`. Mate/stalemate disagreement with the tag only warns in C; do not reject for it.
 
-- [ ] **Step 1: Write failing tests.** Normalisation table (`1/2`, `?`, empty, absent, already-normal); result fixing table from `test-fixresulttags-in.pgn` cases (mate with `*`, stalemate with `1-0`, tag `*` vs token `1-0`, tag `1-0` vs token `*`); rejection table; an `Evaluate` ordering test proving `--result` sees the pre-fix tag; a `NoSetup` test where a FEN game without SetUp is excluded; a short-circuit test (tag failure ⇒ no mark comments added).
-- [ ] **Step 2: Implement.**
-- [ ] **Step 3: Test, vet, commit** — `feat(filter): result-tag consistency and ordered Evaluate`
+- [x] **Step 1: Write failing tests.** Normalisation table (`1/2`, `?`, empty, absent, already-normal); result fixing table from `test-fixresulttags-in.pgn` cases (mate with `*`, stalemate with `1-0`, tag `*` vs token `1-0`, tag `1-0` vs token `*`); rejection table; an `Evaluate` ordering test proving `--result` sees the pre-fix tag; a `NoSetup` test where a FEN game without SetUp is excluded; a short-circuit test (tag failure ⇒ no mark comments added).
+- [x] **Step 2: Implement.**
+- [x] **Step 3: Test, vet, commit** — `feat(filter): result-tag consistency and ordered Evaluate`
 
 ---
 
@@ -225,9 +225,9 @@ Excluded (later phases, see spec): test-tFEN, test-Te, test-x/-v/-y-positional, 
   - `func NewSelector(o SelectorOptions) *Selector`; `func (s *Selector) Decide(gameIndex int, matched bool) Decision`; `func (s *Selector) Matched() int`.
   - Semantics (`grammar.c:1290-1345`, `grammar.c:367`): `gameIndex < FirstGame` ⇒ not matched ⇒ `ToUnmatched`. Matched ⇒ `matched++`; `SelectOnly` set and `matched` not in current range ⇒ held back (neither output); `SkipMatching` and in range ⇒ held back; else `Emit`. Unmatched ⇒ `ToUnmatched`. `Stop` when `SelectOnly` ranges exhausted, `matched == StopAfter`, or `gameIndex >= GameLimit`. (C evaluates the stop after parsing the *next* game and drops it; pgnx stops before reading it — same output, different "processed" count; diagnostics are not held to parity.)
 
-- [ ] **Step 1: Write failing tests.** Range parsing (valid, descending ⇒ error, `0` ⇒ error, `2:4,7`); a scripted sequence of (index, matched) pairs for each option and for `--select-only 2,3` reproducing test-selectonly (matches 1..4 ⇒ emit 2 and 3 only, stop after 3).
-- [ ] **Step 2: Implement.**
-- [ ] **Step 3: Test, vet, commit** — `feat(filter): game selection bookkeeping`
+- [x] **Step 1: Write failing tests.** Range parsing (valid, descending ⇒ error, `0` ⇒ error, `2:4,7`); a scripted sequence of (index, matched) pairs for each option and for `--select-only 2,3` reproducing test-selectonly (matches 1..4 ⇒ emit 2 and 3 only, stop after 3).
+- [x] **Step 2: Implement.**
+- [x] **Step 3: Test, vet, commit** — `feat(filter): game selection bookkeeping`
 
 ---
 
@@ -246,9 +246,9 @@ Excluded (later phases, see spec): test-tFEN, test-Te, test-x/-v/-y-positional, 
 - Per-game loop: replay → (broken: log, `--keep-broken` ⇒ continue with partial result, else `return err`) → `filter.Evaluate` (`ErrBadResult` ⇒ log + treat as broken) → `Selector.Decide` → write to matched writer / unmatched writer / neither; `Stop` ⇒ `return errStop`. Writers are `output.NewWriter` with the shared options; broken games under `--keep-broken` use a Source-format writer as `convert` does.
 - Summary: `"%d game(s) matched out of %d."` to the log writer unless `--quiet` or `--suppress-matched`. Exit 2 iff any broken/rejected game or I/O error.
 
-- [ ] **Step 1: Write failing tests** (reuse `runCLI` from `convert_test.go`): no criteria ⇒ output identical to `convert`; `--player` routes to `-o` and `--unmatched`; `--suppress-matched` leaves stdout empty; `--stop-after 1` stops reading (feed a second, *unparsable* game after the first match and assert exit 0); conflicting flags ⇒ exit 1; `--no-bad-results` ⇒ exit 2 with the bad game logged; `--tag-file` missing ⇒ exit 1.
-- [ ] **Step 2: Implement.** Keep `convert.go` behaviour byte-identical (its conformance rows are the regression check for the refactor).
-- [ ] **Step 3: Test, vet, commit** — `feat: pgnx filter command`
+- [x] **Step 1: Write failing tests** (reuse `runCLI` from `convert_test.go`): no criteria ⇒ output identical to `convert`; `--player` routes to `-o` and `--unmatched`; `--suppress-matched` leaves stdout empty; `--stop-after 1` stops reading (feed a second, *unparsable* game after the first match and assert exit 0); conflicting flags ⇒ exit 1; `--no-bad-results` ⇒ exit 2 with the bad game logged; `--tag-file` missing ⇒ exit 1.
+- [x] **Step 2: Implement.** Keep `convert.go` behaviour byte-identical (its conformance rows are the regression check for the refactor).
+- [x] **Step 3: Test, vet, commit** — `feat: pgnx filter command`
 
 ---
 
@@ -257,11 +257,11 @@ Excluded (later phases, see spec): test-tFEN, test-Te, test-x/-v/-y-positional, 
 **Files:**
 - Modify: `cmd/pgnx/conformance_test.go`
 
-- [ ] **Step 1:** Add a row per line of the "Oracle target → pgnx invocation" table above, keeping the C command as a comment on each row. Extend the row struct with `wantProblems bool` (exit 2 accepted) for test-nobadresults, and adjust the runner so a `wantProblems` row tolerates `errProblems` but still fatals on any other error. Rows referencing criteria/material files pass `filepath.Join("testdata","golden","infiles", …)` — add a `files []string`-style substitution or just build the arg in the row with the relative path (the test runs with `cmd/pgnx` as cwd).
-- [ ] **Step 2:** Add `TestGoldenConformanceUnmatched` (test-n: two output files compared) and `TestGoldenConformanceSuppressMatched` (stdout empty, unmatched file compared), modelled on `TestGoldenConformanceMultiFile`.
-- [ ] **Step 3:** Update the "Phase 2+" exclusion comment at the bottom of the table: remove what is now covered; leave the Phase 3/4 and transform targets with their reasons.
-- [ ] **Step 4:** Run, triage every failure against the C source first (never patch to the oracle file alone). Expected trouble spots, in likely order: tag ordering of the added `SetUp` tag (test-onlysetup), mark-comment placement/wrapping for fifty/repetition (comments go through the Phase 1 word-wrap path), material match depth off-by-one (test-z/-y), ply-count definition for FEN games (test-b*/p*), CRLF in reltags.txt.
-- [ ] **Step 5: Commit** — `test: golden conformance rows for pgnx filter`
+- [x] **Step 1:** Add a row per line of the "Oracle target → pgnx invocation" table above, keeping the C command as a comment on each row. Extend the row struct with `wantProblems bool` (exit 2 accepted) for test-nobadresults, and adjust the runner so a `wantProblems` row tolerates `errProblems` but still fatals on any other error. Rows referencing criteria/material files pass `filepath.Join("testdata","golden","infiles", …)` — add a `files []string`-style substitution or just build the arg in the row with the relative path (the test runs with `cmd/pgnx` as cwd).
+- [x] **Step 2:** Add `TestGoldenConformanceUnmatched` (test-n: two output files compared) and `TestGoldenConformanceSuppressMatched` (stdout empty, unmatched file compared), modelled on `TestGoldenConformanceMultiFile`.
+- [x] **Step 3:** Update the "Phase 2+" exclusion comment at the bottom of the table: remove what is now covered; leave the Phase 3/4 and transform targets with their reasons.
+- [x] **Step 4:** Run, triage every failure against the C source first (never patch to the oracle file alone). Expected trouble spots, in likely order: tag ordering of the added `SetUp` tag (test-onlysetup), mark-comment placement/wrapping for fifty/repetition (comments go through the Phase 1 word-wrap path), material match depth off-by-one (test-z/-y), ply-count definition for FEN games (test-b*/p*), CRLF in reltags.txt.
+- [x] **Step 5: Commit** — `test: golden conformance rows for pgnx filter`
 
 ---
 
@@ -270,12 +270,12 @@ Excluded (later phases, see spec): test-tFEN, test-Te, test-x/-v/-y-positional, 
 **Files:**
 - Modify: `scripts/difftest.sh`, `MIGRATION.md`, `CONFORMANCE.md`, `README.md`, `CLAUDE.md`, this plan's status banner.
 
-- [ ] **Step 1: `difftest.sh`** — accept `C_FLAGS` and `PGNX_FLAGS` env vars (verbatim extra args for each binary) and a `PGNX_CMD` (default `convert`) so a filter run is `PGNX_CMD=filter C_FLAGS='-TpFischer' PGNX_FLAGS='--player Fischer' scripts/difftest.sh big.pgn`. Run at least: `--player`, `--date`, `--min-moves`, `--checkmate`, `--repetition --mark-matches X`, `--tag-file reltags.txt`, `--material-file zmatch.txt --mark-matches MATCH` over every `infiles/*.pgn` and over `kyle_b81.pgn` (the Chess.com export in the repo root; keep it untracked or move it under `testdata/local/` in `.gitignore`). Fix or document every divergence.
-- [ ] **Step 2: `MIGRATION.md`** — move the `-t`/`-T`/`-z`/`-y`/`-b`/`-p`/`-n` and long-flag families from "Not yet ported" into the mapping table with their `filter` equivalents (one row per C flag; include `--repetition5` → `--repetition=5`, `-S` → `--soundex`, `--tagsubstr` → `--tag-substring`, `-n` → `--unmatched`). Keep `-Tf`, `-x`, `-v`, `-e`, dedup flags, `--odds`, and the output transforms under "Not yet ported" with their target phase.
-- [ ] **Step 3: `CONFORMANCE.md`** — new section "Filtering (Phase 2)" documenting: `=~` uses RE2 not POSIX BRE; malformed criteria files are an error rather than silently truncated; moves bound 0 is a usage error rather than "nothing matches"; pgnx always replays so broken games that fail tag criteria are still reported (exit 2) whereas C never examines them; `--stop-after`/`--select-only` stop before reading the next game (processed count differs); `--keep-broken` evaluates filters against the partial replay. Plus anything Step 1 surfaces. Also verify a Phase 1 gap this phase exposed: `convert` emits a `[Result "1/2"]` or `[Result "?"]` tag unchanged, while the C tool rewrites both in `check_result` (`grammar.c:182`) before output — run `difftest.sh` on a crafted input and either move the normalisation into `output` (with the oracle as justification) or document it.
-- [ ] **Step 4: `README.md`** — a `filter` section with three examples (player + date, length, repetition with marking, unmatched routing). **`CLAUDE.md`** — add `filter` to the layer list and the subcommand list; mention `scripts/difftest.sh`'s new env vars.
-- [ ] **Step 5: Full check** — `go build ./... && go test ./... && go vet ./... && gofmt -l .`; flip this plan's banner to **COMPLETE** with the verification date and the commit range.
-- [ ] **Step 6: Commit** — `docs: filter migration, conformance notes, differential flags; mark Phase 2 complete`
+- [x] **Step 1: `difftest.sh`** — accept `C_FLAGS` and `PGNX_FLAGS` env vars (verbatim extra args for each binary) and a `PGNX_CMD` (default `convert`) so a filter run is `PGNX_CMD=filter C_FLAGS='-TpFischer' PGNX_FLAGS='--player Fischer' scripts/difftest.sh big.pgn`. Run at least: `--player`, `--date`, `--min-moves`, `--checkmate`, `--repetition --mark-matches X`, `--tag-file reltags.txt`, `--material-file zmatch.txt --mark-matches MATCH` over every `infiles/*.pgn` and over `kyle_b81.pgn` (the Chess.com export in the repo root; keep it untracked or move it under `testdata/local/` in `.gitignore`). Fix or document every divergence.
+- [x] **Step 2: `MIGRATION.md`** — move the `-t`/`-T`/`-z`/`-y`/`-b`/`-p`/`-n` and long-flag families from "Not yet ported" into the mapping table with their `filter` equivalents (one row per C flag; include `--repetition5` → `--repetition=5`, `-S` → `--soundex`, `--tagsubstr` → `--tag-substring`, `-n` → `--unmatched`). Keep `-Tf`, `-x`, `-v`, `-e`, dedup flags, `--odds`, and the output transforms under "Not yet ported" with their target phase.
+- [x] **Step 3: `CONFORMANCE.md`** — new section "Filtering (Phase 2)" documenting: `=~` uses RE2 not POSIX BRE; malformed criteria files are an error rather than silently truncated; moves bound 0 is a usage error rather than "nothing matches"; pgnx always replays so broken games that fail tag criteria are still reported (exit 2) whereas C never examines them; `--stop-after`/`--select-only` stop before reading the next game (processed count differs); `--keep-broken` evaluates filters against the partial replay. Plus anything Step 1 surfaces. Also verify a Phase 1 gap this phase exposed: `convert` emits a `[Result "1/2"]` or `[Result "?"]` tag unchanged, while the C tool rewrites both in `check_result` (`grammar.c:182`) before output — run `difftest.sh` on a crafted input and either move the normalisation into `output` (with the oracle as justification) or document it.
+- [x] **Step 4: `README.md`** — a `filter` section with three examples (player + date, length, repetition with marking, unmatched routing). **`CLAUDE.md`** — add `filter` to the layer list and the subcommand list; mention `scripts/difftest.sh`'s new env vars.
+- [x] **Step 5: Full check** — `go build ./... && go test ./... && go vet ./... && gofmt -l .`; flip this plan's banner to **COMPLETE** with the verification date and the commit range.
+- [x] **Step 6: Commit** — `docs: filter migration, conformance notes, differential flags; mark Phase 2 complete`
 
 ---
 

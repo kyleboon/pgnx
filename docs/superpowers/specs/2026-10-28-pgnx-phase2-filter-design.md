@@ -1,7 +1,7 @@
 # pgnx: Go Port of pgn-extract — Phase 2 Design (`pgnx filter`)
 
 **Date:** 2026-10-28
-**Status:** Draft (awaiting approval)
+**Status:** Implemented (2026-10-29; see the plan for the commit range)
 **Module:** `github.com/kyleboon/pgnx`
 **Builds on:** [Phase 1 design](2026-08-07-pgnx-go-port-design.md) (status: complete)
 

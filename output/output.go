@@ -5,6 +5,7 @@ package output
 import (
 	"fmt"
 	"io"
+	"sort"
 
 	"github.com/kyleboon/pgnx/pgn"
 	"github.com/kyleboon/pgnx/replay"
@@ -117,10 +118,59 @@ var wellKnownTagOrder = []string{
 	"MaterialMatch",
 }
 
+// predefinedTrailingTags are the tag names pgn-extract knows (taglist.h)
+// but leaves out of DefaultTagOrder. output.c emits leftover tags by tag
+// index, so these fixed-index names come after the ordered list and
+// before any tag first seen in the input, in this (enum) order.
+var predefinedTrailingTags = []string{
+	"BlackFideId", "HashCode", "MatchLabel", "TotalPlyCount", "WhiteFideId",
+}
+
+// TagRegistry records the order in which tag names not known to the C
+// oracle were first seen during a run. pgn-extract assigns such a name a
+// tag index the first time its lexer meets it — in any game, matched or
+// not, or in a -t criteria file — and emits leftover tags by index, so
+// their output order is run-wide first-seen order rather than each
+// game's source order. A Writer orders unrecognised tags by the registry
+// in its Options; callers that want exact parity Observe every parsed
+// game (and criteria name) before writing, sharing one registry across
+// all Writers of a run.
+type TagRegistry struct {
+	index map[string]int
+}
+
+// NewTagRegistry returns an empty registry.
+func NewTagRegistry() *TagRegistry {
+	return &TagRegistry{index: make(map[string]int)}
+}
+
+// ObserveName registers name if it has not been seen before.
+func (r *TagRegistry) ObserveName(name string) {
+	if r.index == nil {
+		r.index = make(map[string]int)
+	}
+	if _, ok := r.index[name]; !ok {
+		r.index[name] = len(r.index)
+	}
+}
+
+// Observe registers every tag name of g, in order.
+func (r *TagRegistry) Observe(g *pgn.Game) {
+	for _, t := range g.Tags {
+		r.ObserveName(t.Name)
+	}
+}
+
 // Options controls how Writer renders games.
 type Options struct {
 	Format    Format
 	LineWidth int // default 75 when 0
+
+	// Tags orders tag names the C oracle does not know. When nil, the
+	// Writer keeps a private registry that observes games as they are
+	// written, which matches the oracle only when every game in the run
+	// is written.
+	Tags *TagRegistry
 
 	SevenTagRoster bool     // emit only the seven roster tags
 	Roster         []string // explicit tag list; overrides SevenTagRoster
@@ -141,6 +191,9 @@ type Writer struct {
 // NewWriter returns a Writer that writes rendered games to w according to
 // opts.
 func NewWriter(w io.Writer, opts Options) *Writer {
+	if opts.Tags == nil {
+		opts.Tags = NewTagRegistry()
+	}
 	return &Writer{w: w, opts: opts}
 }
 
@@ -203,9 +256,32 @@ func (w *Writer) writeMovetextGame(g *pgn.Game, r *replay.Result) error {
 	return err
 }
 
+// normalisedResult returns the Result tag value the C oracle would emit
+// for a tag (value, present) and terminating token. Its parser's
+// check_result (grammar.c) rewrites the short form "1/2" to "1/2-1/2"
+// and fills an absent, empty or "?" tag from the token; its replay
+// (apply.c play_moves) then replaces any tag that is still not one of
+// the four PGN results with "*". With neither tag nor token the roster
+// default "*" applies.
+func normalisedResult(value string, present bool, token string) string {
+	if present && value == "1/2" {
+		value = "1/2-1/2"
+	}
+	if token != "" && (!present || value == "" || value == "?") {
+		value, present = token, true
+	}
+	switch value {
+	case "1-0", "0-1", "1/2-1/2", "*":
+		return value
+	}
+	return "*"
+}
+
 // writeTags renders the tag section: the seven roster tags (using the
 // game's value if present, else the standard default) in fixed order,
-// followed by any other tags in their original appearance order. When
+// then the oracle's well-known tags in its fixed order, then the oracle's
+// remaining predefined tags, then any other tags in run-wide first-seen
+// order (see TagRegistry). When
 // opts.SevenTagRoster is set, only the seven roster tags are emitted. When
 // opts.Roster is set (and non-empty), it overrides SevenTagRoster and
 // exactly that explicit tag list is emitted, in the order given, using the
@@ -227,14 +303,8 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 		rosterSet[rt.name] = true
 		value, ok := g.Tag(rt.name)
 		switch {
-		case rt.name == "Result" && (!ok || value == ""):
-			// Result is special: the oracle fills an absent OR empty
-			// Result tag from the game's actual result (the movetext
-			// terminator), falling back to "*" when that is unknown.
-			value = g.Result
-			if value == "" {
-				value = rt.deflt
-			}
+		case rt.name == "Result":
+			value = normalisedResult(value, ok, g.Result)
 		case !ok:
 			// A present-but-empty roster tag is preserved as ""; only a
 			// genuinely missing tag gets the standard default.
@@ -263,15 +333,36 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 		}
 	}
 
-	// Any remaining (unrecognized) tags print afterward, in original
-	// source appearance order.
+	// Predefined-but-unordered oracle tags print next, in their fixed
+	// (tag-index) order.
+	for _, name := range predefinedTrailingTags {
+		value, ok := g.Tag(name)
+		if !ok {
+			continue
+		}
+		rosterSet[name] = true
+		if _, err := fmt.Fprintf(w.w, "[%s %q]\n", name, value); err != nil {
+			return err
+		}
+	}
+
+	// Any remaining (unrecognized) tags print afterward, in the order the
+	// run first saw their names (output.c emits leftovers by tag index).
+	w.opts.Tags.Observe(g)
+	var rest []pgn.Tag
 	for _, t := range g.Tags {
 		if rosterSet[t.Name] {
 			continue
 		}
 		rosterSet[t.Name] = true
 		value, _ := g.Tag(t.Name)
-		if _, err := fmt.Fprintf(w.w, "[%s %q]\n", t.Name, value); err != nil {
+		rest = append(rest, pgn.Tag{Name: t.Name, Value: value})
+	}
+	sort.SliceStable(rest, func(i, j int) bool {
+		return w.opts.Tags.index[rest[i].Name] < w.opts.Tags.index[rest[j].Name]
+	})
+	for _, t := range rest {
+		if _, err := fmt.Fprintf(w.w, "[%s %q]\n", t.Name, t.Value); err != nil {
 			return err
 		}
 	}

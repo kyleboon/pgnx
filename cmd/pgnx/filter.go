@@ -302,7 +302,15 @@ func runFilter(cmd *cobra.Command, args []string) error {
 		defer logCloser.Close()
 	}
 
-	sourceOpts := output.Options{Format: output.Source, LineWidth: opts.LineWidth}
+	// One registry shared by every writer, fed criteria tag names and
+	// every parsed game, so unrecognised tags come out in the C oracle's
+	// run-wide first-seen order (its lexer registers names from -t files
+	// and from unmatched games too).
+	opts.Tags = output.NewTagRegistry()
+	for _, name := range criteriaTagNames(cmd) {
+		opts.Tags.ObserveName(name)
+	}
+	sourceOpts := output.Options{Format: output.Source, LineWidth: opts.LineWidth, Tags: opts.Tags}
 	matchedW := output.NewWriter(out, opts)
 	matchedSourceW := output.NewWriter(out, sourceOpts)
 	var unmatchedW, unmatchedSourceW *output.Writer
@@ -313,6 +321,7 @@ func runFilter(cmd *cobra.Command, args []string) error {
 
 	sel := filter.NewSelector(selOpts)
 	total, succeeded, ioErr := forEachGame(cmd, args, logW, logW, func(src string, n int, g *pgn.Game) error {
+		opts.Tags.Observe(g)
 		r, replayErr := replay.Game(g, replay.Options{})
 		if replayErr != nil && !keepBroken {
 			return replayErr
@@ -356,4 +365,30 @@ func writeGame(g *pgn.Game, r *replay.Result, replayErr error, w, sourceW *outpu
 		return sourceW.WriteGame(g, nil)
 	}
 	return w.WriteGame(g, r)
+}
+
+// criteriaTagNames returns the tag names mentioned by --tag-file files and
+// --tag expressions, in order, for TagRegistry seeding. Errors are
+// ignored here: filterOptions has already reported them.
+func criteriaTagNames(cmd *cobra.Command) []string {
+	var names []string
+	files, _ := cmd.Flags().GetStringArray("tag-file")
+	for _, path := range files {
+		f, err := os.Open(path)
+		if err != nil {
+			continue
+		}
+		cs, _ := filter.ReadCriteria(f)
+		f.Close()
+		for _, c := range cs {
+			names = append(names, c.Tag)
+		}
+	}
+	exprs, _ := cmd.Flags().GetStringArray("tag")
+	for _, e := range exprs {
+		if c, err := filter.ParseCriterion(e); err == nil {
+			names = append(names, c.Tag)
+		}
+	}
+	return names
 }

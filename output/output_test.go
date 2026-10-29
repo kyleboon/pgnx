@@ -487,3 +487,81 @@ func TestParseFormat(t *testing.T) {
 		t.Error("ParseFormat(bogus): expected error, got nil")
 	}
 }
+
+func TestUnknownTagsRunWideFirstSeenOrder(t *testing.T) {
+	// pgn-extract emits unrecognised tags by tag index, assigned on first
+	// sight anywhere in the run; a later game listing them in a different
+	// order still comes out in the first game's order.
+	g1 := parseGame(t, "[Event \"e\"]\n[Alpha \"1\"]\n[Beta \"2\"]\n\n*\n")
+	g2 := parseGame(t, "[Event \"e\"]\n[Beta \"2\"]\n[Gamma \"3\"]\n[Alpha \"1\"]\n\n*\n")
+	var buf bytes.Buffer
+	w := NewWriter(&buf, Options{Format: Source})
+	for _, g := range []*pgn.Game{g1, g2} {
+		if err := w.WriteGame(g, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out := buf.String()
+	second := out[strings.LastIndex(out, "[Event"):]
+	a, b, c := strings.Index(second, "[Alpha"), strings.Index(second, "[Beta"), strings.Index(second, "[Gamma")
+	if !(a < b && b < c) {
+		t.Errorf("want Alpha, Beta, Gamma order in second game:\n%s", second)
+	}
+
+	// A shared registry seeded by Observe orders tags of a game that was
+	// never written.
+	reg := NewTagRegistry()
+	reg.Observe(parseGame(t, "[Zeta \"0\"]\n[Alpha \"1\"]\n\n*\n"))
+	buf.Reset()
+	w = NewWriter(&buf, Options{Format: Source, Tags: reg})
+	w.WriteGame(parseGame(t, "[Alpha \"1\"]\n[Zeta \"0\"]\n\n*\n"), nil)
+	if z, a := strings.Index(buf.String(), "[Zeta"), strings.Index(buf.String(), "[Alpha"); z > a {
+		t.Errorf("registry order not applied:\n%s", buf.String())
+	}
+
+	// Predefined-but-unordered oracle tags precede unknown ones.
+	buf.Reset()
+	w = NewWriter(&buf, Options{Format: Source})
+	w.WriteGame(parseGame(t, "[Unknown \"u\"]\n[HashCode \"abc\"]\n[BlackFideId \"1\"]\n\n*\n"), nil)
+	s := buf.String()
+	if !(strings.Index(s, "[BlackFideId") < strings.Index(s, "[HashCode") && strings.Index(s, "[HashCode") < strings.Index(s, "[Unknown")) {
+		t.Errorf("predefined trailing tags order:\n%s", s)
+	}
+}
+
+// parseGame parses src as a single PGN game without replaying it.
+func parseGame(t *testing.T, src string) *pgn.Game {
+	t.Helper()
+	s := pgn.NewScanner(strings.NewReader(src), pgn.ParserOptions{})
+	if !s.Next() {
+		t.Fatalf("no game parsed: %v", s.Err())
+	}
+	return s.Game()
+}
+
+func TestResultTagNormalisation(t *testing.T) {
+	cases := []struct {
+		src  string
+		want string
+	}{
+		{"[Result \"1/2\"]\n\n1. e4 1/2-1/2\n", "1/2-1/2"},
+		{"[Result \"1/2\"]\n\n1. e4 *\n", "1/2-1/2"},
+		{"[Result \"?\"]\n\n1. e4 1-0\n", "1-0"},
+		{"[Result \"\"]\n\n1. e4 0-1\n", "0-1"},
+		{"1. e4 0-1\n", "0-1"},
+		{"[Result \"1:0\"]\n\n1. e4 1-0\n", "*"},
+		{"[Result \"1-0\"]\n\n1. e4 0-1\n", "1-0"}, // disagreement is filter's business
+		{"[Event \"x\"]\n\n*\n", "*"},
+	}
+	for _, c := range cases {
+		g := parseGame(t, c.src)
+		var buf bytes.Buffer
+		if err := NewWriter(&buf, Options{Format: Source}).WriteGame(g, nil); err != nil {
+			t.Fatal(err)
+		}
+		want := "[Result \"" + c.want + "\"]\n"
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("%q: want %s in\n%s", c.src, want, buf.String())
+		}
+	}
+}
