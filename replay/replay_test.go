@@ -138,3 +138,26 @@ func TestUnderpromotionRecorded(t *testing.T) {
 		t.Errorf("promotion = %v, want Knight", r.Moves[0].Move.Promotion)
 	}
 }
+
+func TestReplayPlacementKeyPerPly(t *testing.T) {
+	g := parseOne(t, "1. f3 e5 2. g4 Qh4# 0-1\n")
+	r, err := Game(g, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, p := range r.Positions {
+		b, err := chess.FromFEN(p.FEN)
+		if err != nil {
+			t.Fatalf("ply %d: %v", i, err)
+		}
+		if p.Placement != b.PlacementKey() {
+			t.Errorf("ply %d: Placement = %#x, PlacementKey(FEN) = %#x", i, p.Placement, b.PlacementKey())
+		}
+		if p.Placement == 0 {
+			t.Errorf("ply %d: Placement is zero", i)
+		}
+	}
+	if r.Positions[0].Placement == r.Positions[1].Placement {
+		t.Error("Placement unchanged after 1.f3")
+	}
+}

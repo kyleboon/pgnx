@@ -34,6 +34,12 @@ type Position struct {
 	FEN     string
 	Zobrist uint64
 
+	// Placement is chess.Board.PlacementKey() for the position: a hash of
+	// the piece placement only, equal across differences in side to move,
+	// castling rights, en passant square and clocks. Positional matching
+	// and ECO classification compare positions by this key.
+	Placement uint64
+
 	// HalfmoveClock, FullmoveNumber, and SideToMove are the FEN's clock
 	// fields and side to move, exposed so that callers (the filter
 	// package's fifty-move and length predicates) need not re-parse FEN.
@@ -164,11 +170,12 @@ func capturedPieceType(m chess.Move, b *chess.Board) chess.PieceType {
 	return b.PieceAt(m.To).Type
 }
 
-// positionOf snapshots b's current FEN and Zobrist hash.
+// positionOf snapshots b's current FEN, Zobrist hash and placement key.
 func positionOf(b *chess.Board) Position {
 	return Position{
 		FEN:            b.FEN(),
 		Zobrist:        b.Zobrist(),
+		Placement:      b.PlacementKey(),
 		HalfmoveClock:  b.HalfmoveClock,
 		FullmoveNumber: b.FullmoveNumber,
 		SideToMove:     b.SideToMove,

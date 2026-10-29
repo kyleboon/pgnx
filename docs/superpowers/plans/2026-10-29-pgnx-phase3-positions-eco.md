@@ -55,8 +55,8 @@ Excluded: dedup targets (Phase 4), test-odds/test-allownullmoves (null moves), t
 - `func (b *Board) PlacementKey() uint64` — XOR of `polyglotRandom[64*kind+8*rank+file]` over occupied squares only; no castling, en passant or side-to-move terms. This is the pgnx stand-in for `weak_hash_value` (`apply.c:735-750`; updated incrementally in `map.c` by XOR of the same kind of per-square term), whose only observable property is equality.
 - `replay.Position` gains `Placement uint64`, set in `positionOf`.
 
-- [ ] **Step 1: Failing tests.** `PlacementKey` equal for two boards differing only in side to move / castling rights / ep square; different after a single move; `Zobrist` still differs in those cases. `replay`: `Positions[i].Placement == FromFEN(Positions[i].FEN).PlacementKey()` for every ply of fools-mate.
-- [ ] **Step 2: Implement.**
+- [x] **Step 1: Failing tests.** `PlacementKey` equal for two boards differing only in side to move / castling rights / ep square; different after a single move; `Zobrist` still differs in those cases. `replay`: `Positions[i].Placement == FromFEN(Positions[i].FEN).PlacementKey()` for every ply of fools-mate.
+- [x] **Step 2: Implement.**
 - [ ] **Step 3: Test, vet, commit** — `feat(chess,replay): piece-placement key for positional matching`
 
 ---
