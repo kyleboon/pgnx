@@ -51,6 +51,14 @@ type Options struct {
 	// Commented requires at least one comment anywhere in the game.
 	Underpromotion, Commented bool
 
+	// Sequences holds -v move sequences, matched against the main-line
+	// moves as written (see ParseSequence); any one matching suffices.
+	// ExactOrder requires the listed move order (-P); SequenceAnywhere
+	// lets a match start at any move rather than the first (--vanywhere).
+	Sequences        []*Sequence
+	ExactOrder       bool
+	SequenceAnywhere bool
+
 	// Positions holds the positional criteria (-x lines, FEN positions,
 	// -H hashes, FEN patterns); nil or empty means none are sought.
 	Positions *PositionCriteria
@@ -95,10 +103,11 @@ type Options struct {
 //     rule, underpromotion, stalemate and insufficient material are
 //     enforced. Checks gated by StartPly only look at plies from there.
 //  6. Ply-count bounds.
-//  7. Material patterns, then piece count (each may insert a mark).
-//  8. Checkmate, then repetition.
-//  9. ECO tag criteria (last, so a future classifier can add the tag).
-//  10. Commented.
+//  7. Move sequences (any one of Sequences, straight or permuted).
+//  8. Material patterns, then piece count (each may insert a mark).
+//  9. Checkmate, then repetition.
+//  10. ECO tag criteria (last, so a future classifier can add the tag).
+//  11. Commented.
 //
 // Evaluate mutates g only in the ways listed: the Result tag/token, a
 // SetUp "1" tag, mark comments, and the MaterialMatch and MatchLabel
@@ -170,6 +179,9 @@ func Evaluate(g *pgn.Game, r *replay.Result, o *Options) (bool, error) {
 	}
 
 	if !o.Bounds.Match(r.PlyCount()) {
+		return false, nil
+	}
+	if !matchSequences(g, o.Sequences, o.ExactOrder, o.SequenceAnywhere) {
 		return false, nil
 	}
 	if len(o.Material) > 0 && !matchMaterial(g, r, o.Material, o.MarkMatches, o.AddMatchTag) {

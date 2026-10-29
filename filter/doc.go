@@ -4,6 +4,7 @@
 // material-balance matching (-z/-y), positional matching by move line,
 // FEN, Polyglot hash and FEN pattern (-x, FEN lines, -H, -Tf/--fenpattern,
 // with --startply, --matchplylimit, --wtm/--btm and --addlabeltag),
+// move-sequence matching (-v, -P, --vanywhere),
 // result-tag consistency (--nobadresults/--fixresulttags), and the
 // matched-game bookkeeping behind --selectonly, --skipmatching,
 // --stopafter, --firstgame and --gamelimit.
