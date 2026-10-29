@@ -109,8 +109,10 @@ differences:
   reading ends), and merely logs a line with a missing quoted value.
   pgnx's `--tag-file`/`--tag` reject any line that does not parse
   (`filter.ReadCriteria` names the line number) with exit status 1.
-  `FEN`, `FENPattern` and `FENPatternI` lines are rejected with a
-  "positional criteria are not supported yet" error (Phase 3).
+  `FEN`, `FENPattern` and `FENPatternI` lines parse as positional
+  criteria (the pattern forms with the rest of the line as a label) and
+  are rejected by `pgnx filter` until the Phase 3 CLI routes them to the
+  positional matcher.
 - **A length bound of 0 is a usage error.** `-bl0`/`-b0` in C compute
   `2*(0-1)+1` in unsigned arithmetic and silently match nothing; `-bu`
   below `-bl` is logged and ignored. pgnx rejects `--moves`/`--min-moves`/

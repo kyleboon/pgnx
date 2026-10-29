@@ -160,3 +160,65 @@ func TestEvaluatePartialResult(t *testing.T) {
 		t.Error("nil result has ply count 0")
 	}
 }
+
+func TestEvaluatePhase3Order(t *testing.T) {
+	// A positional match is marked during the replay step; failing the ply
+	// bounds afterwards rejects the game but leaves the mark in place, so
+	// an unmatched-games output sees it (as in C).
+	pc := &PositionCriteria{}
+	if err := pc.AddLine("e4 c5"); err != nil {
+		t.Fatal(err)
+	}
+	g, r := replayed(t, sicilianEnglishAttack)
+	ok, err := Evaluate(g, r, &Options{Positions: pc, MarkMatches: "POS", Bounds: Bounds{MinPly: 100}})
+	if err != nil || ok {
+		t.Fatalf("matched %v err %v", ok, err)
+	}
+	if got := commentsAt(g); len(got) != 1 || got[0] != 1 || g.Moves[1].Comments[0] != "POS" {
+		t.Errorf("position mark not kept: comments at %v", got)
+	}
+
+	// Bounds are tested before sequences: a game failing bounds is
+	// rejected whatever the sequence says; a game failing the sequence is
+	// not tested for material, so no material mark is inserted.
+	seqs := []*Sequence{mustSeq(t, "d4 d5")}
+	mp, err := ParseMaterial("q*r*b*n*p* q*r*b*n*p*", EitherColour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, r = replayed(t, sicilianEnglishAttack)
+	ok, err = Evaluate(g, r, &Options{Sequences: seqs, Material: []*MaterialPattern{mp}, MarkMatches: "MAT"})
+	if err != nil || ok {
+		t.Fatalf("matched %v err %v", ok, err)
+	}
+	for _, m := range g.Moves {
+		for _, c := range m.Comments {
+			if c == "MAT" {
+				t.Fatal("material mark inserted although the sequence check failed")
+			}
+		}
+	}
+	if _, has := g.Tag("MaterialMatch"); has {
+		t.Error("MaterialMatch tag added although the sequence check failed")
+	}
+
+	// ECO criteria run last: a game failing only its ECO criterion has
+	// already been marked for its material match and tagged.
+	eco := &TagMatcher{}
+	eco.AddPrefix("ECO", "D")
+	g, r = replayed(t, "[ECO \"B90\"]\n\n"+sicilianEnglishAttack)
+	ok, err = Evaluate(g, r, &Options{Tags: eco, Material: []*MaterialPattern{mp}, MarkMatches: "MAT", AddMatchTag: true})
+	if err != nil || ok {
+		t.Fatalf("matched %v err %v", ok, err)
+	}
+	if len(commentsAt(g)) == 0 {
+		t.Error("material mark missing: ECO criteria must be tested after material")
+	}
+	if _, has := g.Tag("MaterialMatch"); !has {
+		t.Error("MaterialMatch tag missing: ECO criteria must be tested after material")
+	}
+	g, r = replayed(t, "[ECO \"D90\"]\n\n"+sicilianEnglishAttack)
+	if ok, _ := Evaluate(g, r, &Options{Tags: eco, Material: []*MaterialPattern{mp}}); !ok {
+		t.Error("ECO criterion satisfied: want match")
+	}
+}

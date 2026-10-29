@@ -84,37 +84,56 @@ type Options struct {
 // Evaluate reports whether g (with its replay r, which may be partial
 // for a broken game kept with --keep-broken) satisfies o, running the
 // checks in the same order as pgn-extract's deal_with_game chain
-// (grammar.c) and stopping at the first failure:
+// (grammar.c:1214, apply.c:955-1330) and stopping at the first failure:
 //
 //  1. Result-tag normalisation ("1/2" → "1/2-1/2"; absent/empty/"?"
 //     filled from the terminating token), as the C parser does.
 //  2. FEN/SetUp consistency (may add SetUp "1"; rejects SetUp without FEN).
-//  3. Tag criteria, then higher/lower-rated-winner.
+//  3. Tag criteria other than ECO, then higher/lower-rated-winner.
 //  4. SetUp-tag filter.
-//  5. The replay-time checks (apply.c play_moves): an invalid Result tag
-//     becomes "*"; the positional walk runs over the main line and its
-//     variations, marking the first match and stopping once the search
-//     depth is exceeded without one; repetition and N-move-rule marks are
-//     inserted (after a positional mark at the same ply); underpromotion
-//     is noted; a MatchLabel tag is added for a labelled pattern match;
-//     the end-of-game result check runs if the walk reached the last move
+//  5. ECO classification is not Evaluate's job: the CLI classifies a
+//     replayed game (replacing its ECO/Opening/Variation/SubVariation
+//     tags) before calling Evaluate, which is observably the same as the
+//     C tool classifying inside apply_move_list.
+//  6. The replay-time walk (apply.c play_moves) over the main line and,
+//     unless NoVariations, its variations, each main-line ply having the
+//     absolute ply number p (1 for a standard start; from a FEN,
+//     2*(Fullmove-1)+(Black?1:0)+1 for the first move). An invalid Result
+//     tag becomes "*". When positions are sought: the start position is
+//     tested before any move when p >= StartPly, a match going to the
+//     front of the prefix comments; variations on a move are walked
+//     first, each with a fresh matched state, a match inside marking the
+//     variation move and matching the game without contributing a label;
+//     the position after a move is tested when p >= StartPly and nothing
+//     has matched yet, a match being marked on that move before any
+//     repetition or N-move mark at the same ply and its label recorded
+//     (main line only); the walk stops once p exceeds the search depth
+//     (MatchPlyLimit, or the longest -x line) without a match, leaving
+//     the game unmatched with no later marks.
+//  7. Repetition and N-move-rule marks, and the underpromotion check,
+//     only from StartPly and only as far as the walk went.
+//  8. A MatchLabel tag when AddLabelTag and the label is non-empty.
+//  9. The end-of-game result check, if the walk reached the last move
 //     (FixResultTags may rewrite the Result tag and g.Result; NoBadResults
-//     may return ErrBadResult); then the positional criteria, N-move
-//     rule, underpromotion, stalemate and insufficient material are
-//     enforced. Checks gated by StartPly only look at plies from there.
-//  6. Ply-count bounds.
-//  7. Move sequences (any one of Sequences, straight or permuted).
-//  8. Material patterns, then piece count (each may insert a mark).
-//  9. Checkmate, then repetition.
-//  10. ECO tag criteria (last, so a future classifier can add the tag).
-//  11. Commented.
+//     may return ErrBadResult).
+//  10. Positions sought but unmatched, the N-move rule, underpromotion,
+//     stalemate and insufficient material reject the game.
+//  11. Ply-count bounds.
+//  12. Move sequences (check_textual_variations): any one of Sequences,
+//     straight or permuted, from the first move or, with
+//     SequenceAnywhere, from any move.
+//  13. Material patterns, then piece count (each may insert a mark).
+//  14. Checkmate, then repetition.
+//  15. ECO tag criteria (last, after classification has had its say).
+//  16. Commented.
 //
 // Evaluate mutates g only in the ways listed: the Result tag/token, a
 // SetUp "1" tag, mark comments, and the MaterialMatch and MatchLabel
-// tags. Because marks
-// are inserted before later criteria are tested, a game that is marked
-// and then rejected keeps its marks (and is seen that way by an
-// unmatched-games output), exactly as in C.
+// tags. Because marks and those tags are added before later criteria are
+// tested, a game that is marked and then rejected (by bounds, say) keeps
+// its marks and is seen that way by an unmatched-games output, exactly
+// as in C; conversely a game rejected by an earlier step (a failed
+// sequence, say) never receives a mark from a later one.
 func Evaluate(g *pgn.Game, r *replay.Result, o *Options) (bool, error) {
 	if o == nil {
 		o = &Options{}

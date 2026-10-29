@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"fmt"
 	"math"
 	"strings"
 
@@ -23,8 +24,14 @@ type TagMatcher struct {
 	order  []string // tag names in first-insertion order
 }
 
-// Add appends c to the criteria for c.Tag.
-func (m *TagMatcher) Add(c Criterion) {
+// Add appends c to the criteria for c.Tag. A positional criterion (FEN,
+// FENPattern, FENPatternI; see Criterion.IsPositional) is rejected with
+// an error wrapping ErrPositionalCriterion: it selects by position and
+// belongs in a PositionCriteria.
+func (m *TagMatcher) Add(c Criterion) error {
+	if c.IsPositional() {
+		return fmt.Errorf("%s: %w", c.Tag, ErrPositionalCriterion)
+	}
 	if m.groups == nil {
 		m.groups = make(map[string][]Criterion)
 	}
@@ -32,6 +39,7 @@ func (m *TagMatcher) Add(c Criterion) {
 		m.order = append(m.order, c.Tag)
 	}
 	m.groups[c.Tag] = append(m.groups[c.Tag], c)
+	return nil
 }
 
 // AddPrefix adds a plain prefix criterion, the -T shorthand (e.g. -Tp

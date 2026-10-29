@@ -112,7 +112,9 @@ func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions,
 			return nil, sel, fmt.Errorf("%s: %w", path, err)
 		}
 		for _, c := range cs {
-			m.Add(c)
+			if err := m.Add(c); err != nil {
+				return nil, sel, fmt.Errorf("%s: %w", path, err)
+			}
 		}
 	}
 	for _, expr := range getList("tag") {
@@ -120,7 +122,9 @@ func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions,
 		if err != nil {
 			return nil, sel, fmt.Errorf("--tag: %w", err)
 		}
-		m.Add(c)
+		if err := m.Add(c); err != nil {
+			return nil, sel, fmt.Errorf("--tag: %w", err)
+		}
 	}
 	for flag, tag := range map[string]string{
 		"player": "Player", "white": "White", "black": "Black",

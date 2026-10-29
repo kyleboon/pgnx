@@ -58,18 +58,40 @@ func (o Op) relational() bool {
 // (either WhiteElo or BlackElo) and "EloDiff" (absolute rating
 // difference) are accepted as ordinary names and given their special
 // meaning by TagMatcher.
+//
+// The names FEN, FENPattern and FENPatternI are positional criteria
+// rather than tag criteria (see IsPositional): the C tool turns such a
+// line into a sought position or pattern (taglines.c process_tag_line).
+// They belong in a PositionCriteria, not a TagMatcher.
 type Criterion struct {
 	Tag   string
 	Op    Op
 	Value string
+	// Label is the text following the closing quote of a FENPattern or
+	// FENPatternI line, with surrounding whitespace removed; it is the
+	// pattern's label (reported through the MatchLabel tag). Empty for
+	// every other criterion.
+	Label string
 
 	re *regexp.Regexp // compiled Value when Op == OpRegex
 }
 
-// ErrUnsupportedCriterion is returned (wrapped) by ParseCriterion for the
-// positional pseudo-tags FEN, FENPattern and FENPatternI, which pgnx does
-// not support yet.
-var ErrUnsupportedCriterion = errors.New("positional criteria are not supported yet")
+// IsPositional reports whether c names one of the positional criteria
+// FEN, FENPattern or FENPatternI, which select games by position rather
+// than by tag. The CLI routes them to PositionCriteria: FEN to AddFEN,
+// FENPattern to AddPattern(Value, false, Label) and FENPatternI to
+// AddPattern(Value, true, Label).
+func (c Criterion) IsPositional() bool {
+	switch c.Tag {
+	case "FEN", "FENPattern", "FENPatternI":
+		return true
+	}
+	return false
+}
+
+// ErrPositionalCriterion is returned (wrapped) by TagMatcher.Add for a
+// positional criterion (see Criterion.IsPositional).
+var ErrPositionalCriterion = errors.New("positional criterion cannot be used as a tag criterion")
 
 // ParseCriterion parses one line of pgn-extract's -t file grammar
 // (taglines.c process_tag_line):
@@ -80,9 +102,12 @@ var ErrUnsupportedCriterion = errors.New("positional criteria are not supported 
 // optional, whitespace around op is optional, and the value is a
 // double-quoted string in which \" and \\ are escapes (other backslash
 // sequences are kept verbatim, as the pgn lexer does for tag values).
-// Anything after the closing quote is ignored. An =~ value must compile
-// as a Go (RE2) regular expression; pgn-extract uses POSIX basic regular
-// expressions, a documented divergence.
+// Anything after the closing quote is ignored, except that for the
+// positional names FENPattern and FENPatternI the rest of the line,
+// whitespace-trimmed, is the pattern's Label (taglines.c:183-211); an
+// operator before a positional value is accepted and ignored, as in C.
+// An =~ value must compile as a Go (RE2) regular expression; pgn-extract
+// uses POSIX basic regular expressions, a documented divergence.
 func ParseCriterion(line string) (Criterion, error) {
 	s := strings.TrimLeft(line, " \t")
 	i := 0
@@ -116,15 +141,18 @@ func ParseCriterion(line string) (Criterion, error) {
 	if !strings.HasPrefix(s, `"`) {
 		return Criterion{}, fmt.Errorf("missing quoted value for tag %s in %q", c.Tag, line)
 	}
-	value, _, ok := unquote(s[1:])
+	value, rest, ok := unquote(s[1:])
 	if !ok {
 		return Criterion{}, fmt.Errorf("missing closing quote in %q", line)
 	}
 	c.Value = value
 
 	switch c.Tag {
-	case "FEN", "FENPattern", "FENPatternI":
-		return Criterion{}, fmt.Errorf("%s: %w", c.Tag, ErrUnsupportedCriterion)
+	case "FENPattern", "FENPatternI":
+		c.Label = strings.TrimSpace(rest)
+		return c, nil
+	case "FEN":
+		return c, nil
 	}
 	if c.Op == OpRegex {
 		re, err := regexp.Compile(c.Value)

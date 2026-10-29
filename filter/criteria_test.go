@@ -31,8 +31,6 @@ func TestParseCriterion(t *testing.T) {
 		{`White "Fischer\`, Criterion{}, true},
 		{`Event =~ "("`, Criterion{}, true},
 		{``, Criterion{}, true},
-		{`FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"`, Criterion{}, true},
-		{`FENPattern "..."`, Criterion{}, true},
 	}
 	for _, c := range cases {
 		got, err := ParseCriterion(c.line)
@@ -55,10 +53,77 @@ func TestParseCriterion(t *testing.T) {
 	}
 }
 
-func TestParseCriterionUnsupportedFEN(t *testing.T) {
-	_, err := ParseCriterion(`FEN "8/8/8/8/8/8/8/K6k w - - 0 1"`)
-	if !errors.Is(err, ErrUnsupportedCriterion) {
-		t.Errorf("want ErrUnsupportedCriterion, got %v", err)
+func TestParseCriterionPositional(t *testing.T) {
+	cases := []struct {
+		line       string
+		tag, value string
+		label      string
+	}{
+		{`FEN "8/8/8/8/8/8/8/K6k w - - 0 1"`, "FEN", "8/8/8/8/8/8/8/K6k w - - 0 1", ""},
+		{`FEN "8/8/8/8/8/8/8/K6k w - - 0 1" ignored`, "FEN", "8/8/8/8/8/8/8/K6k w - - 0 1", ""},
+		{`FENPattern "*/*/*/*/???N????/*/*/*" Nd4th`, "FENPattern", "*/*/*/*/???N????/*/*/*", "Nd4th"},
+		{`FENPatternI "*/*/*/*/???N????/*/*/*" Nd4th`, "FENPatternI", "*/*/*/*/???N????/*/*/*", "Nd4th"},
+		{`FENPatternI "*/*/*/*/???N????/*/*/*"   Nd4 th  `, "FENPatternI", "*/*/*/*/???N????/*/*/*", "Nd4 th"},
+		{`FENPattern "*/*/*/*/???N????/*/*/*"   `, "FENPattern", "*/*/*/*/???N????/*/*/*", ""},
+		{`FENPattern "*/*/*/*/???N????/*/*/*"`, "FENPattern", "*/*/*/*/???N????/*/*/*", ""},
+		{"FENPattern \"*/*/*/*/???N????/*/*/*\" lab\r", "FENPattern", "*/*/*/*/???N????/*/*/*", "lab"},
+	}
+	for _, c := range cases {
+		got, err := ParseCriterion(c.line)
+		if err != nil {
+			t.Errorf("%q: %v", c.line, err)
+			continue
+		}
+		if got.Tag != c.tag || got.Value != c.value || got.Label != c.label {
+			t.Errorf("%q: got %+v, want tag %q value %q label %q", c.line, got, c.tag, c.value, c.label)
+		}
+		if !got.IsPositional() {
+			t.Errorf("%q: IsPositional false", c.line)
+		}
+	}
+	// Non-positional criteria never carry a label and are not positional.
+	got, err := ParseCriterion(`White "Fischer" trailing`)
+	if err != nil || got.Label != "" || got.IsPositional() {
+		t.Errorf("White criterion: %+v err %v", got, err)
+	}
+	// A missing value is still an error for the positional names.
+	if _, err := ParseCriterion(`FENPattern Nd4th`); err == nil {
+		t.Error("FENPattern without a quoted value: want error")
+	}
+}
+
+func TestTagMatcherRejectsPositional(t *testing.T) {
+	for _, line := range []string{
+		`FEN "8/8/8/8/8/8/8/K6k w - - 0 1"`,
+		`FENPattern "*/*/*/*/???N????/*/*/*" L`,
+		`FENPatternI "*/*/*/*/???N????/*/*/*"`,
+	} {
+		c, err := ParseCriterion(line)
+		if err != nil {
+			t.Fatalf("%q: %v", line, err)
+		}
+		m := &TagMatcher{}
+		if err := m.Add(c); !errors.Is(err, ErrPositionalCriterion) {
+			t.Errorf("%q: Add returned %v, want ErrPositionalCriterion", line, err)
+		}
+		if !m.Empty() {
+			t.Errorf("%q: criterion was added despite the error", line)
+		}
+	}
+	m := &TagMatcher{}
+	if err := m.Add(Criterion{Tag: "White", Value: "Fischer"}); err != nil {
+		t.Errorf("ordinary criterion: %v", err)
+	}
+}
+
+func TestReadCriteriaKeepsPositionalLines(t *testing.T) {
+	src := "White \"Fischer\"\nFENPattern \"*/*/*/*/???N????/*/*/*\" Nd4th\nFEN \"8/8/8/8/8/8/8/K6k w - - 0 1\"\n"
+	cs, err := ReadCriteria(strings.NewReader(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cs) != 3 || cs[0].IsPositional() || !cs[1].IsPositional() || cs[1].Label != "Nd4th" || !cs[2].IsPositional() {
+		t.Errorf("criteria: %+v", cs)
 	}
 }
 
