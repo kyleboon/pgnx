@@ -24,6 +24,14 @@ func newConvertCmd() *cobra.Command {
 		RunE:  runConvert,
 	}
 
+	addOutputFlags(cmd)
+	return cmd
+}
+
+// addOutputFlags registers the output-shaping flags shared by convert and
+// filter, so that filter with no selection criteria behaves exactly like
+// convert.
+func addOutputFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.StringP("format", "f", "san", "output format: san, source, lalg, halg, elalg, xlalg, uci, epd, fen")
 	flags.StringP("output", "o", "", "write output to FILE instead of stdout")
@@ -38,8 +46,6 @@ func newConvertCmd() *cobra.Command {
 	flags.Bool("no-results", false, "omit the trailing result token")
 	flags.Bool("keep-broken", false, "emit games that fail replay, in Source format, instead of skipping them")
 	flags.Bool("nested-comments", false, "allow { to nest inside a comment")
-
-	return cmd
 }
 
 // forcedUCILineWidth is the line width pgn-extract's C oracle silently
@@ -53,9 +59,9 @@ func newConvertCmd() *cobra.Command {
 // "given later" since pgnx has no analogous ordering effect to replicate).
 const forcedUCILineWidth = 5000
 
-// convertOptions builds the output.Options that runConvert's Writer uses,
-// from cmd's convert-specific flags.
-func convertOptions(cmd *cobra.Command) (output.Options, error) {
+// outputOptions builds the output.Options for a command's Writer from the
+// flags registered by addOutputFlags.
+func outputOptions(cmd *cobra.Command) (output.Options, error) {
 	flags := cmd.Flags()
 
 	formatName, _ := flags.GetString("format")
@@ -96,12 +102,13 @@ func convertOptions(cmd *cobra.Command) (output.Options, error) {
 	}, nil
 }
 
-// convertOutput opens the destination for rendered games per the --output
-// and --append flags, returning cmd.OutOrStdout() (with a no-op Closer)
-// when --output was not given.
-func convertOutput(cmd *cobra.Command) (io.Writer, io.Closer, error) {
-	path, _ := cmd.Flags().GetString("output")
-	if path == "" {
+// openOutput opens the destination named by the string flag flagName
+// (--output, or filter's --unmatched), truncating or appending per
+// --append. An empty value, or "-", means cmd.OutOrStdout() (with a nil
+// Closer).
+func openOutput(cmd *cobra.Command, flagName string) (io.Writer, io.Closer, error) {
+	path, _ := cmd.Flags().GetString(flagName)
+	if path == "" || path == "-" {
 		return cmd.OutOrStdout(), nil, nil
 	}
 	append_, _ := cmd.Flags().GetBool("append")
@@ -119,14 +126,14 @@ func convertOutput(cmd *cobra.Command) (io.Writer, io.Closer, error) {
 }
 
 func runConvert(cmd *cobra.Command, args []string) error {
-	opts, err := convertOptions(cmd)
+	opts, err := outputOptions(cmd)
 	if err != nil {
 		return err
 	}
 	keepBroken, _ := cmd.Flags().GetBool("keep-broken")
 	quiet, _ := cmd.Flags().GetBool("quiet")
 
-	out, outCloser, err := convertOutput(cmd)
+	out, outCloser, err := openOutput(cmd, "output")
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -8,6 +9,28 @@ import (
 	"github.com/kyleboon/pgnx/pgn"
 	"github.com/spf13/cobra"
 )
+
+// errStop may be returned by a forEachGame callback to end iteration
+// cleanly after the current game: it is not logged and the game is
+// counted as succeeded. To stop after a game that also failed, wrap the
+// failure with stopAfter so it is still logged and counted.
+var errStop = errors.New("stop")
+
+// stopError carries a per-game failure that should also end iteration.
+type stopError struct{ err error }
+
+func (e *stopError) Error() string        { return e.err.Error() }
+func (e *stopError) Unwrap() error        { return e.err }
+func (e *stopError) Is(target error) bool { return target == errStop }
+
+// stopAfter returns an error that scanGames treats as "log/count err as
+// usual, then stop": errStop itself when err is nil.
+func stopAfter(err error) error {
+	if err == nil {
+		return errStop
+	}
+	return &stopError{err: err}
+}
 
 // openLogFile opens path for the --log flag. It always truncates/creates,
 // matching typical log-file conventions for a fresh run.
@@ -23,7 +46,8 @@ func openLogFile(path string) (*os.File, error) {
 //
 // fn is expected to attempt whatever processing it needs (typically a
 // replay) and return an error describing why the game failed, or nil on
-// success. forEachGame logs per-game failures to w in the form
+// success; returning errStop (or stopAfter(err)) ends iteration after
+// that game, across all remaining files. forEachGame logs per-game failures to w in the form
 // "<file>:<line>: game <n>: <error>", and I/O errors opening a file to
 // ioW as "<file>: <error>", and returns the total number of games seen
 // and the number that succeeded. The two writers are separate so a caller
@@ -38,7 +62,7 @@ func openLogFile(path string) (*os.File, error) {
 // seen".
 func forEachGame(cmd *cobra.Command, files []string, w, ioW io.Writer, fn func(src string, n int, g *pgn.Game) error) (total, succeeded int, ioErr error) {
 	if len(files) == 0 {
-		total, succeeded, ioErr = scanGames(cmd, "stdin", cmd.InOrStdin(), w, ioW, total, succeeded, fn)
+		total, succeeded, ioErr, _ = scanGames(cmd, "stdin", cmd.InOrStdin(), w, ioW, total, succeeded, fn)
 		return total, succeeded, ioErr
 	}
 
@@ -50,11 +74,15 @@ func forEachGame(cmd *cobra.Command, files []string, w, ioW io.Writer, fn func(s
 			continue
 		}
 		var scanErr error
-		total, succeeded, scanErr = scanGames(cmd, path, f, w, ioW, total, succeeded, fn)
+		var stopped bool
+		total, succeeded, scanErr, stopped = scanGames(cmd, path, f, w, ioW, total, succeeded, fn)
 		if scanErr != nil {
 			ioErr = scanErr
 		}
 		f.Close()
+		if stopped {
+			break
+		}
 	}
 	return total, succeeded, ioErr
 }
@@ -67,8 +95,9 @@ func forEachGame(cmd *cobra.Command, files []string, w, ioW io.Writer, fn func(s
 // "<src>: <error>" and also returned, so callers treat it the same as a
 // file-open failure: visible on the I/O-error writer and sufficient to
 // fail the run, even though any games already scanned (and any output
-// already produced for them) stand.
-func scanGames(cmd *cobra.Command, src string, r io.Reader, w, ioW io.Writer, total, succeeded int, fn func(src string, n int, g *pgn.Game) error) (int, int, error) {
+// already produced for them) stand. stopped reports that fn asked to
+// stop (errStop); no further games are read from r in that case.
+func scanGames(cmd *cobra.Command, src string, r io.Reader, w, ioW io.Writer, total, succeeded int, fn func(src string, n int, g *pgn.Game) error) (_, _ int, err error, stopped bool) {
 	opts := pgn.ParserOptions{}
 	if nested, err := cmd.Flags().GetBool("nested-comments"); err == nil {
 		opts.NestedComments = nested
@@ -77,15 +106,28 @@ func scanGames(cmd *cobra.Command, src string, r io.Reader, w, ioW io.Writer, to
 	for scanner.Next() {
 		total++
 		g := scanner.Game()
-		if err := fn(src, total, g); err != nil {
-			fmt.Fprintf(w, "%s:%d: game %d: %v\n", src, g.StartLine, total, err)
-			continue
+		err := fn(src, total, g)
+		if errors.Is(err, errStop) {
+			stopped = true
+			var se *stopError
+			if errors.As(err, &se) {
+				err = se.err
+			} else {
+				err = nil
+			}
 		}
-		succeeded++
+		if err != nil {
+			fmt.Fprintf(w, "%s:%d: game %d: %v\n", src, g.StartLine, total, err)
+		} else {
+			succeeded++
+		}
+		if stopped {
+			return total, succeeded, nil, true
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintf(ioW, "%s: %v\n", src, err)
-		return total, succeeded, err
+		return total, succeeded, err, false
 	}
-	return total, succeeded, nil
+	return total, succeeded, nil, false
 }
