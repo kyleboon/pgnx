@@ -33,6 +33,13 @@ type MoveInfo struct {
 type Position struct {
 	FEN     string
 	Zobrist uint64
+
+	// HalfmoveClock, FullmoveNumber, and SideToMove are the FEN's clock
+	// fields and side to move, exposed so that callers (the filter
+	// package's fifty-move and length predicates) need not re-parse FEN.
+	HalfmoveClock  int
+	FullmoveNumber int
+	SideToMove     chess.Color
 }
 
 // IllegalMoveError reports that a move in the game record could not be
@@ -159,5 +166,38 @@ func capturedPieceType(m chess.Move, b *chess.Board) chess.PieceType {
 
 // positionOf snapshots b's current FEN and Zobrist hash.
 func positionOf(b *chess.Board) Position {
-	return Position{FEN: b.FEN(), Zobrist: b.Zobrist()}
+	return Position{
+		FEN:            b.FEN(),
+		Zobrist:        b.Zobrist(),
+		HalfmoveClock:  b.HalfmoveClock,
+		FullmoveNumber: b.FullmoveNumber,
+		SideToMove:     b.SideToMove,
+	}
+}
+
+// PlyCount returns the game's length in plies as pgn-extract defines it
+// (apply.c apply_move_list): derived from the final position's fullmove
+// number and side to move, not from a count of moves played. For a game
+// that starts from a FEN tag this is therefore the absolute half-move
+// number reached, which is what the C tool's -b/-p bounds compare
+// against. It is 0 for an empty Result.
+func (r *Result) PlyCount() int {
+	if r == nil || len(r.Positions) == 0 {
+		return 0
+	}
+	last := r.Positions[len(r.Positions)-1]
+	if last.SideToMove == chess.Black {
+		return 2*(last.FullmoveNumber-1) + 1
+	}
+	return 2 * (last.FullmoveNumber - 1)
+}
+
+// FinalBoard reconstructs the last position reached from its FEN. It is a
+// convenience for predicates that need the board itself (stalemate,
+// insufficient material); Result does not retain a Board per ply.
+func (r *Result) FinalBoard() (*chess.Board, error) {
+	if r == nil || len(r.Positions) == 0 {
+		return nil, fmt.Errorf("replay: empty result has no final position")
+	}
+	return chess.FromFEN(r.Positions[len(r.Positions)-1].FEN)
 }
