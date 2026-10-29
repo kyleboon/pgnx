@@ -66,7 +66,7 @@ func TestMatchNMoveRuleMarks(t *testing.T) {
 	// Clock already at 98; two quiet moves reach 99 then 100.
 	src := "[FEN \"4k3/8/8/8/8/8/8/4K2R w K - 98 60\"]\n\n60. Kd1 Kd8 61. Ke1 Ke8 *\n"
 	g, r := replayed(t, src)
-	if !matchNMoveRule(g, r, 50, "FIFTY") {
+	if !matchNMoveRule(g, r, 50, "FIFTY", 1, len(r.Moves)) {
 		t.Fatal("fifty-move rule should apply")
 	}
 	want := []int{0, 0, 1, 1} // clocks 99, 100, 101, 102 → plies 2,3,4 qualify
@@ -77,7 +77,7 @@ func TestMatchNMoveRuleMarks(t *testing.T) {
 		}
 	}
 	g, r = replayed(t, src)
-	if matchNMoveRule(g, r, 75, "X") {
+	if matchNMoveRule(g, r, 75, "X", 1, len(r.Moves)) {
 		t.Error("seventy-five should not apply")
 	}
 	for _, m := range g.Moves {
@@ -86,7 +86,7 @@ func TestMatchNMoveRuleMarks(t *testing.T) {
 		}
 	}
 	g, r = replayed(t, src)
-	matchNMoveRule(g, r, 50, "")
+	matchNMoveRule(g, r, 50, "", 1, len(r.Moves))
 	if len(g.Moves[1].Comments) != 0 {
 		t.Error("empty mark adds nothing")
 	}
@@ -99,7 +99,7 @@ func TestMatchRepetitionMarks(t *testing.T) {
 	// next occurrence, so plies 8 through 12 are all marked (as in C).
 	src := "1. Nf3 Nf6 2. Ng1 Ng8 3. Nf3 Nf6 4. Ng1 Ng8 5. Nf3 Nf6 6. Ng1 Ng8 *\n"
 	g, r := replayed(t, src)
-	if !matchRepetition(g, r, 3, "REPEAT") {
+	if !matchRepetition(g, r, 3, "REPEAT", 1, len(r.Moves)) {
 		t.Fatal("threefold")
 	}
 	for i, m := range g.Moves {
@@ -112,15 +112,15 @@ func TestMatchRepetitionMarks(t *testing.T) {
 		}
 	}
 	g, r = replayed(t, src)
-	if matchRepetition(g, r, 5, "X") {
+	if matchRepetition(g, r, 5, "X", 1, len(r.Moves)) {
 		t.Error("not fivefold")
 	}
 	g, r = replayed(t, "1. Nf3 Nf6 2. Ng1 Ng8 3. Nf3 Nf6 4. Ng1 Ng8 5. Nf3 Nf6 6. Ng1 Ng8 7. Nf3 Nf6 8. Ng1 Ng8 *\n")
-	if !matchRepetition(g, r, 5, "X") || len(g.Moves[15].Comments) != 1 || len(g.Moves[11].Comments) != 0 {
+	if !matchRepetition(g, r, 5, "X", 1, len(r.Moves)) || len(g.Moves[15].Comments) != 1 || len(g.Moves[11].Comments) != 0 {
 		t.Error("fivefold marks only ply 16")
 	}
 	g, r = replayed(t, foolsMate)
-	if matchRepetition(g, r, 3, "X") {
+	if matchRepetition(g, r, 3, "X", 1, len(r.Moves)) {
 		t.Error("no repetition")
 	}
 }
@@ -128,7 +128,7 @@ func TestMatchRepetitionMarks(t *testing.T) {
 func TestMatchRepetitionFENMark(t *testing.T) {
 	src := "1. Nf3 Nf6 2. Ng1 Ng8 3. Nf3 Nf6 4. Ng1 Ng8 *\n"
 	g, r := replayed(t, src)
-	matchRepetition(g, r, 3, "FEN")
+	matchRepetition(g, r, 3, "FEN", 1, len(r.Moves))
 	if got := g.Moves[7].Comments; len(got) != 1 || got[0] != r.Positions[8].FEN {
 		t.Errorf("FEN mark = %v", got)
 	}
@@ -136,11 +136,11 @@ func TestMatchRepetitionFENMark(t *testing.T) {
 
 func TestMatchUnderpromotion(t *testing.T) {
 	_, r := replayed(t, "[FEN \"8/P6k/8/8/8/8/8/K7 w - - 0 1\"]\n\n1. a8=N *\n")
-	if !matchUnderpromotion(r) {
+	if !matchUnderpromotion(r, 1, len(r.Moves)) {
 		t.Error("knight promotion")
 	}
 	_, r = replayed(t, "[FEN \"8/P6k/8/8/8/8/8/K7 w - - 0 1\"]\n\n1. a8=Q *\n")
-	if matchUnderpromotion(r) {
+	if matchUnderpromotion(r, 1, len(r.Moves)) {
 		t.Error("queen promotion is not under")
 	}
 }

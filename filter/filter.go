@@ -51,10 +51,25 @@ type Options struct {
 	// Commented requires at least one comment anywhere in the game.
 	Underpromotion, Commented bool
 
+	// Positions holds the positional criteria (-x lines, FEN positions,
+	// -H hashes, FEN patterns); nil or empty means none are sought.
+	Positions *PositionCriteria
+	// StartPly is the first ply number at which positional, repetition,
+	// N-move-rule and underpromotion checks run (--startply); 0 means 1.
+	StartPly int
+	// NoVariations stops the positional search from entering variations
+	// (the C tool's keep_variations, cleared by -V).
+	NoVariations bool
+	// AddLabelTag adds a MatchLabel tag holding the label of the FEN
+	// pattern that matched (--addlabeltag); nothing is added for an
+	// unlabelled pattern or a match by position or hash.
+	AddLabelTag bool
+
 	// MarkMatches, when non-empty, is inserted as a comment after every
 	// main-line move at which an N-move-rule, repetition, material or
-	// piece-count match occurs (--markmatches). "FEN" inserts the
-	// position's FEN instead.
+	// piece-count match occurs, and after the move reaching the first
+	// positional match (--markmatches). "FEN" inserts the position's FEN
+	// instead.
 	MarkMatches string
 }
 
@@ -68,12 +83,17 @@ type Options struct {
 //  2. FEN/SetUp consistency (may add SetUp "1"; rejects SetUp without FEN).
 //  3. Tag criteria, then higher/lower-rated-winner.
 //  4. SetUp-tag filter.
-//  5. The replay-time checks: an invalid Result tag becomes "*";
-//     repetition and N-move-rule marks are inserted; underpromotion is
-//     noted; the end-of-game result check runs (FixResultTags may rewrite
-//     the Result tag and g.Result; NoBadResults may return ErrBadResult);
-//     then N-move rule, underpromotion, stalemate and insufficient
-//     material are enforced.
+//  5. The replay-time checks (apply.c play_moves): an invalid Result tag
+//     becomes "*"; the positional walk runs over the main line and its
+//     variations, marking the first match and stopping once the search
+//     depth is exceeded without one; repetition and N-move-rule marks are
+//     inserted (after a positional mark at the same ply); underpromotion
+//     is noted; a MatchLabel tag is added for a labelled pattern match;
+//     the end-of-game result check runs if the walk reached the last move
+//     (FixResultTags may rewrite the Result tag and g.Result; NoBadResults
+//     may return ErrBadResult); then the positional criteria, N-move
+//     rule, underpromotion, stalemate and insufficient material are
+//     enforced. Checks gated by StartPly only look at plies from there.
 //  6. Ply-count bounds.
 //  7. Material patterns, then piece count (each may insert a mark).
 //  8. Checkmate, then repetition.
@@ -81,7 +101,8 @@ type Options struct {
 //  10. Commented.
 //
 // Evaluate mutates g only in the ways listed: the Result tag/token, a
-// SetUp "1" tag, mark comments, and a MaterialMatch tag. Because marks
+// SetUp "1" tag, mark comments, and the MaterialMatch and MatchLabel
+// tags. Because marks
 // are inserted before later criteria are tested, a game that is marked
 // and then rejected keeps its marks (and is seen that way by an
 // unmatched-games output), exactly as in C.
@@ -109,21 +130,36 @@ func Evaluate(g *pgn.Game, r *replay.Result, o *Options) (bool, error) {
 
 	// apply_move_list / play_moves.
 	ensureValidResultTag(g)
+	startPly := o.StartPly
+	if startPly < 1 {
+		startPly = 1
+	}
+	positioned, label, stop := true, "", len(r.Moves)
+	if !o.Positions.Empty() {
+		positioned, label, stop = matchPositions(g, r, o.Positions, startPly, o.MarkMatches, o.NoVariations)
+	}
 	repeated := true
 	if o.Repetition > 0 {
-		repeated = matchRepetition(g, r, o.Repetition, o.MarkMatches)
+		repeated = matchRepetition(g, r, o.Repetition, o.MarkMatches, startPly, stop)
 	}
 	nMoveRule := true
 	if o.NMoveRule > 0 {
-		nMoveRule = matchNMoveRule(g, r, o.NMoveRule, o.MarkMatches)
+		nMoveRule = matchNMoveRule(g, r, o.NMoveRule, o.MarkMatches, startPly, stop)
 	}
-	if err := checkResult(g, r, o.FixResultTags, o.NoBadResults); err != nil {
-		return false, err
+	if o.AddLabelTag && label != "" {
+		setTag(g, "MatchLabel", label)
 	}
-	if !nMoveRule {
+	if stop >= len(r.Moves) {
+		// The result check lives at the last move of the walk; a walk cut
+		// short by the search depth never reaches it.
+		if err := checkResult(g, r, o.FixResultTags, o.NoBadResults); err != nil {
+			return false, err
+		}
+	}
+	if !positioned || !nMoveRule {
 		return false, nil
 	}
-	if o.Underpromotion && !matchUnderpromotion(r) {
+	if o.Underpromotion && !matchUnderpromotion(r, startPly, stop) {
 		return false, nil
 	}
 	if o.Stalemate && !matchStalemate(r) {

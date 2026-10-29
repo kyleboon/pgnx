@@ -1,10 +1,12 @@
 // Package filter implements game selection for pgnx: tag criteria
 // (pgn-extract's -t/-T family), length bounds (-b/-p), end-state and
 // game-property predicates (--checkmate, --fifty, --repetition, ...),
-// material-balance matching (-z/-y), result-tag consistency
-// (--nobadresults/--fixresulttags), and the matched-game bookkeeping
-// behind --selectonly, --skipmatching, --stopafter, --firstgame and
-// --gamelimit.
+// material-balance matching (-z/-y), positional matching by move line,
+// FEN, Polyglot hash and FEN pattern (-x, FEN lines, -H, -Tf/--fenpattern,
+// with --startply, --matchplylimit, --wtm/--btm and --addlabeltag),
+// result-tag consistency (--nobadresults/--fixresulttags), and the
+// matched-game bookkeeping behind --selectonly, --skipmatching,
+// --stopafter, --firstgame and --gamelimit.
 //
 // The predicates are pure functions over a parsed *pgn.Game and its
 // *replay.Result. Evaluate runs them in the same order as the C tool's

@@ -54,14 +54,19 @@ func matchInsufficient(r *replay.Result) bool {
 
 // matchNMoveRule reports whether the N-move rule (N = 50 or 75) was
 // available at any point in the main line: after some ply the halfmove
-// clock reached 2N (apply.c play_moves). With a non-empty mark, a
-// comment is appended to every qualifying ply's move, not just the
-// first.
-func matchNMoveRule(g *pgn.Game, r *replay.Result, n int, mark string) bool {
+// clock reached 2N (apply.c play_moves). Only moves before index stop
+// whose ply number is at least startPly are examined, as in the C walk.
+// With a non-empty mark, a comment is appended to every qualifying ply's
+// move, not just the first.
+func matchNMoveRule(g *pgn.Game, r *replay.Result, n int, mark string, startPly, stop int) bool {
 	matched := false
-	for i := range r.Moves {
+	p0 := firstPly(r)
+	for i := 0; i < stop && i < len(r.Moves); i++ {
 		if i+1 >= len(r.Positions) || i >= len(g.Moves) {
 			break
+		}
+		if p0+i < startPly {
+			continue
 		}
 		pos := r.Positions[i+1]
 		if pos.HalfmoveClock >= 2*n {
@@ -74,26 +79,41 @@ func matchNMoveRule(g *pgn.Game, r *replay.Result, n int, mark string) bool {
 	return matched
 }
 
+// firstPly is the ply number of the first move of r (1 for a game from
+// the standard start), or 1 for an empty result.
+func firstPly(r *replay.Result) int {
+	if len(r.Positions) == 0 {
+		return 1
+	}
+	return plyNumber(r.Positions[0])
+}
+
 // matchRepetition reports whether some position occurs at least n times
 // in the main line, counting the starting position (apply.c
-// apply_move_list seeds the count list with the initial board). Every
-// ply at which a position's count reaches or exceeds n is marked.
+// apply_move_list seeds the count list with the initial board). Only
+// positions after moves before index stop whose ply number is at least
+// startPly are counted (play_moves' check_for_match). Every ply at which
+// a position's count reaches or exceeds n is marked.
 //
 // Position identity is the Polyglot Zobrist hash, which already folds
 // in the side to move, castling rights, and the en passant file only
 // when a capture is actually possible — exactly hashing.c's
 // repetition_position_matches (board hash + to_move + castling rights +
 // non-redundant ep square).
-func matchRepetition(g *pgn.Game, r *replay.Result, n int, mark string) bool {
+func matchRepetition(g *pgn.Game, r *replay.Result, n int, mark string, startPly, stop int) bool {
 	if len(r.Positions) == 0 {
 		return false
 	}
 	counts := make(map[uint64]int, len(r.Positions))
 	counts[r.Positions[0].Zobrist]++
 	matched := false
-	for i := range r.Moves {
+	p0 := firstPly(r)
+	for i := 0; i < stop && i < len(r.Moves); i++ {
 		if i+1 >= len(r.Positions) || i >= len(g.Moves) {
 			break
+		}
+		if p0+i < startPly {
+			continue
 		}
 		pos := r.Positions[i+1]
 		counts[pos.Zobrist]++
@@ -107,10 +127,15 @@ func matchRepetition(g *pgn.Game, r *replay.Result, n int, mark string) bool {
 	return matched
 }
 
-// matchUnderpromotion reports whether any main-line move promoted to a
-// piece other than a queen (apply.c play_moves).
-func matchUnderpromotion(r *replay.Result) bool {
-	for i := range r.Moves {
+// matchUnderpromotion reports whether any main-line move before index
+// stop, at a ply number of at least startPly, promoted to a piece other
+// than a queen (apply.c play_moves).
+func matchUnderpromotion(r *replay.Result, startPly, stop int) bool {
+	p0 := firstPly(r)
+	for i := 0; i < stop && i < len(r.Moves); i++ {
+		if p0+i < startPly {
+			continue
+		}
 		p := r.Moves[i].Move.Promotion
 		if p != chess.NoPiece && p != chess.Queen {
 			return true
