@@ -6,3 +6,10 @@
 /kyle_b81.pgn
 /testdata/local/
 /twic/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.beads/proxieddb/
+*.gate.lock*
