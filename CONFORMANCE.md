@@ -150,6 +150,36 @@ differences:
   `SetUp "1"` tag. Flagged as a gap (no golden case); revisit with the
   Chess960 work.
 
+## Positional matching and ECO (Phase 3)
+
+Phase 3 is in progress. The FEN pattern matcher (`filter.PatternSet`, a
+port of `fenmatcher.c`) is complete and was checked against the C binary
+on one TWIC issue (1709 games) with eighteen `--fenpattern`/`--fenpatterni`
+patterns covering literals, `?`, `!`, `A`/`a`, `m`, digits, `*`, `[...]`,
+`[^...]`, material constraints and inverse forms; matched-game counts were
+identical in every case. Known, intentional differences:
+
+- **An inverse pattern with a material constraint keeps the constraint.**
+  `add_fen_pattern` builds the colour-reversed pattern by truncating the
+  original text at the scan pointer, which has already stepped past the
+  `:` when a constraint is present; the reversed text therefore starts
+  with `rank1:` and is rejected as "badly formed", so `--fenpatterni
+  'pattern:constraint'` silently matches only the original orientation
+  (verified with the C binary). pgnx adds the reversed pattern with the
+  same constraint. Because the C tool parses the constraint of an inverse
+  pattern with `both_colours` set, the constraint is already
+  colour-symmetric, so this only ever adds matches of the mirrored
+  position, never changes which boards the original orientation matches.
+- **`m` is colour-neutral under inversion.** `reverse_fen_pattern` swaps
+  the case of every letter, turning the not-a-pawn metacharacter `m` into
+  `M`, which matches nothing. pgnx leaves `m` unchanged in the reversed
+  pattern.
+- **A malformed material constraint is an error.** The C tool logs the
+  bad constraint and stores the pattern without one; `PatternSet.Add`
+  returns the parse error and stores nothing. Malformed patterns are an
+  error in both (the C tool logs and continues; pgnx reports through the
+  CLI).
+
 ## Differential-testing findings (2026-08-07 run)
 
 `scripts/difftest.sh` was run over every file in
