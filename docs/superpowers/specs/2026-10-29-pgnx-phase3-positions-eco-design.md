@@ -1,7 +1,7 @@
 # pgnx: Go Port of pgn-extract — Phase 3 Design (positions, move sequences, ECO)
 
 **Date:** 2026-10-29
-**Status:** Draft (plan: [`docs/superpowers/plans/2026-10-29-pgnx-phase3-positions-eco.md`](../plans/2026-10-29-pgnx-phase3-positions-eco.md))
+**Status:** Implemented (2026-10-30; see the plan for the commit range: [`docs/superpowers/plans/2026-10-29-pgnx-phase3-positions-eco.md`](../plans/2026-10-29-pgnx-phase3-positions-eco.md))
 **Module:** `github.com/kyleboon/pgnx`
 **Builds on:** [Phase 1](2026-08-07-pgnx-go-port-design.md) (complete), [Phase 2](2026-10-28-pgnx-phase2-filter-design.md) (complete 2026-10-29)
 

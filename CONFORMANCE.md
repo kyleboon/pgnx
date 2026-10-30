@@ -111,8 +111,7 @@ differences:
   (`filter.ReadCriteria` names the line number) with exit status 1.
   `FEN`, `FENPattern` and `FENPatternI` lines parse as positional
   criteria (the pattern forms with the rest of the line as a label) and
-  are rejected by `pgnx filter` until the Phase 3 CLI routes them to the
-  positional matcher.
+  are routed to the positional matcher (see Phase 3 below).
 - **A length bound of 0 is a usage error.** `-bl0`/`-b0` in C compute
   `2*(0-1)+1` in unsigned arithmetic and silently match nothing; `-bu`
   below `-bl` is logged and ignored. pgnx rejects `--moves`/`--min-moves`/
@@ -154,13 +153,55 @@ differences:
 
 ## Positional matching and ECO (Phase 3)
 
-Phase 3 is in progress. The FEN pattern matcher (`filter.PatternSet`, a
-port of `fenmatcher.c`) is complete and was checked against the C binary
-on one TWIC issue (1709 games) with eighteen `--fenpattern`/`--fenpatterni`
-patterns covering literals, `?`, `!`, `A`/`a`, `m`, digits, `*`, `[...]`,
-`[^...]`, material constraints and inverse forms; matched-game counts were
-identical in every case. Known, intentional differences:
+`pgnx filter` ports pgn-extract's positional criteria (`apply.c`
+`play_moves`/`position_matches`, `fenmatcher.c`, the `-x` reader in
+`moves.c`), move-sequence matching (`moves.c` `check_textual_variations`)
+and their `--startply`/`--matchplylimit`/`--wtm`/`--btm`/`--markmatches`/
+`--addlabeltag` modifiers; `convert` and `filter` port ECO classification
+and ECO-split output (`eco.c`). Every in-scope target of the C test suite
+is a golden row, and a differential sweep of fifteen flag combinations
+(`-x`, `-v`, `-P -v`, `--vanywhere`, `-Tf`, `--fenpatterni`, `-H`, `-t`
+with FEN lines, `-e`, `-e -7`, `-e -TeB1`, `--startply` with `-Tf`,
+`--matchplylimit` with `-x`, `--wtm`, `--addlabeltag`) over the golden
+inputs and one 8,005-game TWIC issue produced byte-identical output
+apart from the pre-existing classes listed under the 2026-10-30 findings
+below. Known, intentional differences:
 
+- **pgnx replays past the search depth.** `play_moves` stops applying
+  moves once the ply count passes the positional search depth
+  (`--matchplylimit`, or the length of the longest `-x` line) without a
+  match, so an illegal move beyond that depth in a non-matching game is
+  never noticed by the C tool. pgnx replays every game in full before
+  evaluating criteria: such a game is logged as broken and makes the
+  exit status 2. Output is unaffected (the game is emitted nowhere
+  unless `--keep-broken`); the matched and `-n` outputs were confirmed
+  identical on the TWIC issue with `--matchplylimit 20`.
+- **Malformed positional input is a usage error.** A FEN pattern that is
+  "badly formed" is logged and dropped by the C tool, which then, with
+  positional matching switched on but nothing to match, selects no
+  games; a malformed material constraint is logged and the pattern kept
+  without it; a `-v` line containing only move numbers becomes an empty
+  sequence that every game matches. pgnx rejects all three with exit
+  status 1 (`PatternSet.Add`, `ParseSequence`'s `ErrNoMoves`), naming
+  the flag or file line. An unreplayable `-x` line, a non-hexadecimal
+  `-H` value and an unreadable ECO file are fatal in both tools.
+- **Sequence matching is textual on the moves as written**, whatever
+  the output format. `-v`/`--sequence` compares the move text from the
+  source (check glyphs normalised to a single `+`, `!`/`?` glyphs
+  dropped), not the canonical SAN that `convert` emits, because the C
+  tool runs `check_textual_variations` before its output-time rewrite.
+  `Ngf3` in a sequence therefore matches only a game that wrote `Ngf3`,
+  even though the `san` output of that game shows `Nf3`. This is parity,
+  recorded here because it is easy to mistake for a bug.
+- **No implicit ECO file.** `-e` with no file name uses `$ECO_FILE` or
+  `eco.pgn` in the current directory; `--eco-file` requires a path.
+- **ECO diagnostics differ.** The C tool logs every "ECO hash collision"
+  (two lines in the ECO file reaching the same position at the same
+  ply) and each line it fails to replay as the file is read. pgnx keeps
+  the first of two colliding lines silently (the same line the C tool
+  keeps) and reports unreplayable lines as one count on the log writer
+  (`skipped N ECO lines that could not be replayed`), suppressed by
+  `--quiet`.
 - **An inverse pattern with a material constraint keeps the constraint.**
   `add_fen_pattern` builds the colour-reversed pattern by truncating the
   original text at the scan pointer, which has already stepped past the
@@ -176,11 +217,6 @@ identical in every case. Known, intentional differences:
   the case of every letter, turning the not-a-pawn metacharacter `m` into
   `M`, which matches nothing. pgnx leaves `m` unchanged in the reversed
   pattern.
-- **A malformed material constraint is an error.** The C tool logs the
-  bad constraint and stores the pattern without one; `PatternSet.Add`
-  returns the parse error and stores nothing. Malformed patterns are an
-  error in both (the C tool logs and continues; pgnx reports through the
-  CLI).
 
 ## Differential-testing findings (2026-08-07 run)
 
@@ -307,3 +343,36 @@ oracle as justification and one is documented.
   pgn-extract --quiet noresult.pgn   # first game: tags + "*" only
   pgnx convert --quiet noresult.pgn  # first game: "1. e4 e5 2. Nf3 *"
   ```
+
+## Differential-testing findings (2026-10-30 run, Phase 3)
+
+The sweep described under "Positional matching and ECO" above ran
+`scripts/difftest.sh` with fifteen `C_FLAGS`/`PGNX_FLAGS` combinations
+over every golden input except `nested-comment.pgn` (which needs the
+per-file flag the script does not thread; see the 2026-08-07 note) and
+over `twic1500.pgn` (8,005 games). One Phase 3 divergence was fixed; the
+remaining diffs are pre-existing classes already documented here.
+
+- **Fixed:** the colour-reversed pattern added by `--fenpatterni` was
+  unlabelled, so `--addlabeltag` added no `MatchLabel` tag to a game
+  matched in the mirrored orientation. `add_fen_pattern` receives the
+  empty string as the label from the `--fenpatterni` flag and labels the
+  reversed pattern `label + "I"`, i.e. `"I"`, so the C tool emits
+  `[MatchLabel "I"]` for such games. `PatternSet.Add` now always labels
+  the inverse `label+"I"`. A `FENPatternI "pattern"` criteria line with
+  no label is different: `taglines.c` passes a NULL label and the
+  reversed pattern gets `""`, so no tag is added; `PositionCriteria.
+  AddCriterion` reproduces that. Both forms were confirmed against the C
+  binary on `petrosian.pgn` and the TWIC issue.
+- **Pre-existing, surfaced again by `-e -7`:** `--seven-tag-roster`
+  drops the `SetUp`/`FEN` (and `Variant`) tags of a game that starts
+  from a FEN, which the C tool emits after the seven roster tags
+  (`output.c`), leaving the movetext unreplayable. Tracked as beads
+  issue `pgnx-w1j`; not Phase 3 specific (`odds.pgn`,
+  `test-promotion-in.pgn` and `test-setup-in.pgn` diverge the same way
+  under plain `-7`). The ECO roster extras added in Phase 3 (`ECO`,
+  `Opening`, `Variation`, `SubVariation` after the roster when
+  classifying) are emitted correctly.
+- Also seen, already documented above: NAG/comment interleaving
+  (`test-nagcomments.pgn`), comments across a variation boundary
+  (`test-splitvariants.pgn`) and Latin-1 tag bytes (`odds.pgn`).

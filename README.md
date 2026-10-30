@@ -3,8 +3,8 @@
 pgnx is a Go port of [pgn-extract](https://www.cs.kent.ac.uk/people/staff/djb/pgn-extract/),
 David J. Barnes' C tool for searching, filtering, and reformatting chess
 games recorded in [PGN](https://en.wikipedia.org/wiki/Portable_Game_Notation).
-It provides both a reusable Go library (`chess`, `pgn`, `replay`, `output`,
-`filter`) and a CLI (`pgnx`) that replays every game on an internal board
+It provides both a reusable Go library (`chess`, `pgn`, `replay`, `filter`,
+`eco`, `output`) and a CLI (`pgnx`) that replays every game on an internal board
 with full legality checking, the same semantic depth as the original.
 
 pgnx is licensed under [GPL-3.0](LICENSE), the same license as pgn-extract.
@@ -15,12 +15,14 @@ See [MIGRATION.md](MIGRATION.md) for how old flags map to new invocations,
 and [CONFORMANCE.md](CONFORMANCE.md) for documented behavioral differences
 from the C tool.
 
-**Status:** Phase 2 — core parsing, move replay/validation, output
-formatting (`convert`, `validate`, `info`), and game selection (`filter`:
-tag criteria, length, end state, material balance, result consistency).
-Position matching, ECO classification, and deduplication are planned for
-later phases; see [docs/superpowers/specs](docs/superpowers/specs) for the
-design spec and phasing plan.
+**Status:** Phase 3 — core parsing, move replay/validation, output
+formatting (`convert`, `validate`, `info`), game selection (`filter`: tag
+criteria, length, end state, material balance, result consistency,
+positions reached, FEN patterns, move sequences) and ECO classification
+(`--eco-file`, `--eco-split`). Duplicate detection and output-side
+transforms are planned for later phases; see
+[docs/superpowers/specs](docs/superpowers/specs) for the design specs and
+phasing plan.
 
 ## Install
 
@@ -43,6 +45,10 @@ elements from the output.
 
 ```sh
 pgnx convert -f uci -o out.pgn games.pgn
+
+# Add ECO/Opening/Variation tags from an ECO file, splitting the output
+# into A.pgn .. E.pgn (and noeco.pgn) by the first letter of the code
+pgnx convert --eco-file eco.pgn --eco-split 1 games.pgn
 ```
 
 ### `pgnx filter`
@@ -65,6 +71,21 @@ pgnx filter --repetition --mark-matches REPEAT games.pgn
 
 # Route matched and unmatched games to separate files
 pgnx filter --checkmate -o mates.pgn --unmatched others.pgn games.pgn
+
+# Games reaching the Najdorf position, by any move order, with the
+# matching move marked
+pgnx filter --position 'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6' --mark-matches MATCH games.pgn
+
+# Games with a white knight on e4 beside a black pawn on d4, supported by
+# a pawn on d3, or the mirror image for Black; matched games get a
+# MatchLabel tag (I for the mirrored form)
+pgnx filter --fen-pattern-i '*/*/*/*/???pN???/???P????/*/*' --add-label-tag games.pgn
+
+# Games opening 1. c4 Nf6 2. Nc3 e6 3. d4 Bb4 in exactly that order
+pgnx filter --exact-order --sequence 'c4 Nf6 Nc3 e6 d4 Bb4' games.pgn
+
+# Classify by ECO, then keep only the B9x (Najdorf) games
+pgnx filter --eco-file eco.pgn --eco B9 games.pgn
 ```
 
 ### `pgnx validate`
@@ -93,8 +114,8 @@ The library is organized in layers: `pgn` parses PGN text into a
 variations); `replay` applies a game's moves to a `chess.Board`, validating
 legality and resolving the detail (FEN, checks, captures) that non-Source
 output formats need; `filter` evaluates selection criteria over a game and
-its replay; `output` renders a game, plus its replay result, back out as
-text.
+its replay; `eco` classifies a replayed game against an ECO file; `output`
+renders a game, plus its replay result, back out as text.
 
 ```go
 package main
@@ -138,7 +159,10 @@ func main() {
 
 To select games, build a `filter.Options` and call `filter.Evaluate(game,
 result, &opts)` between replay and output; `filter.ParseCriterion` and
-`filter.TagMatcher` give the same tag-criteria semantics as the CLI.
+`filter.TagMatcher` give the same tag-criteria semantics as the CLI, and
+`filter.PositionCriteria` / `filter.ParseSequence` the positional and
+move-sequence ones. To classify, `eco.Load` an ECO file once, then
+`table.Classify(result)` and `eco.Apply(game, entry)` before output.
 
 `pgn.Scanner` streams one game at a time (`bufio.Scanner`-style), so
 million-game files process in constant memory. `chess` has no PGN

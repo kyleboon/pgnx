@@ -60,7 +60,7 @@ tag are alternatives (ORed); criteria on different tags must all hold.
 | `-Tb NAME` | `pgnx filter --black NAME` |
 | `-Td DATE` | `pgnx filter --date DATE` (`b1962`/`a1962` prefixes work as in C) |
 | `-Tr RESULT` | `pgnx filter --result RESULT` |
-| `-Te ECO` | `pgnx filter --eco ECO` (prefix match on an existing ECO tag only; no classification) |
+| `-Te ECO` | `pgnx filter --eco ECO` (prefix match on the ECO tag; with `--eco-file` it tests the classified tag, as in C) |
 | `-Ta NAME`, `-Tt TC`, any other single criterion | `pgnx filter --tag 'Annotator "NAME"'`, `--tag 'TimeControl >= "180"'` — the `-t` line grammar on the command line, repeatable |
 | `--tagsubstr` | `pgnx filter --tag-substring` |
 | `-S` | `pgnx filter --soundex` |
@@ -85,8 +85,8 @@ tag are alternatives (ORed); criteria on different tags must all hold.
 
 Notes:
 
-- `-Tf` (FEN criterion) and `FEN`/`FENPattern` lines in `-t` files are
-  positional matching (Phase 3) and are rejected with an error.
+- `-Tf` and `FEN`/`FENPattern`/`FENPatternI` lines in `-t` files are
+  positional criteria; see the next section.
 - Malformed criteria files, a length bound of 0, and conflicting flags are
   usage errors (exit 1) rather than silently tolerated; see
   [CONFORMANCE.md](CONFORMANCE.md#filtering-phase-2-pgnx-filter).
@@ -94,14 +94,48 @@ Notes:
   error. Broken games and games rejected by `--no-bad-results` make the
   exit status 2.
 
-## Not yet ported (Phase 3+)
+## Positional, sequence and ECO flags (Phase 3 scope)
+
+Positional and move-sequence criteria are `pgnx filter` flags. ECO
+classification and ECO-split output are accepted by both `convert` and
+`filter`.
+
+| pgn-extract | pgnx |
+|---|---|
+| `-x FILE` | `pgnx filter --position-file FILE` (one move line per line, as in C); one line can be given inline with `--position 'e4 c5 Nf3'` |
+| `FEN "..."` line in a `-t` file | accepted by `pgnx filter --tag-file FILE` and `--tag 'FEN "..."'`; `--fen '...'` gives one inline |
+| `-Tf PATTERN` / `--fenpattern PATTERN` | `pgnx filter --fen-pattern PATTERN` |
+| `--fenpatterni PATTERN` | `pgnx filter --fen-pattern-i PATTERN` |
+| `FENPattern "..." [label]` / `FENPatternI "..." [label]` lines in a `-t` file | accepted by `--tag-file FILE` and `--tag '...'` with the same grammar |
+| `-H HASH` | `pgnx filter --hash HASH` |
+| `--startply N` | `pgnx filter --start-ply N` |
+| `--matchplylimit N` | `pgnx filter --match-ply-limit N` |
+| `--wtm` / `--btm` | `pgnx filter --white-to-move` / `--black-to-move` |
+| `--addlabeltag` | `pgnx filter --add-label-tag` |
+| `--markmatches TEXT` | `pgnx filter --mark-matches TEXT` also marks positional matches, as in C |
+| `-v FILE` | `pgnx filter --sequence-file FILE`; one line inline with `--sequence 'e4 c5 * d6'` |
+| `-P` | `pgnx filter --exact-order` |
+| `--vanywhere` | `pgnx filter --sequence-anywhere` |
+| `-e FILE` | `pgnx convert --eco-file FILE` / `pgnx filter --eco-file FILE` |
+| `-E N` | `pgnx convert --eco-split N` / `pgnx filter --eco-split N` |
+| `-e FILE -TeB1` | `pgnx filter --eco-file FILE --eco B1` (the criterion sees the classified tag) |
+
+Notes:
+
+- `-e` with no file name falls back to `$ECO_FILE` or `./eco.pgn` in the
+  C tool; `--eco-file` always needs a path. A copy of pgn-extract's
+  `eco.pgn` is in the repository at `cmd/pgnx/testdata/golden/eco.pgn`.
+- `--eco-split N` writes to `<prefix>.pgn` (or `noeco.pgn`) in the
+  current directory, appending, exactly as `-E` does, and cannot be
+  combined with `--output`.
+- Malformed patterns, hashes, move lines and sequences are usage errors
+  (exit 1) rather than logged and skipped; see
+  [CONFORMANCE.md](CONFORMANCE.md#positional-matching-and-eco-phase-3).
+
+## Not yet ported (Phase 4+)
 
 The following pgn-extract flags have no pgnx equivalent yet:
 
-- Positional matching (Phase 3): `-Tf`, `FEN`/`FENPattern` lines in `-t`
-  files, `-x`, `-v`, `-H`, `-P`, `--startply`, `--matchplylimit`,
-  `--addlabeltag`, `--wtm`/`--btm`, `--vanywhere`
-- `-e` / `-E` — ECO classification (Phase 3)
 - Duplicate detection (Phase 4): `-D`, `-U`, `-d`, `-c`, `-Z`,
   `--fuzzydepth`, `--deletesamesetup`
 - `--odds` — needs null-move support (`--allownullmoves`), which `replay`
@@ -117,8 +151,9 @@ Also not yet supported, regardless of flag:
 - JSON output (`--json`)
 - Argument files (`-A`/`argsfile`)
 - `-#` file splitting
-- `pgnx dedupe`, `pgnx eco`, `pgnx split` — planned as new subcommands in
-  later phases, not flags on `convert`
+- `-e` without a file name (the `eco.pgn`/`$ECO_FILE` default)
+- `pgnx dedupe`, `pgnx split` — planned as new subcommands in later
+  phases, not flags on `convert`
 
 See [CONFORMANCE.md](CONFORMANCE.md) for behavioral differences in flags
 that *are* implemented.

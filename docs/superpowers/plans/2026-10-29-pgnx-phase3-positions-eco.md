@@ -1,6 +1,7 @@
 # pgnx Phase 3 Implementation Plan — positions, move sequences, ECO
 
-> **Status: NOT STARTED** (plan written 2026-10-29). Spec: [`docs/superpowers/specs/2026-10-29-pgnx-phase3-positions-eco-design.md`](../specs/2026-10-29-pgnx-phase3-positions-eco-design.md). Tracking: beads epic `pgnx-phase3` (one child task per task below).
+> **Status: COMPLETE** (verified 2026-10-30; commits `e6745fe`..`HEAD` on `main`). Spec: [`docs/superpowers/specs/2026-10-29-pgnx-phase3-positions-eco-design.md`](../specs/2026-10-29-pgnx-phase3-positions-eco-design.md). Tracking: beads epic `pgnx-phase3` (one child task per task below).
+> All in-scope golden targets byte-match the oracle; a 15-combination differential sweep over the golden inputs and one 8,005-game TWIC issue is clean apart from pre-existing documented classes. One Phase 3 divergence surfaced by the sweep (the unlabelled `--fenpatterni` inverse pattern) was fixed; see CONFORMANCE.md.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Claim the matching beads task (`bd update <id> --claim`) before starting one and close it when its commit lands.
 
@@ -219,12 +220,12 @@ Excluded: dedup targets (Phase 4), test-odds/test-allownullmoves (null moves), t
 **Files:**
 - Modify: `MIGRATION.md`, `CONFORMANCE.md`, `README.md`, `CLAUDE.md`, this plan's status banner, the spec's status line.
 
-- [ ] **Step 1: Differential.** With `scripts/difftest.sh` (`PGNX_CMD=filter|convert`, `C_FLAGS`, `PGNX_FLAGS`) over every `infiles/*.pgn` and one TWIC issue (`twic/` local corpus; see the `twic-differential-corpus` memory): `-x xvars.txt`, `-v vvars.txt`, `-P -v Pvars.txt`, `-Tf …`, `--fenpatterni …`, `-H …`, `-e eco.pgn`, `-e eco.pgn -7`, `-e eco.pgn -TeB1`, `--startply 20 -Tf …`, `--matchplylimit 20 -x …`. Fix with oracle justification or document.
-- [ ] **Step 2: `MIGRATION.md`.** Move `-x`, `-v`, `-P`, `--vanywhere`, `-H`, `-Tf`, `--fenpattern(i)`, `FEN`/`FENPattern` lines, `--startply`, `--matchplylimit`, `--wtm`/`--btm`, `--addlabeltag`, `-e`, `-E` into the mapping table; update the "Not yet ported" list (Phase 4 dedup, null moves, transforms, argsfile) and the Phase-2 note that FEN lines are rejected.
-- [ ] **Step 3: `CONFORMANCE.md`.** New section "Positional matching and ECO (Phase 3)": pgnx replays past the search depth (broken games beyond `--match-ply-limit` are reported); malformed patterns and unreplayable `-x` lines are usage errors; sequence matching is textual on the moves as written (parity with C, which matches before its output-time SAN rewrite); no implicit `eco.pgn`/`$ECO_FILE`; ECO collision/skip diagnostics differ; whatever Step 1 surfaces.
-- [ ] **Step 4: `README.md`** — positional/sequence/ECO examples. **`CLAUDE.md`** — add `eco` to the layer list; mention `--eco-file`/`--eco-split`; update the phase status line.
-- [ ] **Step 5: Full check** — `go build ./... && go test ./... && go vet ./... && gofmt -l .`; flip this plan's banner to **COMPLETE** with the verification date and commit range; set the spec's status to Implemented.
-- [ ] **Step 6: Commit** — `docs: positional/ECO migration and conformance notes; mark Phase 3 complete`
+- [x] **Step 1: Differential.** With `scripts/difftest.sh` (`PGNX_CMD=filter|convert`, `C_FLAGS`, `PGNX_FLAGS`) over every `infiles/*.pgn` and one TWIC issue (`twic/` local corpus; see the `twic-differential-corpus` memory): `-x xvars.txt`, `-v vvars.txt`, `-P -v Pvars.txt`, `-Tf …`, `--fenpatterni …`, `-H …`, `-e eco.pgn`, `-e eco.pgn -7`, `-e eco.pgn -TeB1`, `--startply 20 -Tf …`, `--matchplylimit 20 -x …`. Fix with oracle justification or document.
+- [x] **Step 2: `MIGRATION.md`.** Move `-x`, `-v`, `-P`, `--vanywhere`, `-H`, `-Tf`, `--fenpattern(i)`, `FEN`/`FENPattern` lines, `--startply`, `--matchplylimit`, `--wtm`/`--btm`, `--addlabeltag`, `-e`, `-E` into the mapping table; update the "Not yet ported" list (Phase 4 dedup, null moves, transforms, argsfile) and the Phase-2 note that FEN lines are rejected.
+- [x] **Step 3: `CONFORMANCE.md`.** New section "Positional matching and ECO (Phase 3)": pgnx replays past the search depth (broken games beyond `--match-ply-limit` are reported); malformed patterns and unreplayable `-x` lines are usage errors; sequence matching is textual on the moves as written (parity with C, which matches before its output-time SAN rewrite); no implicit `eco.pgn`/`$ECO_FILE`; ECO collision/skip diagnostics differ; whatever Step 1 surfaces.
+- [x] **Step 4: `README.md`** — positional/sequence/ECO examples. **`CLAUDE.md`** — add `eco` to the layer list; mention `--eco-file`/`--eco-split`; update the phase status line.
+- [x] **Step 5: Full check** — `go build ./... && go test ./... && go vet ./... && gofmt -l .`; flip this plan's banner to **COMPLETE** with the verification date and commit range; set the spec's status to Implemented.
+- [x] **Step 6: Commit** — `docs: positional/ECO migration and conformance notes; mark Phase 3 complete`
 
 ---
 
