@@ -159,22 +159,44 @@ func parseCastling(field string, b *Board) (CastlingRights, error) {
 	for _, ch := range field {
 		switch ch {
 		case 'K':
-			c.WhiteKingside = true
-			c.WhiteKRookFile = 7
+			c.WhiteKRookFile, c.WhiteKingside = outermostRook(b, White, true)
 		case 'Q':
-			c.WhiteQueenside = true
-			c.WhiteQRookFile = 0
+			c.WhiteQRookFile, c.WhiteQueenside = outermostRook(b, White, false)
 		case 'k':
-			c.BlackKingside = true
-			c.BlackKRookFile = 7
+			c.BlackKRookFile, c.BlackKingside = outermostRook(b, Black, true)
 		case 'q':
-			c.BlackQueenside = true
-			c.BlackQRookFile = 0
+			c.BlackQRookFile, c.BlackQueenside = outermostRook(b, Black, false)
 		default:
 			return CastlingRights{}, fmt.Errorf("fen: bad castling char %q", ch)
 		}
 	}
 	return c, nil
+}
+
+// outermostRook finds the rook of the given colour nearest the h-file
+// (kingside) or a-file (queenside) on that colour's back rank, as
+// pgn-extract's find_rook_starting_position does for KQkq. ok is false when
+// the back rank holds no such rook, in which case no right is granted.
+func outermostRook(b *Board, color Color, kingside bool) (file int, ok bool) {
+	rank := 0
+	if color == Black {
+		rank = 7
+	}
+	want := Piece{Type: Rook, Color: color}
+	if kingside {
+		for f := 7; f >= 0; f-- {
+			if b.PieceAt(Square{File: f, Rank: rank}) == want {
+				return f, true
+			}
+		}
+		return 0, false
+	}
+	for f := 0; f < 8; f++ {
+		if b.PieceAt(Square{File: f, Rank: rank}) == want {
+			return f, true
+		}
+	}
+	return 0, false
 }
 
 // parseShredderCastling parses Shredder-FEN style castling rights, where
