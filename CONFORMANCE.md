@@ -144,7 +144,8 @@ differences:
 - **`--mark-matches FEN` uses pgnx's FEN rendering.** The C tool inserts
   `get_FEN_string(board)`; pgnx inserts `chess.Board.FEN()`. Both are
   standard six-field FEN; castling-right spelling for Chess960 positions
-  may differ.
+  may differ. (Parsing is not affected: `KQkq` in an input FEN resolves to the
+  outermost rook on the back rank, as `find_rook_starting_position` does.)
 - **Chess960 `Variant` tag is not added.** `consistent_FEN_tags` in the C
   tool also adds `[Variant "chess 960"]` to a FEN game whose start position
   looks like a Chess960 setup but has no `Variant` tag. pgnx adds only the
