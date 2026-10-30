@@ -280,18 +280,19 @@ were fixed; the rest are the documented differences above.
   are both empty, which risks silently dropping legitimate tag-only
   records other callers may rely on parsing; flagged here for a
   deliberate decision rather than folded into this fix wave.
-- **Open concern — invalid-UTF-8 bytes are corrupted to U+FFFD.** Several
-  `odds.pgn` tag values contain raw Latin-1 bytes (e.g. `0xE7`, `0xE9` for
-  "Fran\xe7ois", "Andr\xe9"). pgn-extract passes these bytes through
-  untouched (it is byte-oriented). pgnx's lexer (`pgn/lexer.go`) reads
-  input via `bufio.Reader.ReadRune`, which decodes UTF-8 and substitutes
-  the replacement character U+FFFD for any invalid byte; the original byte
-  is unrecoverable by the time a token's text is built. Fixing this
-  requires switching the lexer's core read primitives from rune-oriented
-  to byte-oriented (touching every token type: tag names, strings,
-  comments, moves), which is more than a minimal, oracle-justified patch
-  for Phase 1. Flagged here rather than fixed; revisit if golden/
-  differential corpora surface more non-UTF-8 real-world PGN.
+- **Fixed — invalid-UTF-8 bytes were corrupted to U+FFFD.** Several
+  `odds.pgn` tag values (and many TWIC team/player/site tags) contain raw
+  Latin-1 bytes (e.g. `0xE7`, `0xE9`). pgn-extract is byte-oriented and
+  passes them through; pgnx's lexer used `bufio.Reader.ReadRune`, which
+  substituted U+FFFD. `pgn/lexer.go` now reads and peeks single bytes
+  (`ReadByte`) and appends bytes to token text, so Latin-1 and UTF-8 alike
+  pass through tag values and comments unchanged; bytes >= 0x80 outside
+  strings/comments are skipped as unknown characters, as before. The
+  scanner still streams one game at a time. Output wrapping counts bytes
+  (`len`), as the C tool does. Covered by `pgn/bytes_test.go`. Tag output
+  must not re-escape these bytes (the `%q` quoting in `output/output.go`
+  is tracked separately); with raw quoting `difftest.sh` over `odds.pgn`
+  and several Latin-1 TWIC issues is clean.
 - **Script scope note, not a bug:** `difftest.sh` runs both binaries with
   no flags beyond `--quiet`/`-f`/`-o` (per its usage: `<input.pgn>
   [format]`). `testdata/golden/infiles/nested-comment.pgn` is designed to

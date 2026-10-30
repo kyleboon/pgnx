@@ -48,6 +48,9 @@ func isMoveChar(ch rune) bool {
 	return ch >= 0 && ch < 256 && moveChars[byte(ch)]
 }
 
+// The lexer is byte-oriented, like pgn-extract's: each "rune" here is a single
+// input byte (0-255), so Latin-1 or any other non-UTF-8 bytes pass through
+// tag values and comments unchanged.
 // lexer turns a stream of PGN text into a sequence of tokens. It knows
 // nothing about chess semantics -- it is a pure tokenizer over text.
 //
@@ -87,10 +90,11 @@ func (l *lexer) readRune() (rune, error) {
 		l.runeBuf = l.runeBuf[:n-1]
 	} else {
 		var err error
-		ch, _, err = l.r.ReadRune()
+		b, err := l.r.ReadByte()
 		if err != nil {
 			return 0, err
 		}
+		ch = rune(b)
 	}
 	if ch == '\n' {
 		l.line++
@@ -113,12 +117,12 @@ func (l *lexer) peekRune() (ch rune, ok bool) {
 	if n := len(l.runeBuf); n > 0 {
 		return l.runeBuf[n-1], true
 	}
-	r, _, err := l.r.ReadRune()
+	b, err := l.r.ReadByte()
 	if err != nil {
 		return 0, false
 	}
-	l.runeBuf = append(l.runeBuf, r)
-	return r, true
+	l.runeBuf = append(l.runeBuf, rune(b))
+	return rune(b), true
 }
 
 // next returns the next token from the input, or an error for malformed
@@ -226,7 +230,7 @@ func (l *lexer) lexTagName() (token, error) {
 		}
 		if isAlnum(ch) || ch == '_' {
 			l.readRune()
-			sb.WriteRune(ch)
+			sb.WriteByte(byte(ch))
 			continue
 		}
 		break
@@ -258,14 +262,14 @@ func (l *lexer) lexString() (token, error) {
 			}
 			// Keep the escape sequence exactly as written, as pgn-extract's
 			// lexer does, so values round-trip byte for byte on output.
-			sb.WriteRune(ch)
-			sb.WriteRune(next)
+			sb.WriteByte(byte(ch))
+			sb.WriteByte(byte(next))
 			continue
 		}
 		if ch == '"' {
 			return token{kind: tokString, text: sb.String(), line: line}, nil
 		}
-		sb.WriteRune(ch)
+		sb.WriteByte(byte(ch))
 	}
 }
 
@@ -288,17 +292,17 @@ func (l *lexer) lexComment() (token, error) {
 			if l.opts.NestedComments {
 				depth++
 			}
-			sb.WriteRune(ch)
+			sb.WriteByte(byte(ch))
 		case '}':
 			depth--
 			if depth == 0 {
 				return token{kind: tokComment, text: sb.String(), line: line}, nil
 			}
-			sb.WriteRune(ch)
+			sb.WriteByte(byte(ch))
 		case '\n':
-			sb.WriteRune(' ')
+			sb.WriteByte(' ')
 		default:
-			sb.WriteRune(ch)
+			sb.WriteByte(byte(ch))
 		}
 	}
 }
@@ -314,7 +318,7 @@ func (l *lexer) lexNAG() (token, error) {
 		}
 		if ch >= '0' && ch <= '9' {
 			l.readRune()
-			sb.WriteRune(ch)
+			sb.WriteByte(byte(ch))
 			continue
 		}
 		break
@@ -368,7 +372,7 @@ func (l *lexer) lexNumberOrResult(first rune) (token, error) {
 
 	// Move number: gather remaining digits.
 	var sb strings.Builder
-	sb.WriteRune(first)
+	sb.WriteByte(byte(first))
 	for {
 		ch, ok := l.peekRune()
 		if !ok {
@@ -376,7 +380,7 @@ func (l *lexer) lexNumberOrResult(first rune) (token, error) {
 		}
 		if ch >= '0' && ch <= '9' {
 			l.readRune()
-			sb.WriteRune(ch)
+			sb.WriteByte(byte(ch))
 			continue
 		}
 		break
@@ -403,7 +407,7 @@ func (l *lexer) lexNumberOrResult(first rune) (token, error) {
 func (l *lexer) lexMove(first rune) (token, error) {
 	line := l.line
 	var sb strings.Builder
-	sb.WriteRune(first)
+	sb.WriteByte(byte(first))
 	l.consumeMoveTail(&sb)
 	return token{kind: tokMove, text: sb.String(), line: line}, nil
 }
@@ -421,7 +425,7 @@ func (l *lexer) consumeMoveTail(sb *strings.Builder) {
 		}
 		if isMoveChar(ch) {
 			l.readRune()
-			sb.WriteRune(ch)
+			sb.WriteByte(byte(ch))
 			continue
 		}
 		break
@@ -433,7 +437,7 @@ func (l *lexer) consumeMoveTail(sb *strings.Builder) {
 		}
 		if ch == '!' || ch == '?' {
 			l.readRune()
-			sb.WriteRune(ch)
+			sb.WriteByte(byte(ch))
 			continue
 		}
 		return
