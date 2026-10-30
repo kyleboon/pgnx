@@ -15,7 +15,8 @@ type Game struct {
 	StartLine      int
 	EndLine        int
 
-	errs []error
+	errs    []error
+	skipped []error
 }
 
 // Tag returns the value of the last tag named name, and whether it was
@@ -35,6 +36,14 @@ func (g *Game) Tag(name string) (string, bool) {
 // or an unparsable NAG are recorded here instead.
 func (g *Game) ParseErrors() []error {
 	return g.errs
+}
+
+// SkippedTokens returns the movetext tokens that were not moves (a lone
+// "-", a bare piece letter, ...) and were discarded while parsing this
+// game, as pgn-extract does, one error per token. The game itself is
+// otherwise intact.
+func (g *Game) SkippedTokens() []error {
+	return g.skipped
 }
 
 // Move is a single ply of movetext.

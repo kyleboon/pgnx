@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/kyleboon/pgnx/pgn"
+	"github.com/kyleboon/pgnx/replay"
 	"github.com/spf13/cobra"
 )
 
@@ -107,6 +108,14 @@ func scanGames(cmd *cobra.Command, src string, r io.Reader, w, ioW io.Writer, to
 		total++
 		g := scanner.Game()
 		err := fn(src, total, g)
+		// Tokens the parser discarded (a lone "-", a bare piece letter,
+		// ...) are reported like the C oracle's warnings, and the game is
+		// emitted regardless; but it still counts as a problem, so the run
+		// exits 2 (the C tool exits 0 here).
+		skipped := g.SkippedTokens()
+		for _, serr := range skipped {
+			fmt.Fprintf(w, "%s:%d: game %d: warning: %v\n", src, g.StartLine, total, serr)
+		}
 		if errors.Is(err, errStop) {
 			stopped = true
 			var se *stopError
@@ -118,7 +127,7 @@ func scanGames(cmd *cobra.Command, src string, r io.Reader, w, ioW io.Writer, to
 		}
 		if err != nil {
 			fmt.Fprintf(w, "%s:%d: game %d: %v\n", src, g.StartLine, total, err)
-		} else {
+		} else if len(skipped) == 0 {
 			succeeded++
 		}
 		if stopped {
@@ -130,4 +139,23 @@ func scanGames(cmd *cobra.Command, src string, r io.Reader, w, ioW io.Writer, to
 		return total, succeeded, err, false
 	}
 	return total, succeeded, nil, false
+}
+
+// replayGame replays g for output. A game whose movetext has no
+// terminating result token and does not replay is not rejected: pgn-extract
+// never replays such a game at all (grammar.c parse_game reports "Missing
+// result" and discards the moves), emitting the tag section with the
+// Result tag as the movetext. replayGame does the same for that case only
+// (unless keepBroken, which wants the moves back), dropping the moves and
+// returning problem to report once the game has been written. Otherwise
+// replayErr is the replay failure, if any. See CONFORMANCE.md.
+func replayGame(g *pgn.Game, keepBroken bool) (r *replay.Result, replayErr, problem error) {
+	r, replayErr = replay.Game(g, replay.Options{})
+	if replayErr != nil && !keepBroken && g.Result == "" && len(g.Moves) > 0 {
+		g.Moves = nil
+		r, _ = replay.Game(g, replay.Options{})
+		problem = fmt.Errorf("no result token and the moves do not replay (%v); moves dropped", replayErr)
+		replayErr = nil
+	}
+	return r, replayErr, problem
 }

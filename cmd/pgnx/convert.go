@@ -8,7 +8,6 @@ import (
 
 	"github.com/kyleboon/pgnx/output"
 	"github.com/kyleboon/pgnx/pgn"
-	"github.com/kyleboon/pgnx/replay"
 	"github.com/spf13/cobra"
 )
 
@@ -165,13 +164,16 @@ func runConvert(cmd *cobra.Command, args []string) error {
 
 	total, succeeded, ioErr := forEachGame(cmd, args, logW, logW, func(src string, n int, g *pgn.Game) error {
 		opts.Tags.Observe(g)
-		r, replayErr := replay.Game(g, replay.Options{})
+		r, replayErr, problem := replayGame(g, keepBroken)
 		if replayErr != nil && !keepBroken {
 			return replayErr
 		}
 		ecoSet.classify(g, r)
 		if err := writeGameTo(dest, g, r, replayErr); err != nil {
 			return err
+		}
+		if replayErr == nil {
+			return problem
 		}
 		return replayErr
 	})

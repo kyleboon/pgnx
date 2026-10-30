@@ -186,6 +186,15 @@ func (l *lexer) next() (token, error) {
 		case ch >= '0' && ch <= '9':
 			return l.lexNumberOrResult(ch)
 
+		case ch == '-':
+			// A '-' that does not begin the null move "--" is not a token
+			// at all (lex.c, DASH case: "Single '-' not allowed"): hand it
+			// to the parser as a stray token to be reported and skipped.
+			if next, ok := l.peekRune(); ok && next == '-' {
+				return l.lexMove(ch)
+			}
+			return token{kind: tokStray, text: "-", line: l.line}, nil
+
 		case isMoveStart(ch):
 			return l.lexMove(ch)
 
@@ -409,7 +418,15 @@ func (l *lexer) lexMove(first rune) (token, error) {
 	var sb strings.Builder
 	sb.WriteByte(byte(first))
 	l.consumeMoveTail(&sb)
-	return token{kind: tokMove, text: sb.String(), line: line}, nil
+	text := sb.String()
+	// The C lexer only classifies a word as a move when it seems to be a
+	// complete one (lex.c: move_seems_valid); anything else is reported
+	// ("Unknown move text N.") and discarded, and the game carries on.
+	if !strings.HasPrefix(text, "--") && !strings.HasPrefix(text, "Z0") &&
+		!moveSeemsValid(strings.TrimRight(text, "!?")) {
+		return token{kind: tokStray, text: text, line: line}, nil
+	}
+	return token{kind: tokMove, text: text, line: line}, nil
 }
 
 // consumeMoveTail appends to sb the remaining characters of a move token:

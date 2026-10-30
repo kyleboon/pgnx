@@ -602,3 +602,38 @@ func firstDiff(got, want []byte) string {
 	}
 	return "length differs: got " + strconv.Itoa(len(gl)) + " lines, want " + strconv.Itoa(len(wl))
 }
+
+// TestStrayTokensConformance covers movetext tokens that are not moves, which
+// the C lexer reports and discards (lex.c: "Single '-' not allowed", "Unknown
+// move text N") while keeping the game, plus an unterminated "0-0" game that
+// the C parser reduces to its tag section ("Missing result"). There is no
+// target for this in the C repo's test/Makefile, so the input lives in
+// testdata/stray rather than the vendored golden/infiles. The expected output
+// was generated with the C binary:
+//
+//	pgn-extract -ostray-tokens-out.pgn --quiet stray-tokens.pgn
+//
+// pgnx exits 2 here (errProblems) because it reports the skipped tokens; the
+// C tool exits 0. See CONFORMANCE.md.
+func TestStrayTokensConformance(t *testing.T) {
+	outFile := filepath.Join(t.TempDir(), "out.pgn")
+	root := NewRootCmd()
+	var errb bytes.Buffer
+	root.SetErr(&errb)
+	root.SetArgs([]string{"convert", "--quiet", "-o", outFile,
+		filepath.Join("testdata", "stray", "stray-tokens.pgn")})
+	if err := root.Execute(); !errors.Is(err, errProblems) {
+		t.Fatalf("exit: got %v, want errProblems (skipped tokens are reported)\n%s", err, errb.String())
+	}
+	got, err := os.ReadFile(outFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := os.ReadFile(filepath.Join("testdata", "stray", "stray-tokens-out.pgn"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("output differs from C oracle\n--- first divergence ---\n%s", firstDiff(got, want))
+	}
+}
