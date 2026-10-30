@@ -612,3 +612,44 @@ func TestResultTagNormalisation(t *testing.T) {
 		}
 	}
 }
+
+// TestRosterFENTags pins that, under SevenTagRoster, a game with a FEN tag
+// gets Variant, SetUp and FEN after the roster (and after any ECO extras),
+// and that a SetUp tag without FEN is not emitted. Oracle output.c
+// print_algebraic_game (the SEVEN_TAG_ROSTER branch).
+func TestRosterFENTags(t *testing.T) {
+	const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+	src := "[Event \"E\"]\n[Annotator \"X\"]\n[ECO \"C00\"]\n[FEN \"" + fen + "\"]\n[SetUp \"1\"]\n[Variant \"standard\"]\n[Result \"*\"]\n\n1. e4 *\n"
+	head := "[Event \"E\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n"
+	tail := "[Variant \"standard\"]\n[SetUp \"1\"]\n[FEN \"" + fen + "\"]\n\n1. e4 *\n\n"
+
+	for _, tc := range []struct {
+		name   string
+		extras []string
+		want   string
+	}{
+		{"plain", nil, head + tail},
+		{"eco", []string{"ECO", "Opening"}, head + "[ECO \"C00\"]\n" + tail},
+	} {
+		g, r := gameAndReplay(t, src)
+		var buf bytes.Buffer
+		w := NewWriter(&buf, Options{Format: SAN, SevenTagRoster: true, RosterExtras: tc.extras})
+		if err := w.WriteGame(g, r); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != tc.want {
+			t.Errorf("%s: got:\n%q\nwant:\n%q", tc.name, buf.String(), tc.want)
+		}
+	}
+
+	// SetUp without FEN is not emitted.
+	g, r := gameAndReplay(t, "[Event \"E\"]\n[SetUp \"1\"]\n[Result \"*\"]\n\n1. e4 *\n")
+	var buf bytes.Buffer
+	w := NewWriter(&buf, Options{Format: SAN, SevenTagRoster: true})
+	if err := w.WriteGame(g, r); err != nil {
+		t.Fatal(err)
+	}
+	if want := head + "\n1. e4 *\n\n"; buf.String() != want {
+		t.Errorf("got:\n%q\nwant:\n%q", buf.String(), want)
+	}
+}
