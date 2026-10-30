@@ -59,7 +59,7 @@ func TestLexFullGame(t *testing.T) {
 
 func TestLexStringEscapes(t *testing.T) {
 	toks := lexAll(t, `[Event "a \"quoted\" name"]`, ParserOptions{})
-	if toks[1].text != `a "quoted" name` {
+	if toks[1].text != `a \"quoted\" name` {
 		t.Errorf("string = %q", toks[1].text)
 	}
 }
