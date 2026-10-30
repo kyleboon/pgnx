@@ -1,0 +1,60 @@
+[Event "Forfeit"]
+[Site "?"]
+[Date "2014.10.18"]
+[Round "1"]
+[White "Alpha"]
+[Black "Beta"]
+[Result "*"]
+
+*
+
+[Event "Lone dash"]
+[Site "?"]
+[Date "2014.10.18"]
+[Round "2"]
+[White "Alpha"]
+[Black "Beta"]
+[Result "1/2-1/2"]
+
+1. e4 e5 2. Nf3 Nc6 1/2-1/2
+
+[Event "Bare piece letter"]
+[Site "?"]
+[Date "2014.10.18"]
+[Round "3"]
+[White "Alpha"]
+[Black "Beta"]
+[Result "1/2-1/2"]
+
+1. e4 e5 2. Nf3 Nc6 1/2-1/2
+
+[Event "Only a bare piece letter"]
+[Site "?"]
+[Date "2014.10.18"]
+[Round "4"]
+[White "Alpha"]
+[Black "Beta"]
+[Result "1-0"]
+
+1-0
+
+[Event "Double forfeit"]
+[Site "?"]
+[Date "2014.10.18"]
+[Round "5"]
+[White "Alpha"]
+[Black "Beta"]
+[Result "*"]
+
+*
+
+[Event "Ordinary"]
+[Site "?"]
+[Date "2014.10.18"]
+[Round "6"]
+[White "Alpha"]
+[Black "Beta"]
+[Result "1-0"]
+
+1. d4 d5 1-0
+

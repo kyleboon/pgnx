@@ -8,7 +8,6 @@ import (
 	"github.com/kyleboon/pgnx/filter"
 	"github.com/kyleboon/pgnx/output"
 	"github.com/kyleboon/pgnx/pgn"
-	"github.com/kyleboon/pgnx/replay"
 	"github.com/spf13/cobra"
 )
 
@@ -441,7 +440,7 @@ func runFilter(cmd *cobra.Command, args []string) error {
 	sel := filter.NewSelector(selOpts)
 	total, succeeded, ioErr := forEachGame(cmd, args, logW, logW, func(src string, n int, g *pgn.Game) error {
 		opts.Tags.Observe(g)
-		r, replayErr := replay.Game(g, replay.Options{})
+		r, replayErr, problem := replayGame(g, keepBroken)
 		if replayErr != nil && !keepBroken {
 			return replayErr
 		}
@@ -459,6 +458,9 @@ func runFilter(cmd *cobra.Command, args []string) error {
 		}
 		if err != nil {
 			return err
+		}
+		if replayErr == nil {
+			replayErr = problem
 		}
 		if d.Stop {
 			return stopAfter(replayErr)
