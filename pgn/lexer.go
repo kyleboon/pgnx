@@ -256,14 +256,10 @@ func (l *lexer) lexString() (token, error) {
 			if err != nil {
 				return token{}, fmt.Errorf("line %d: unterminated string escape", line)
 			}
-			switch next {
-			case '"', '\\':
-				sb.WriteRune(next)
-			default:
-				// Not a recognised escape: keep both characters as-is.
-				sb.WriteRune(ch)
-				sb.WriteRune(next)
-			}
+			// Keep the escape sequence exactly as written, as pgn-extract's
+			// lexer does, so values round-trip byte for byte on output.
+			sb.WriteRune(ch)
+			sb.WriteRune(next)
 			continue
 		}
 		if ch == '"' {

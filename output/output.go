@@ -298,7 +298,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 	if len(w.opts.Roster) > 0 {
 		for _, name := range w.opts.Roster {
 			value, _ := g.Tag(name)
-			if _, err := fmt.Fprintf(w.w, "[%s %q]\n", name, value); err != nil {
+			if _, err := fmt.Fprintf(w.w, "[%s %s]\n", name, quoteTagValue(value)); err != nil {
 				return err
 			}
 		}
@@ -317,7 +317,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 			// genuinely missing tag gets the standard default.
 			value = rt.deflt
 		}
-		if _, err := fmt.Fprintf(w.w, "[%s %q]\n", rt.name, value); err != nil {
+		if _, err := fmt.Fprintf(w.w, "[%s %s]\n", rt.name, quoteTagValue(value)); err != nil {
 			return err
 		}
 	}
@@ -330,7 +330,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 			if !ok {
 				continue
 			}
-			if _, err := fmt.Fprintf(w.w, "[%s %q]\n", name, value); err != nil {
+			if _, err := fmt.Fprintf(w.w, "[%s %s]\n", name, quoteTagValue(value)); err != nil {
 				return err
 			}
 		}
@@ -360,7 +360,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 			continue
 		}
 		rosterSet[name] = true
-		if _, err := fmt.Fprintf(w.w, "[%s %q]\n", name, value); err != nil {
+		if _, err := fmt.Fprintf(w.w, "[%s %s]\n", name, quoteTagValue(value)); err != nil {
 			return err
 		}
 	}
@@ -373,7 +373,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 			continue
 		}
 		rosterSet[name] = true
-		if _, err := fmt.Fprintf(w.w, "[%s %q]\n", name, value); err != nil {
+		if _, err := fmt.Fprintf(w.w, "[%s %s]\n", name, quoteTagValue(value)); err != nil {
 			return err
 		}
 	}
@@ -394,7 +394,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 		return w.opts.Tags.index[rest[i].Name] < w.opts.Tags.index[rest[j].Name]
 	})
 	for _, t := range rest {
-		if _, err := fmt.Fprintf(w.w, "[%s %q]\n", t.Name, t.Value); err != nil {
+		if _, err := fmt.Fprintf(w.w, "[%s %s]\n", t.Name, quoteTagValue(t.Value)); err != nil {
 			return err
 		}
 	}
