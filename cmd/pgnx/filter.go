@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/kyleboon/pgnx/filter"
@@ -32,6 +31,7 @@ colour.`,
 		RunE: runFilter,
 	}
 	addOutputFlags(cmd)
+	addECOFlags(cmd)
 
 	flags := cmd.Flags()
 	flags.StringArray("tag", nil, "tag criterion in -t grammar, e.g. 'WhiteElo >= \"2500\"' (repeatable)")
@@ -73,6 +73,22 @@ colour.`,
 	flags.String("mark-matches", "", "insert { TEXT } after each move matching a fifty/seventy-five, repetition, material or piece-count criterion (TEXT=FEN inserts the position)")
 	flags.Bool("add-match-tag", false, "add a MaterialMatch tag naming the colour that matched a material pattern")
 
+	flags.StringArray("position", nil, "match games reaching the position after these SAN moves from the start, by any move order (-x line; repeatable)")
+	flags.StringArray("position-file", nil, "file of --position move lines, one per line (-x FILE; repeatable)")
+	flags.StringArray("fen", nil, "match games reaching the piece placement of this FEN (FEN criteria line; repeatable)")
+	flags.StringArray("fen-pattern", nil, "match games reaching a position matching this FEN pattern (-Tf / --fenpattern; repeatable)")
+	flags.StringArray("fen-pattern-i", nil, "as --fen-pattern, also matching the colour-reversed pattern (--fenpatterni; repeatable)")
+	flags.StringArray("hash", nil, "match games reaching the position with this Polyglot hash, in hex (-H; repeatable)")
+	flags.Int("start-ply", 1, "start positional, repetition and N-move-rule matching at ply N (--startply)")
+	flags.Int("match-ply-limit", 0, "search for positions only up to ply N (--matchplylimit)")
+	flags.Bool("white-to-move", false, "only count positions with White to move (--wtm)")
+	flags.Bool("black-to-move", false, "only count positions with Black to move (--btm)")
+	flags.Bool("add-label-tag", false, "add a MatchLabel tag holding the label of the FEN pattern that matched (--addlabeltag)")
+	flags.StringArray("sequence", nil, "match games whose moves include these moves, in any order unless --exact-order; * matches any move, !move forbids one, a|b offers alternatives (-v line; repeatable)")
+	flags.StringArray("sequence-file", nil, "file of --sequence lines, one per line (-v FILE; repeatable)")
+	flags.Bool("exact-order", false, "require --sequence moves in the listed order (-P)")
+	flags.Bool("sequence-anywhere", false, "let a --sequence match start at any move, not only the first (--vanywhere)")
+
 	flags.String("unmatched", "", "write games that do not match to FILE (- for stdout)")
 	flags.Bool("suppress-matched", false, "do not write matched games (useful with --unmatched)")
 	flags.String("select-only", "", "emit only matched games numbered in this list, e.g. 2,5:7")
@@ -101,6 +117,7 @@ func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions,
 	getList := func(name string) []string { v, _ := flags.GetStringArray(name); return v }
 
 	m := &filter.TagMatcher{Substring: getBool("tag-substring"), Soundex: getBool("soundex")}
+	pc := &filter.PositionCriteria{}
 	for _, path := range getList("tag-file") {
 		f, err := os.Open(path)
 		if err != nil {
@@ -112,7 +129,7 @@ func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions,
 			return nil, sel, fmt.Errorf("%s: %w", path, err)
 		}
 		for _, c := range cs {
-			if err := m.Add(c); err != nil {
+			if err := addCriterion(m, pc, c); err != nil {
 				return nil, sel, fmt.Errorf("%s: %w", path, err)
 			}
 		}
@@ -122,7 +139,7 @@ func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions,
 		if err != nil {
 			return nil, sel, fmt.Errorf("--tag: %w", err)
 		}
-		if err := m.Add(c); err != nil {
+		if err := addCriterion(m, pc, c); err != nil {
 			return nil, sel, fmt.Errorf("--tag: %w", err)
 		}
 	}
@@ -236,6 +253,105 @@ func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions,
 	o.AddMatchTag = getBool("add-match-tag")
 	o.MarkMatches = getStr("mark-matches")
 
+	// Positional criteria (-x, FEN, -H, -Tf) and their modifiers.
+	for _, path := range getList("position-file") {
+		f, err := os.Open(path)
+		if err != nil {
+			return nil, sel, err
+		}
+		lines, err := filter.ReadPositionLines(f)
+		f.Close()
+		if err != nil {
+			return nil, sel, fmt.Errorf("%s: %w", path, err)
+		}
+		for _, line := range lines {
+			if err := pc.AddLine(line); err != nil {
+				return nil, sel, fmt.Errorf("%s: position line %q: %w", path, line, err)
+			}
+		}
+	}
+	for _, line := range getList("position") {
+		if err := pc.AddLine(line); err != nil {
+			return nil, sel, fmt.Errorf("--position %q: %w", line, err)
+		}
+	}
+	for _, fen := range getList("fen") {
+		if err := pc.AddFEN(fen); err != nil {
+			return nil, sel, fmt.Errorf("--fen: %w", err)
+		}
+	}
+	for _, p := range getList("fen-pattern") {
+		if err := pc.AddPattern(p, false, ""); err != nil {
+			return nil, sel, fmt.Errorf("--fen-pattern: %w", err)
+		}
+	}
+	for _, p := range getList("fen-pattern-i") {
+		if err := pc.AddPattern(p, true, ""); err != nil {
+			return nil, sel, fmt.Errorf("--fen-pattern-i: %w", err)
+		}
+	}
+	for _, h := range getList("hash") {
+		if err := pc.AddHash(h); err != nil {
+			return nil, sel, fmt.Errorf("--hash %q: %w", h, err)
+		}
+	}
+	switch {
+	case getBool("white-to-move") && getBool("black-to-move"):
+		return nil, sel, errors.New("--white-to-move and --black-to-move are mutually exclusive")
+	case getBool("white-to-move"):
+		pc.WhoseMove = filter.WhiteToMove
+	case getBool("black-to-move"):
+		pc.WhoseMove = filter.BlackToMove
+	}
+	if flags.Changed("match-ply-limit") {
+		limit := getInt("match-ply-limit")
+		if limit < 1 {
+			return nil, sel, errors.New("--match-ply-limit must be at least 1")
+		}
+		// The C tool refuses a limit below the depth its -x lines already
+		// imply (argsfile.c "conflicts with existing higher limit").
+		if depth := pc.LineDepth(); limit < depth {
+			return nil, sel, fmt.Errorf("--match-ply-limit of %d conflicts with the search depth of %d implied by the --position lines", limit, depth)
+		}
+		pc.MatchPlyLimit = limit
+	}
+	if !pc.Empty() {
+		o.Positions = pc
+	}
+	if n := getInt("start-ply"); n < 1 {
+		return nil, sel, errors.New("--start-ply must be at least 1")
+	} else {
+		o.StartPly = n
+	}
+	o.AddLabelTag = getBool("add-label-tag")
+	o.NoVariations = getBool("no-variations")
+
+	// Move sequences (-v, -P, --vanywhere).
+	for _, path := range getList("sequence-file") {
+		f, err := os.Open(path)
+		if err != nil {
+			return nil, sel, err
+		}
+		seqs, err := filter.ReadSequences(f)
+		f.Close()
+		if err != nil {
+			return nil, sel, fmt.Errorf("%s: %w", path, err)
+		}
+		o.Sequences = append(o.Sequences, seqs...)
+	}
+	for _, line := range getList("sequence") {
+		seq, err := filter.ParseSequence(line)
+		if err != nil {
+			return nil, sel, fmt.Errorf("--sequence %q: %w", line, err)
+		}
+		if seq == nil {
+			return nil, sel, fmt.Errorf("--sequence %q: no moves", line)
+		}
+		o.Sequences = append(o.Sequences, seq)
+	}
+	o.ExactOrder = getBool("exact-order")
+	o.SequenceAnywhere = getBool("sequence-anywhere")
+
 	o.NoBadResults = getBool("no-bad-results")
 	o.FixResultTags = getBool("fix-result-tags")
 
@@ -273,30 +389,15 @@ func runFilter(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	ecoSet, err := ecoOptions(cmd)
+	if err != nil {
+		return err
+	}
 	flags := cmd.Flags()
 	keepBroken, _ := flags.GetBool("keep-broken")
 	quiet, _ := flags.GetBool("quiet")
 	suppressMatched, _ := flags.GetBool("suppress-matched")
 	unmatchedPath, _ := flags.GetString("unmatched")
-
-	out, outCloser, err := openOutput(cmd, "output")
-	if err != nil {
-		return err
-	}
-	if outCloser != nil {
-		defer outCloser.Close()
-	}
-	var unmatchedOut io.Writer
-	if unmatchedPath != "" {
-		var closer io.Closer
-		unmatchedOut, closer, err = openOutput(cmd, "unmatched")
-		if err != nil {
-			return err
-		}
-		if closer != nil {
-			defer closer.Close()
-		}
-	}
 
 	logW, logCloser, err := logWriter(cmd)
 	if err != nil {
@@ -304,6 +405,10 @@ func runFilter(cmd *cobra.Command, args []string) error {
 	}
 	if logCloser != nil {
 		defer logCloser.Close()
+	}
+	if !quiet {
+		ecoPath, _ := flags.GetString("eco-file")
+		ecoSet.logSkipped(logW, ecoPath)
 	}
 
 	// One registry shared by every writer, fed criteria tag names and
@@ -314,13 +419,23 @@ func runFilter(cmd *cobra.Command, args []string) error {
 	for _, name := range criteriaTagNames(cmd) {
 		opts.Tags.ObserveName(name)
 	}
-	sourceOpts := output.Options{Format: output.Source, LineWidth: opts.LineWidth, Tags: opts.Tags}
-	matchedW := output.NewWriter(out, opts)
-	matchedSourceW := output.NewWriter(out, sourceOpts)
-	var unmatchedW, unmatchedSourceW *output.Writer
-	if unmatchedOut != nil {
-		unmatchedW = output.NewWriter(unmatchedOut, opts)
-		unmatchedSourceW = output.NewWriter(unmatchedOut, sourceOpts)
+	if opts.SevenTagRoster && ecoSet.classifying() {
+		opts.RosterExtras = ecoRosterExtras
+	}
+	matched, err := openDestination(cmd, "output", opts, ecoSet.split)
+	if err != nil {
+		return err
+	}
+	defer matched.Close()
+	var unmatched gameWriters
+	if unmatchedPath != "" {
+		// Unmatched games are never divided by ECO (grammar.c
+		// select_output_file routes only matched games through -E).
+		unmatched, err = openDestination(cmd, "unmatched", opts, 0)
+		if err != nil {
+			return err
+		}
+		defer unmatched.Close()
 	}
 
 	sel := filter.NewSelector(selOpts)
@@ -330,16 +445,17 @@ func runFilter(cmd *cobra.Command, args []string) error {
 		if replayErr != nil && !keepBroken {
 			return replayErr
 		}
-		matched, err := filter.Evaluate(g, r, fopts)
+		ecoSet.classify(g, r)
+		isMatch, err := filter.Evaluate(g, r, fopts)
 		if err != nil {
 			return err
 		}
-		d := sel.Decide(n, matched)
+		d := sel.Decide(n, isMatch)
 		switch {
 		case d.Emit && !suppressMatched:
-			err = writeGame(g, r, replayErr, matchedW, matchedSourceW)
-		case d.ToUnmatched && unmatchedW != nil:
-			err = writeGame(g, r, replayErr, unmatchedW, unmatchedSourceW)
+			err = writeGameTo(matched, g, r, replayErr)
+		case d.ToUnmatched && unmatched != nil:
+			err = writeGameTo(unmatched, g, r, replayErr)
 		}
 		if err != nil {
 			return err
@@ -351,8 +467,8 @@ func runFilter(cmd *cobra.Command, args []string) error {
 	})
 
 	if !quiet && !suppressMatched {
-		matched := sel.Matched()
-		fmt.Fprintf(logW, "%d game%s matched out of %d.\n", matched, plural(matched), total)
+		count := sel.Matched()
+		fmt.Fprintf(logW, "%d game%s matched out of %d.\n", count, plural(count), total)
 	}
 
 	if ioErr != nil || succeeded < total {
@@ -361,19 +477,25 @@ func runFilter(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// writeGame writes g with w, or (when its replay failed and the game is
-// being kept) with sourceW, since only Source format can render a game
-// without replay detail.
-func writeGame(g *pgn.Game, r *replay.Result, replayErr error, w, sourceW *output.Writer) error {
-	if replayErr != nil {
-		return sourceW.WriteGame(g, nil)
+// addCriterion sends a parsed -t line to the matcher it belongs to: FEN,
+// FENPattern and FENPatternI lines are positional criteria (taglines.c
+// process_tag_line), everything else is a tag criterion.
+func addCriterion(m *filter.TagMatcher, pc *filter.PositionCriteria, c filter.Criterion) error {
+	switch c.Tag {
+	case "FEN":
+		return pc.AddFEN(c.Value)
+	case "FENPattern":
+		return pc.AddPattern(c.Value, false, c.Label)
+	case "FENPatternI":
+		return pc.AddPattern(c.Value, true, c.Label)
 	}
-	return w.WriteGame(g, r)
+	return m.Add(c)
 }
 
 // criteriaTagNames returns the tag names mentioned by --tag-file files and
-// --tag expressions, in order, for TagRegistry seeding. Errors are
-// ignored here: filterOptions has already reported them.
+// --tag expressions, in order, for TagRegistry seeding; positional
+// criteria lines name no tag. Errors are ignored here: filterOptions has
+// already reported them.
 func criteriaTagNames(cmd *cobra.Command) []string {
 	var names []string
 	files, _ := cmd.Flags().GetStringArray("tag-file")
@@ -385,12 +507,14 @@ func criteriaTagNames(cmd *cobra.Command) []string {
 		cs, _ := filter.ReadCriteria(f)
 		f.Close()
 		for _, c := range cs {
-			names = append(names, c.Tag)
+			if !c.IsPositional() {
+				names = append(names, c.Tag)
+			}
 		}
 	}
 	exprs, _ := cmd.Flags().GetStringArray("tag")
 	for _, e := range exprs {
-		if c, err := filter.ParseCriterion(e); err == nil {
+		if c, err := filter.ParseCriterion(e); err == nil && !c.IsPositional() {
 			names = append(names, c.Tag)
 		}
 	}

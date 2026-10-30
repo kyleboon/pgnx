@@ -173,3 +173,182 @@ func TestFilterUsageErrorsPrinted(t *testing.T) {
 		t.Errorf("exit %d err %q", code, errOut)
 	}
 }
+
+const sicilianAndQueens = "[White \"Sicilian\"]\n\n1. e4 c5 2. Nf3 d6 *\n\n[White \"Queens\"]\n\n1. d4 d5 2. c4 e6 *\n"
+
+func TestFilterPositionLine(t *testing.T) {
+	out, errOut, code := runCLI(t, sicilianAndQueens, "filter", "--quiet", "--position", "e4 c5", "--unmatched", "-", "--suppress-matched")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if !strings.Contains(out, "Queens") || strings.Contains(out, "Sicilian") {
+		t.Errorf("unmatched: %s", out)
+	}
+	out, _, _ = runCLI(t, sicilianAndQueens, "filter", "--quiet", "--position", "1. e4 c5 *")
+	if !strings.Contains(out, "Sicilian") || strings.Contains(out, "Queens") {
+		t.Errorf("matched: %s", out)
+	}
+	// Transposition: the position is reached by a different move order.
+	out, _, _ = runCLI(t, "1. Nf3 d6 2. e4 c5 *\n", "filter", "--quiet", "--position", "e4 c5 Nf3 d6")
+	if !strings.Contains(out, "Nf3 d6") {
+		t.Errorf("transposition: %s", out)
+	}
+}
+
+func TestFilterPositionFile(t *testing.T) {
+	dir := t.TempDir()
+	pf := filepath.Join(dir, "x.txt")
+	os.WriteFile(pf, []byte("% positions\n\nd4 d5 c4\n"), 0o644)
+	out, _, code := runCLI(t, sicilianAndQueens, "filter", "--quiet", "--position-file", pf)
+	if code != 0 || !strings.Contains(out, "Queens") || strings.Contains(out, "Sicilian") {
+		t.Errorf("exit %d out %s", code, out)
+	}
+	os.WriteFile(pf, []byte("e4 e5\ne4 Qh5\n"), 0o644)
+	_, errOut, code := runCLI(t, sicilianAndQueens, "filter", "--position-file", pf)
+	if code != 1 || !strings.Contains(errOut, "x.txt") || !strings.Contains(errOut, "Qh5") {
+		t.Errorf("unreplayable line: exit %d err %q", code, errOut)
+	}
+}
+
+func TestFilterFENAndHash(t *testing.T) {
+	afterE4C5 := "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2"
+	out, _, code := runCLI(t, sicilianAndQueens, "filter", "--quiet", "--fen", afterE4C5)
+	if code != 0 || !strings.Contains(out, "Sicilian") || strings.Contains(out, "Queens") {
+		t.Errorf("--fen: exit %d out %s", code, out)
+	}
+	out, _, code = runCLI(t, sicilianAndQueens, "filter", "--quiet", "--tag", `FEN "`+afterE4C5+`"`)
+	if code != 0 || !strings.Contains(out, "Sicilian") || strings.Contains(out, "Queens") {
+		t.Errorf("--tag FEN: exit %d out %s", code, out)
+	}
+	// Polyglot hash of the start position: every game reaches it, but
+	// --black-to-move rules it out.
+	out, _, code = runCLI(t, sicilianAndQueens, "filter", "--quiet", "--hash", "463b96181691fc9c")
+	if code != 0 || strings.Count(out, "[White") != 2 {
+		t.Errorf("--hash: exit %d out %s", code, out)
+	}
+	out, _, code = runCLI(t, sicilianAndQueens, "filter", "--quiet", "--hash", "463b96181691fc9c", "--black-to-move")
+	if code != 0 || out != "" {
+		t.Errorf("--hash --black-to-move: exit %d out %s", code, out)
+	}
+}
+
+func TestFilterFENPatternMarks(t *testing.T) {
+	out, errOut, code := runCLI(t, sicilianAndQueens, "filter", "--quiet", "--fen-pattern", "*/*/*/*/????P???/*/*/*", "--mark-matches", "X")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if !strings.Contains(out, "1. e4 { X } 1... c5") || strings.Contains(out, "Queens") {
+		t.Errorf("mark: %s", out)
+	}
+	// --fen-pattern-i also matches the colour-reversed pattern: a White
+	// pawn on d4, or a Black pawn on d5.
+	in := sicilianAndQueens + "\n[White \"Scandinavian\"]\n\n1. e4 d5 *\n"
+	out, _, _ = runCLI(t, in, "filter", "--quiet", "--fen-pattern-i", "*/*/*/*/???P????/*/*/*", "--mark-matches", "X")
+	if strings.Contains(out, "Sicilian") || !strings.Contains(out, "1. d4 { X } 1... d5") || !strings.Contains(out, "1. e4 d5 { X }") {
+		t.Errorf("inverse mark: %s", out)
+	}
+	out, _, _ = runCLI(t, in, "filter", "--quiet", "--fen-pattern", "*/*/*/*/???P????/*/*/*")
+	if strings.Contains(out, "Scandinavian") || !strings.Contains(out, "Queens") {
+		t.Errorf("plain pattern is not colour-reversed: %s", out)
+	}
+}
+
+func TestFilterTagFilePatternLabel(t *testing.T) {
+	dir := t.TempDir()
+	tf := filepath.Join(dir, "t.txt")
+	os.WriteFile(tf, []byte("% patterns\nFENPattern \"*/*/*/*/????P???/*/*/*\" KingPawn\nFENPatternI \"*/*/*/*/???P????/*/*/*\" QueenPawn\n"), 0o644)
+	out, errOut, code := runCLI(t, sicilianAndQueens, "filter", "--quiet", "--tag-file", tf, "--add-label-tag")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if !strings.Contains(out, "[MatchLabel \"KingPawn\"]") || !strings.Contains(out, "[MatchLabel \"QueenPawn\"]") {
+		t.Errorf("labels: %s", out)
+	}
+	out, _, _ = runCLI(t, sicilianAndQueens, "filter", "--quiet", "--tag-file", tf)
+	if strings.Contains(out, "MatchLabel") {
+		t.Errorf("no label tag without --add-label-tag: %s", out)
+	}
+	out, _, _ = runCLI(t, sicilianAndQueens, "filter", "--quiet", "--tag", `FENPattern "*/*/*/*/????P???/*/*/*" Lbl`, "--add-label-tag")
+	if !strings.Contains(out, "[MatchLabel \"Lbl\"]") || strings.Contains(out, "Queens") {
+		t.Errorf("--tag pattern: %s", out)
+	}
+}
+
+func TestFilterStartPlyAndMatchPlyLimit(t *testing.T) {
+	// The pattern matches after 1. e4 (ply 1); starting at ply 2 misses it
+	// in the Sicilian but the e-pawn is still there at later plies.
+	pat := "*/*/*/*/????P???/*/*/*"
+	out, _, code := runCLI(t, "1. e4 e5 2. Nf3 *\n", "filter", "--quiet", "--fen-pattern", pat, "--start-ply", "2", "--mark-matches", "X")
+	if code != 0 || !strings.Contains(out, "e5 { X }") {
+		t.Errorf("start-ply: exit %d out %s", code, out)
+	}
+	out, _, code = runCLI(t, "1. d4 d5 2. e4 *\n", "filter", "--quiet", "--fen-pattern", pat, "--match-ply-limit", "2")
+	if code != 0 || out != "" {
+		t.Errorf("match-ply-limit cuts the search: exit %d out %s", code, out)
+	}
+	out, _, code = runCLI(t, "1. d4 d5 2. e4 *\n", "filter", "--quiet", "--fen-pattern", pat, "--match-ply-limit", "3")
+	if code != 0 || out == "" {
+		t.Errorf("match-ply-limit reaches the move: exit %d out %s", code, out)
+	}
+}
+
+func TestFilterPositionalUsageErrors(t *testing.T) {
+	for _, args := range [][]string{
+		{"--hash", "xyz"},
+		{"--hash", "0123456789abcdef0"},
+		{"--position", "e4 c5 Nf3 d6 d4 cxd4", "--match-ply-limit", "5"},
+		{"--match-ply-limit", "5", "--position", "e4 c5 Nf3 d6 d4 cxd4"},
+		{"--match-ply-limit", "0"},
+		{"--white-to-move", "--black-to-move"},
+		{"--start-ply", "0"},
+		{"--position", "e4 e4"},
+		{"--fen", "not a fen"},
+		{"--fen-pattern", "*/*/*"},
+		{"--sequence", "%"},
+	} {
+		_, errOut, code := runCLI(t, fools, append([]string{"filter"}, args...)...)
+		if code != 1 {
+			t.Errorf("%v: exit %d, want 1 (%s)", args, code, errOut)
+		}
+	}
+	_, errOut, code := runCLI(t, fools, "filter", "--position", "e4 c5 Nf3 d6 d4 cxd4", "--match-ply-limit", "5")
+	if code != 1 || !strings.Contains(errOut, "5") || !strings.Contains(errOut, "14") {
+		t.Errorf("limit error must quote both numbers: %q", errOut)
+	}
+	// --exact-order / --sequence-anywhere without sequences are no-ops.
+	out, _, code := runCLI(t, fools, "filter", "--quiet", "--exact-order", "--sequence-anywhere")
+	if code != 0 || !strings.Contains(out, "Qh4#") {
+		t.Errorf("no-op flags: exit %d out %s", code, out)
+	}
+}
+
+func TestFilterSequences(t *testing.T) {
+	in := "[White \"Straight\"]\n\n1. d4 Nf6 2. Nf3 e6 *\n\n[White \"Permuted\"]\n\n1. Nf3 Nf6 2. d4 e6 *\n\n[White \"Other\"]\n\n1. e4 e5 *\n"
+	out, errOut, code := runCLI(t, in, "filter", "--quiet", "--sequence", "d4 Nf6 Nf3")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if !strings.Contains(out, "Straight") || !strings.Contains(out, "Permuted") || strings.Contains(out, "Other") {
+		t.Errorf("permutation: %s", out)
+	}
+	out, _, _ = runCLI(t, in, "filter", "--quiet", "--sequence", "d4 Nf6 Nf3", "--exact-order")
+	if !strings.Contains(out, "Straight") || strings.Contains(out, "Permuted") {
+		t.Errorf("exact order: %s", out)
+	}
+	out, _, _ = runCLI(t, in, "filter", "--quiet", "--sequence", "Nf3 e6", "--exact-order")
+	if out != "" {
+		t.Errorf("sequence from the first move only: %s", out)
+	}
+	out, _, _ = runCLI(t, in, "filter", "--quiet", "--sequence", "Nf3 e6", "--exact-order", "--sequence-anywhere")
+	if !strings.Contains(out, "Straight") || strings.Contains(out, "Permuted") {
+		t.Errorf("anywhere: %s", out)
+	}
+
+	dir := t.TempDir()
+	sf := filepath.Join(dir, "v.txt")
+	os.WriteFile(sf, []byte("% sequences\n\ne4 e5\nd4 * Nf3\n"), 0o644)
+	out, _, code = runCLI(t, in, "filter", "--quiet", "--sequence-file", sf, "--exact-order")
+	if code != 0 || !strings.Contains(out, "Straight") || !strings.Contains(out, "Other") || strings.Contains(out, "Permuted") {
+		t.Errorf("sequence file: exit %d out %s", code, out)
+	}
+}

@@ -25,6 +25,7 @@ func newConvertCmd() *cobra.Command {
 	}
 
 	addOutputFlags(cmd)
+	addECOFlags(cmd)
 	return cmd
 }
 
@@ -130,16 +131,12 @@ func runConvert(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	keepBroken, _ := cmd.Flags().GetBool("keep-broken")
-	quiet, _ := cmd.Flags().GetBool("quiet")
-
-	out, outCloser, err := openOutput(cmd, "output")
+	ecoSet, err := ecoOptions(cmd)
 	if err != nil {
 		return err
 	}
-	if outCloser != nil {
-		defer outCloser.Close()
-	}
+	keepBroken, _ := cmd.Flags().GetBool("keep-broken")
+	quiet, _ := cmd.Flags().GetBool("quiet")
 
 	logW, logCloser, err := logWriter(cmd)
 	if err != nil {
@@ -148,26 +145,35 @@ func runConvert(cmd *cobra.Command, args []string) error {
 	if logCloser != nil {
 		defer logCloser.Close()
 	}
+	if !quiet {
+		ecoPath, _ := cmd.Flags().GetString("eco-file")
+		ecoSet.logSkipped(logW, ecoPath)
+	}
 
-	// One registry shared by both writers, fed every parsed game so that
+	// One registry shared by every writer, fed every parsed game so that
 	// unrecognised tags are ordered as the C oracle orders them (run-wide
 	// first-seen), even when a game is skipped.
 	opts.Tags = output.NewTagRegistry()
-	w := output.NewWriter(out, opts)
-	sourceWriter := output.NewWriter(out, output.Options{Format: output.Source, LineWidth: opts.LineWidth, Tags: opts.Tags})
+	if opts.SevenTagRoster && ecoSet.classifying() {
+		opts.RosterExtras = ecoRosterExtras
+	}
+	dest, err := openDestination(cmd, "output", opts, ecoSet.split)
+	if err != nil {
+		return err
+	}
+	defer dest.Close()
 
 	total, succeeded, ioErr := forEachGame(cmd, args, logW, logW, func(src string, n int, g *pgn.Game) error {
 		opts.Tags.Observe(g)
 		r, replayErr := replay.Game(g, replay.Options{})
-		if replayErr != nil {
-			if keepBroken {
-				if err := sourceWriter.WriteGame(g, nil); err != nil {
-					return err
-				}
-			}
+		if replayErr != nil && !keepBroken {
 			return replayErr
 		}
-		return w.WriteGame(g, r)
+		ecoSet.classify(g, r)
+		if err := writeGameTo(dest, g, r, replayErr); err != nil {
+			return err
+		}
+		return replayErr
 	})
 
 	if !quiet {
@@ -178,6 +184,39 @@ func runConvert(cmd *cobra.Command, args []string) error {
 		return errProblems
 	}
 	return nil
+}
+
+// openDestination builds the writer selector for games: with --eco-split
+// a per-ECO-prefix set of files in the current directory, otherwise the
+// file named by the string flag flagName (or stdout). The returned
+// Closer closes whatever files were opened.
+func openDestination(cmd *cobra.Command, flagName string, opts output.Options, splitLevel int) (gameWriters, error) {
+	sourceOpts := output.Options{Format: output.Source, LineWidth: opts.LineWidth, Tags: opts.Tags}
+	if splitLevel > 0 {
+		return newECOSplitWriters(splitLevel, opts, sourceOpts), nil
+	}
+	out, closer, err := openOutput(cmd, flagName)
+	if err != nil {
+		return nil, err
+	}
+	return &closingWriters{
+		fixedWriters: fixedWriters{w: output.NewWriter(out, opts), sourceW: output.NewWriter(out, sourceOpts)},
+		closer:       closer,
+	}, nil
+}
+
+// closingWriters is a fixedWriters pair over a file that must be closed
+// at the end of the run (nil for stdout).
+type closingWriters struct {
+	fixedWriters
+	closer io.Closer
+}
+
+func (c *closingWriters) Close() error {
+	if c.closer == nil {
+		return nil
+	}
+	return c.closer.Close()
 }
 
 // plural returns "" when n == 1, else "s", matching the C oracle's
