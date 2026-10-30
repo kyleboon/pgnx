@@ -16,11 +16,11 @@ import (
 // changes a flag or an oracle file, the comment and the row will visibly
 // disagree.
 //
-// Rows cover convert-equivalent behavior (pure move/tag output formatting)
-// and, from Phase 2, the filter command's selection criteria. See the
-// "Phase 3+" comment at the bottom of this table for targets deliberately
-// excluded (positional matching, ECO classification, deduplication, and
-// output transforms not yet implemented).
+// Rows cover convert-equivalent behavior (pure move/tag output formatting),
+// from Phase 2 the filter command's selection criteria, and from Phase 3
+// positional/sequence matching and ECO classification. See the "Phase 4+"
+// comment at the bottom of this table for targets deliberately excluded
+// (deduplication, null moves, and output transforms not yet implemented).
 var goldenCases = []struct {
 	name   string
 	args   []string // pgnx args; input/output paths are appended by the runner
@@ -203,15 +203,52 @@ var goldenCases = []struct {
 	// test-fixresulttags: pgn-extract --fixresulttags -otest-fixresulttags-out.pgn -lfix-results-log.txt --quiet test-fixresulttags-in.pgn
 	{"test-fixresulttags", []string{"filter", "--fix-result-tags"}, "test-fixresulttags-in.pgn", "test-fixresulttags-out.pgn", false},
 
+	// ---- Phase 3: positional matching, move sequences, ECO classification ----
+
+	// test-x: pgn-extract -xxvars.txt -otest-x-out.pgn --quiet najdorf.pgn
+	{"test-x", []string{"filter", "--position-file", filepath.Join("testdata", "golden", "infiles", "xvars.txt")}, "najdorf.pgn", "test-x-out.pgn", false},
+	// test-markmatches: pgn-extract --markmatches MATCH -xxvars.txt -otest-markmatches-out.pgn --quiet najdorf.pgn
+	{"test-markmatches", []string{"filter", "--mark-matches", "MATCH", "--position-file", filepath.Join("testdata", "golden", "infiles", "xvars.txt")}, "najdorf.pgn", "test-markmatches-out.pgn", false},
+	// test-v: pgn-extract -vvvars.txt -otest-v-out.pgn --quiet najdorf.pgn
+	{"test-v", []string{"filter", "--sequence-file", filepath.Join("testdata", "golden", "infiles", "vvars.txt")}, "najdorf.pgn", "test-v-out.pgn", false},
+	// test-PP: pgn-extract -P -vPvars.txt -otest-PP-out.pgn --quiet test-P.pgn
+	{"test-PP", []string{"filter", "--exact-order", "--sequence-file", filepath.Join("testdata", "golden", "infiles", "Pvars.txt")}, "test-P.pgn", "test-PP-out.pgn", false},
+	// test-t (2nd command, FEN criteria lines): pgn-extract -ttest-tFEN.txt -otest-tFEN-out.pgn --quiet fischer.pgn
+	{"test-tFEN", []string{"filter", "--tag-file", filepath.Join("testdata", "golden", "infiles", "test-tFEN.txt")}, "fischer.pgn", "test-tFEN-out.pgn", false},
+	// test-FENPattern: pgn-extract -otest-FENPattern-out.pgn -ltest-FENPattern-log.txt --quiet
+	//   -Atest-FENPattern.txt --addlabeltag --markmatches HERE petrosian.pgn
+	// -A reads an argsfile (not ported); test-FENPattern.txt is a ":-t"
+	// section holding exactly two criteria lines, which are passed here
+	// verbatim as --tag flags. The C Makefile's CMP of the log file is
+	// commented out, so only the PGN output is an oracle.
+	{"test-FENPattern", []string{"filter",
+		"--tag", `FENPattern "*/*/*/*/???pN???/???P????/*/*"`,
+		"--tag", `FENPatternI "*/*/*/*/???Np???/????P???/*/*" Nd4th`,
+		"--add-label-tag", "--mark-matches", "HERE"}, "petrosian.pgn", "test-FENPattern-out.pgn", false},
+	// test-FENPattern (2nd command): pgn-extract -otest-FENPattern-cli-out.pgn -ltest-FENPattern-log.txt --quiet
+	//   --fenpattern "*/*/*/*/???pN???/???P????/*/*" --fenpatterni "*/*/*/*/???Np???/????P???/*/*" --markmatches HERE petrosian.pgn
+	{"test-FENPattern-cli", []string{"filter",
+		"--fen-pattern", "*/*/*/*/???pN???/???P????/*/*",
+		"--fen-pattern-i", "*/*/*/*/???Np???/????P???/*/*",
+		"--mark-matches", "HERE"}, "petrosian.pgn", "test-FENPattern-cli-out.pgn", false},
+	// test-e: pgn-extract -e../eco.pgn -otest-e-out.pgn --quiet test-e.pgn
+	// (ECO_FILE in the C Makefile is the eco.pgn at the C repo root,
+	// vendored here as testdata/golden/eco.pgn)
+	{"test-e", []string{"convert", "--eco-file", goldenECO}, "test-e.pgn", "test-e-out.pgn", false},
+
+	// test-x's second command (-n) is in TestGoldenConformanceUnmatched;
+	// test-matchplylimit and test-startply (several -a runs into one
+	// file) are in TestGoldenConformanceAppendRuns; test-EE (-E1 split
+	// into A.pgn/B.pgn/E.pgn in the cwd) is in
+	// TestGoldenConformanceECOSplit.
+
 	// test-n and test-suppressmatched need two outputs; see
 	// TestGoldenConformanceUnmatched and TestGoldenConformanceSuppressMatched.
 
-	// Phase 3+ (deliberately excluded from this harness):
-	//   Positional matching (Phase 3): test-tFEN (FEN lines in -t files),
-	//   test-Te (needs -e ECO classification), test-x, test-v,
-	//   test-markmatches (uses -x), test-matchplylimit, test-startply,
-	//   test-FENPattern, test-PP.
-	//   ECO classification (Phase 3): test-e/-EE.
+	// Phase 4+ (deliberately excluded from this harness):
+	//   test-Te (pgn-extract -e eco.pgn -TeB14 fischer.pgn) has no CMP
+	//   line and no oracle file in the C repo; its behaviour is pinned by
+	//   TestFilterECOCriterionAfterClassification in eco_test.go instead.
 	//   Duplicate detection (Phase 4): test-AA, test-checkfile,
 	//   test-duplicates, test-noduplicates, test-nounique, test-ZZ,
 	//   test-fuzzydepth.
@@ -277,40 +314,55 @@ func TestGoldenConformance(t *testing.T) {
 	}
 }
 
-// TestGoldenConformanceUnmatched mirrors the C Makefile's test-n target:
-// pgn-extract -TpFischer -otest-n-matched.pgn -ntest-n-unmatched.pgn --quiet petrosian.pgn
-// Two output files are compared, which the goldenCases table can't
-// express.
+// TestGoldenConformanceUnmatched covers the C Makefile targets that write
+// a matched and an unmatched (-n) file, which the goldenCases table can't
+// express:
+// test-n: pgn-extract -TpFischer -otest-n-matched.pgn -ntest-n-unmatched.pgn --quiet petrosian.pgn
+// test-x (2nd command): pgn-extract -xxvars.txt -otest-x-out.pgn -ntest-xn-out.pgn --quiet najdorf.pgn
 func TestGoldenConformanceUnmatched(t *testing.T) {
-	dir := t.TempDir()
-	matched := filepath.Join(dir, "matched.pgn")
-	unmatched := filepath.Join(dir, "unmatched.pgn")
-	args := []string{"filter", "--quiet", "--player", "Fischer", "-o", matched, "--unmatched", unmatched,
-		filepath.Join("testdata", "golden", "infiles", "petrosian.pgn")}
-
-	root := NewRootCmd()
-	var errb bytes.Buffer
-	root.SetErr(&errb)
-	root.SetArgs(args)
-	if err := root.Execute(); err != nil {
-		t.Fatalf("pgnx %v: %v\n%s", args, err, errb.String())
+	cases := []struct {
+		name                     string
+		args                     []string
+		input                    string
+		matchedOracle, unmatched string
+	}{
+		{"test-n", []string{"--player", "Fischer"}, "petrosian.pgn", "test-n-matched.pgn", "test-n-unmatched.pgn"},
+		{"test-xn", []string{"--position-file", filepath.Join("testdata", "golden", "infiles", "xvars.txt")}, "najdorf.pgn", "test-x-out.pgn", "test-xn-out.pgn"},
 	}
-	for _, c := range []struct{ got, oracle string }{
-		{matched, "test-n-matched.pgn"},
-		{unmatched, "test-n-unmatched.pgn"},
-	} {
-		got, err := os.ReadFile(c.got)
-		if err != nil {
-			t.Fatal(err)
-		}
-		want, err := os.ReadFile(filepath.Join("testdata", "golden", "outfiles", c.oracle))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !bytes.Equal(got, want) {
-			t.Errorf("output differs from C oracle %s\n--- first divergence ---\n%s",
-				c.oracle, firstDiff(got, want))
-		}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			matched := filepath.Join(dir, "matched.pgn")
+			unmatched := filepath.Join(dir, "unmatched.pgn")
+			args := append([]string{"filter", "--quiet"}, c.args...)
+			args = append(args, "-o", matched, "--unmatched", unmatched,
+				filepath.Join("testdata", "golden", "infiles", c.input))
+
+			root := NewRootCmd()
+			var errb bytes.Buffer
+			root.SetErr(&errb)
+			root.SetArgs(args)
+			if err := root.Execute(); err != nil {
+				t.Fatalf("pgnx %v: %v\n%s", args, err, errb.String())
+			}
+			for _, f := range []struct{ got, oracle string }{
+				{matched, c.matchedOracle},
+				{unmatched, c.unmatched},
+			} {
+				got, err := os.ReadFile(f.got)
+				if err != nil {
+					t.Fatal(err)
+				}
+				want, err := os.ReadFile(filepath.Join("testdata", "golden", "outfiles", f.oracle))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Equal(got, want) {
+					t.Errorf("output differs from C oracle %s\n--- first divergence ---\n%s",
+						f.oracle, firstDiff(got, want))
+				}
+			}
+		})
 	}
 }
 
@@ -424,6 +476,119 @@ func TestGoldenConformanceMultiFile(t *testing.T) {
 	if !bytes.Equal(got, want) {
 		t.Errorf("output differs from C oracle test-f-out.pgn\n--- first divergence ---\n%s",
 			firstDiff(got, want))
+	}
+}
+
+// TestGoldenConformanceAppendRuns mirrors the C Makefile targets that
+// build one oracle from several -a (append) runs, each a separate process
+// with its own tag registry, over the same input with a different ply
+// bound each time. Every pgnx run is likewise a separate root command.
+//
+// test-matchplylimit (after rm test-matchplylimit-out.pgn), for N in 8 9 10 150:
+//
+//	pgn-extract -Hdb55d4fcaadc775e --matchplylimit N --markmatches match -atest-matchplylimit-out.pgn --quiet test-matchplylimit.pgn
+//
+// test-startply (after rm test-startply-out.pgn), for N in 8 9 10 11 100 200:
+//
+//	pgn-extract --startply N -Tf"*/*/4p3/3pP3/2pP4/2P5/*/*" --markmatches match -atest-startply-out.pgn --quiet test-startply.pgn
+func TestGoldenConformanceAppendRuns(t *testing.T) {
+	cases := []struct {
+		name   string
+		flag   string   // the per-run flag
+		values []string // one run per value, in Makefile order
+		args   []string // flags common to every run
+		input  string
+		oracle string
+	}{
+		{"test-matchplylimit", "--match-ply-limit", []string{"8", "9", "10", "150"},
+			[]string{"--hash", "db55d4fcaadc775e", "--mark-matches", "match"},
+			"test-matchplylimit.pgn", "test-matchplylimit-out.pgn"},
+		{"test-startply", "--start-ply", []string{"8", "9", "10", "11", "100", "200"},
+			[]string{"--fen-pattern", "*/*/4p3/3pP3/2pP4/2P5/*/*", "--mark-matches", "match"},
+			"test-startply.pgn", "test-startply-out.pgn"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			outFile := filepath.Join(t.TempDir(), "out.pgn")
+			for _, v := range c.values {
+				args := append([]string{"filter", "--quiet", c.flag, v}, c.args...)
+				args = append(args, "--append", "-o", outFile,
+					filepath.Join("testdata", "golden", "infiles", c.input))
+				root := NewRootCmd()
+				var errb bytes.Buffer
+				root.SetErr(&errb)
+				root.SetArgs(args)
+				if err := root.Execute(); err != nil {
+					t.Fatalf("pgnx %v: %v\n%s", args, err, errb.String())
+				}
+			}
+			got, err := os.ReadFile(outFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want, err := os.ReadFile(filepath.Join("testdata", "golden", "outfiles", c.oracle))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(got, want) {
+				t.Errorf("output differs from C oracle %s\n--- first divergence ---\n%s",
+					c.oracle, firstDiff(got, want))
+			}
+		})
+	}
+}
+
+// TestGoldenConformanceECOSplit mirrors the C Makefile's test-EE target:
+// rm [A-E].pgn; pgn-extract -e../eco.pgn -E1 --quiet test-ucE.pgn
+// then CMP of A.pgn, B.pgn and E.pgn. -E writes into the current
+// directory, so the run happens in an empty temp cwd; the input and ECO
+// file are therefore passed as absolute paths. No other *.pgn (in
+// particular no noeco.pgn) may appear: the C tool only opens a split
+// file when it has a game to write to it.
+func TestGoldenConformanceECOSplit(t *testing.T) {
+	in, err := filepath.Abs(filepath.Join("testdata", "golden", "infiles", "test-ucE.pgn"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	oracles, err := filepath.Abs(filepath.Join("testdata", "golden", "outfiles"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(t.TempDir())
+
+	args := []string{"convert", "--quiet", "--eco-file", goldenECO, "--eco-split", "1", in}
+	root := NewRootCmd()
+	var out, errb bytes.Buffer
+	root.SetOut(&out)
+	root.SetErr(&errb)
+	root.SetArgs(args)
+	if err := root.Execute(); err != nil {
+		t.Fatalf("pgnx %v: %v\n%s", args, err, errb.String())
+	}
+	if out.Len() != 0 {
+		t.Errorf("stdout should be empty with --eco-split, got %d bytes", out.Len())
+	}
+	for _, name := range []string{"A.pgn", "B.pgn", "E.pgn"} {
+		got, err := os.ReadFile(name)
+		if err != nil {
+			t.Errorf("%s: %v", name, err)
+			continue
+		}
+		want, err := os.ReadFile(filepath.Join(oracles, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Errorf("output differs from C oracle %s\n--- first divergence ---\n%s",
+				name, firstDiff(got, want))
+		}
+	}
+	files, err := filepath.Glob("*.pgn")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 3 {
+		t.Errorf("want exactly A.pgn, B.pgn and E.pgn in the cwd, got %v", files)
 	}
 }
 

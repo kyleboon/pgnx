@@ -7,8 +7,13 @@ import (
 	"testing"
 )
 
-// goldenECO is the C repo's eco.pgn, vendored for the eco package tests.
-// It is absolute so tests that change directory can still reach it.
+// goldenECO is the C repo's eco.pgn (pgn-extract's root directory, the
+// Makefile's ECO_FILE), vendored verbatim for the ECO tests and the
+// test-e/test-EE golden rows. Its leading comment records its origin
+// (Ewart Shaw, Franz Hemmer and others, distributed with pgn-extract by
+// permission); it is used here under the same GPL-3.0 terms as the rest
+// of the vendored testdata. The path is absolute so tests that change
+// directory can still reach it.
 var goldenECO = func() string {
 	p, err := filepath.Abs(filepath.Join("testdata", "golden", "eco.pgn"))
 	if err != nil {
