@@ -56,8 +56,16 @@ func emitMovetext(lw *lineWriter, g *pgn.Game, r *replay.Result, opts Options) {
 	if len(positions) > 0 {
 		baseMoveNumber = fullmoveNumberFromFEN(positions[0].FEN)
 	}
-	// The main line always starts with white to move.
-	emitLine(lw, g.Moves, moveInfos, positions, true, true, baseMoveNumber, opts)
+	// The side to move comes from the starting position's FEN (output.c's
+	// format_game: white_to_move = initial_board->to_move == WHITE); a
+	// black-to-move start is numbered "N..." and the next move is N+1.
+	startWhite := true
+	if len(positions) > 0 {
+		if f := strings.Fields(positions[0].FEN); len(f) >= 2 && f[1] == "b" {
+			startWhite = false
+		}
+	}
+	emitLine(lw, g.Moves, moveInfos, positions, startWhite, true, baseMoveNumber, opts)
 
 	if !opts.NoResults {
 		result := g.Result
@@ -313,32 +321,15 @@ func isWhiteMove(startWhite bool, i int) bool {
 }
 
 // moveNumberOf returns the full-move number for moves[i] in a line that
-// begins with startWhite to move, computed from the nearest preceding move
-// that carries an explicit pgn.Move.MoveNumber (falling back to counting
-// forward/backward across the ply sequence when none is set). baseMoveNumber
-// is ply 0's full-move number to use when no move in the line carries an
-// explicit number at all (see emitMovetext).
+// begins with startWhite to move, counting plies from baseMoveNumber (ply
+// 0's full-move number).
 func moveNumberOf(moves []*pgn.Move, i int, startWhite bool, baseMoveNumber int) int {
-	if moves[i].MoveNumber > 0 {
-		return moves[i].MoveNumber
-	}
-	// Search backward for the closest move with an explicit number and
-	// derive from ply distance.
-	for j := i - 1; j >= 0; j-- {
-		if moves[j].MoveNumber > 0 {
-			return moves[j].MoveNumber + (i-j)/2
-		}
-	}
-	// Search forward as a fallback.
-	for j := i + 1; j < len(moves); j++ {
-		if moves[j].MoveNumber > 0 {
-			return moves[j].MoveNumber - (j-i)/2
-		}
-	}
-	// No move in the line carries an explicit number at all: derive from
-	// scratch, using ply 0's number as baseMoveNumber (or, if the line
-	// starts on black's move, black's first move is still full-move
-	// baseMoveNumber).
+	// Source move numbers are deliberately ignored: the C oracle numbers
+	// every move from its own counter (output.c print_move_list), seeded
+	// from the starting position's fullmove number, so a source that
+	// numbers a FEN game from 1 is still emitted with the FEN's numbers.
+	// If the line starts on black's move, black's first move is still
+	// full-move baseMoveNumber.
 	if startWhite {
 		return i/2 + baseMoveNumber
 	}
