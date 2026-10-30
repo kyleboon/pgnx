@@ -175,6 +175,12 @@ type Options struct {
 	SevenTagRoster bool     // emit only the seven roster tags
 	Roster         []string // explicit tag list; overrides SevenTagRoster
 
+	// RosterExtras names tags that are emitted after the seven roster
+	// tags, in the listed order, when SevenTagRoster is set and the game
+	// carries them. The CLI uses it for the ECO classification tags under
+	// --seven-tag-roster (output.c:1531-1539). Ignored otherwise.
+	RosterExtras []string
+
 	NoComments    bool
 	NoNAGs        bool
 	NoVariations  bool
@@ -282,8 +288,9 @@ func normalisedResult(value string, present bool, token string) string {
 // then the oracle's well-known tags in its fixed order, then the oracle's
 // remaining predefined tags, then any other tags in run-wide first-seen
 // order (see TagRegistry). When
-// opts.SevenTagRoster is set, only the seven roster tags are emitted. When
-// opts.Roster is set (and non-empty), it overrides SevenTagRoster and
+// opts.SevenTagRoster is set, only the seven roster tags are emitted,
+// followed by any opts.RosterExtras tags the game carries, in listed order.
+// When opts.Roster is set (and non-empty), it overrides SevenTagRoster and
 // exactly that explicit tag list is emitted, in the order given, using the
 // game's value when present (no default substitution for non-roster
 // names).
@@ -316,6 +323,17 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 	}
 
 	if w.opts.SevenTagRoster {
+		// The C oracle appends the ECO tags after output_STR when
+		// classification is on; a tag absent from the game is skipped.
+		for _, name := range w.opts.RosterExtras {
+			value, ok := g.Tag(name)
+			if !ok {
+				continue
+			}
+			if _, err := fmt.Fprintf(w.w, "[%s %q]\n", name, value); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 

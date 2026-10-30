@@ -124,6 +124,53 @@ func TestRoster(t *testing.T) {
 	}
 }
 
+// TestRosterExtras pins that, under SevenTagRoster, RosterExtras tags the
+// game carries are emitted after the seven in listed order (SubVariation is
+// absent and so skipped), while other tags such as Annotator stay excluded.
+// Oracle (mini.eco holds `[ECO "C00"][Opening "French"] 1. e4 e6 *`):
+//
+//	printf '[Event "E"]\n[Annotator "X"]\n[ECO "C00"]\n[Opening "French"]\n[Variation "Main"]\n[Result "*"]\n\n1. e4 e6 *\n' \
+//	  | pgn-extract --quiet -7 -emini.eco
+func TestRosterExtras(t *testing.T) {
+	src := "[Event \"E\"]\n[Annotator \"X\"]\n[ECO \"C00\"]\n[Opening \"French\"]\n[Variation \"Main\"]\n[Result \"*\"]\n\n1. e4 e6 *\n"
+	extras := []string{"ECO", "Opening", "Variation", "SubVariation"}
+
+	g, r := gameAndReplay(t, src)
+	var buf bytes.Buffer
+	w := NewWriter(&buf, Options{Format: SAN, SevenTagRoster: true, RosterExtras: extras})
+	if err := w.WriteGame(g, r); err != nil {
+		t.Fatal(err)
+	}
+	want := "[Event \"E\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n[ECO \"C00\"]\n[Opening \"French\"]\n[Variation \"Main\"]\n\n1. e4 e6 *\n\n"
+	if buf.String() != want {
+		t.Errorf("got:\n%q\nwant:\n%q", buf.String(), want)
+	}
+
+	// Without SevenTagRoster the extras list is inert: full tag output is
+	// unchanged and Annotator is back.
+	g, r = gameAndReplay(t, src)
+	buf.Reset()
+	w = NewWriter(&buf, Options{Format: SAN, RosterExtras: extras})
+	if err := w.WriteGame(g, r); err != nil {
+		t.Fatal(err)
+	}
+	want = "[Event \"E\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n[ECO \"C00\"]\n[Opening \"French\"]\n[Variation \"Main\"]\n[Annotator \"X\"]\n\n1. e4 e6 *\n\n"
+	if buf.String() != want {
+		t.Errorf("got:\n%q\nwant:\n%q", buf.String(), want)
+	}
+
+	// An explicit Roster still wins over both.
+	g, r = gameAndReplay(t, src)
+	buf.Reset()
+	w = NewWriter(&buf, Options{Format: SAN, SevenTagRoster: true, RosterExtras: extras, Roster: []string{"Annotator"}})
+	if err := w.WriteGame(g, r); err != nil {
+		t.Fatal(err)
+	}
+	if want := "[Annotator \"X\"]\n\n1. e4 e6 *\n\n"; buf.String() != want {
+		t.Errorf("got:\n%q\nwant:\n%q", buf.String(), want)
+	}
+}
+
 // TestNonRosterTagOrdering pins that, without SevenTagRoster, extra tags are
 // emitted after the seven roster tags in their original appearance order,
 // regardless of where Result appeared among them in the source. Oracle:
