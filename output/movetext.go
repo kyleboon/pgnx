@@ -69,6 +69,15 @@ func emitMovetext(lw *lineWriter, g *pgn.Game, r *replay.Result, opts Options) {
 
 	if !opts.NoResults {
 		result := g.Result
+		if len(g.Moves) == 0 {
+			// A zero-move game has no move to carry a terminating result,
+			// so the C oracle prints the (normalised) Result tag instead
+			// (output.c: "Take account of a possible zero move game"),
+			// whatever result token the movetext held. This is what a game
+			// whose movetext was only a stray token ("+/-", "N") gets.
+			value, ok := g.Tag("Result")
+			result = normalisedResult(value, ok, g.Result)
+		}
 		if result == "" {
 			result = "*"
 		}

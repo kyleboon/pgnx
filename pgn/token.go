@@ -15,6 +15,9 @@ const (
 	tokResult
 	tokRAVStart
 	tokRAVEnd
+	// tokStray is a movetext word that is not a move (a lone '-', a bare
+	// piece letter, ...). The parser reports and skips it.
+	tokStray
 )
 
 func (k tokenKind) String() string {
@@ -39,6 +42,8 @@ func (k tokenKind) String() string {
 		return "RAVStart"
 	case tokRAVEnd:
 		return "RAVEnd"
+	case tokStray:
+		return "Stray"
 	default:
 		return "Unknown"
 	}

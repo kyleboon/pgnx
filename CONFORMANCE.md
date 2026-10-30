@@ -346,6 +346,70 @@ oracle as justification and one is documented.
   pgnx convert --quiet noresult.pgn  # first game: "1. e4 e5 2. Nf3 *"
   ```
 
+  Narrow exception, matching the oracle: if such a game's moves do **not**
+  replay (the C tool never replays them, so it never notices), pgnx drops
+  the moves and emits the tag section with the Result tag as the movetext,
+  exactly as pgn-extract does, and reports the game as a problem (exit 2).
+  A TWIC double forfeit whose whole movetext is `0-0` hits this: `0-0` is
+  lexed as kingside castling, there is no result token, and the C tool
+  emits a bare `*` game (see the stray-token entry below). Without the
+  exception pgnx rejected the game and emitted nothing. `--keep-broken`
+  keeps the moves (Source format) instead.
+
+## Stray movetext tokens (beads `pgnx-twic-straytoken`)
+
+About 45 TWIC games carry non-move words in the movetext: a lone `-`,
+`+/-` / `-/+` as the whole movetext of a forfeit, a bare piece letter
+(`26. N 1/2-1/2`), `-O`, and `0-0` as a double-forfeit "result". pgnx used
+to treat each as a move, fail the replay and emit nothing for the game
+(exit 2). The decision is to **match the oracle**:
+
+- **Fixed:** the lexer now classifies a word as a move only if it "seems
+  valid" (a port of `move_seems_valid`, `decode.c`, used by `lex.c`); any
+  other word, and a single `-` that does not begin the null move `--`
+  (`lex.c`, DASH case, "Single '-' not allowed"), is a stray token. As in
+  the C lexer (`Unknown move text N.`) the parser discards it and keeps the
+  game; the movetext simply continues. `+` and `/` were already ignored.
+  The token is logged as a warning (`game n: warning: ... skipped
+  unrecognised movetext token "N"`; wording is not held to parity) and the
+  game is emitted, but it counts as a problem, so the run exits 2 (the C
+  tool exits 0). `Game.SkippedTokens` exposes them to library users.
+- **Fixed:** a game with no moves is printed with its (normalised) Result
+  tag as the movetext, not the result token and not a default `*`
+  (`output.c`, "Take account of a possible zero move game"). So `+/-`
+  movetext with `[Result "+/-"]` gives the tag section with `[Result "*"]`
+  and a bare `*`; `26. N 1/2-1/2` with `[Result "1-0"]` gives a bare `1-0`.
+- **Fixed (narrowly):** `0-0` as the entire movetext, see the exception
+  added to the missing-result entry above.
+- **Verified:** the stray-token games of `twic943`, `twic1041`, `twic1051`
+  and `twic1110` are byte-identical to the oracle; golden test
+  `TestStrayTokensConformance` (`cmd/pgnx/testdata/stray`) covers `+/-`,
+  a lone `-`, bare piece letters, and `0-0`. `ff` is not a stray token:
+  both tools take it as a pawn move and reject the game (C: "Failed to
+  make move").
+- **Open divergence — `-1` / `-2` and other digit-after-dash tokens.** In
+  `1. e4 e5 -1 2. Nf3 1/2-1/2` the C lexer discards `-` and then yields
+  the move number `1`; two move numbers in a row end `parse_move_list`
+  (`grammar.c`), the game is reduced to "Missing result" (tags only), and
+  `skip_to_next_game` restarts at the next move, producing a second,
+  tagless game `1. Nf3 1/2-1/2`. pgnx skips the `-` and parses one intact
+  game `1. e4 e5 2. Nf3 1/2-1/2`. This is a recovery artefact of the C
+  grammar (a phantom game and lost moves), so it is documented, not
+  copied. Repro:
+
+  ```sh
+  printf '[Event "x"]\n[Result "1/2-1/2"]\n\n1. e4 e5 -1 2. Nf3 1/2-1/2\n' > dash1.pgn
+  pgn-extract --quiet dash1.pgn   # tags + "1/2-1/2", then a tagless "1. Nf3 1/2-1/2" game
+  pgnx convert --quiet dash1.pgn  # "1. e4 e5 2. Nf3 1/2-1/2"
+  ```
+- **Open divergence (unchanged):** when a file's last game is only stray
+  tokens (movetext `-`, nothing after), the C tool stops at EOF and emits
+  nothing; pgnx emits the tag section and `*`. This is the tags-only
+  divergence above; mid-file the two agree.
+- **Known minor difference:** the C lexer gathers a move word from its own
+  narrower character set, so `Nf3Z` is `Nf3` plus junk there; pgnx gathers
+  the whole word and discards it.
+
 ## Differential-testing findings (2026-10-30 run, Phase 3)
 
 The sweep described under "Positional matching and ECO" above ran

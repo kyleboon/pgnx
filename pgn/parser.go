@@ -243,6 +243,13 @@ func (p *parser) parseMovetext(g *Game, depth int) (moves []*Move, prefixComment
 			sawMove = true
 			continue
 
+		case tokStray:
+			// Not a move: pgn-extract reports it and carries on as if it
+			// were not there (lex.c: "Unknown move text", "Single '-' not
+			// allowed"). The skip is recorded so the CLI can report it.
+			g.skipped = append(g.skipped, &ParseError{Line: tok.line, Msg: "skipped unrecognised movetext token " + strconv.Quote(tok.text)})
+			continue
+
 		case tokString:
 			// Stray string in movetext: recoverable error, skip.
 			g.errs = append(g.errs, &ParseError{Line: tok.line, Msg: "unexpected string in movetext"})
