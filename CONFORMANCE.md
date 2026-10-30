@@ -364,15 +364,17 @@ remaining diffs are pre-existing classes already documented here.
   reversed pattern gets `""`, so no tag is added; `PositionCriteria.
   AddCriterion` reproduces that. Both forms were confirmed against the C
   binary on `petrosian.pgn` and the TWIC issue.
-- **Pre-existing, surfaced again by `-e -7`:** `--seven-tag-roster`
-  drops the `SetUp`/`FEN` (and `Variant`) tags of a game that starts
-  from a FEN, which the C tool emits after the seven roster tags
-  (`output.c`), leaving the movetext unreplayable. Tracked as beads
-  issue `pgnx-w1j`; not Phase 3 specific (`odds.pgn`,
-  `test-promotion-in.pgn` and `test-setup-in.pgn` diverge the same way
-  under plain `-7`). The ECO roster extras added in Phase 3 (`ECO`,
-  `Opening`, `Variation`, `SubVariation` after the roster when
-  classifying) are emitted correctly.
+- **Fixed (`pgnx-w1j`), surfaced by `-e -7`:** `--seven-tag-roster`
+  used to drop the `Variant`/`SetUp`/`FEN` tags of a game that starts
+  from a FEN, leaving the movetext unreplayable. Following `output.c`
+  `print_algebraic_game`, a game carrying a `FEN` tag now gets `Variant`,
+  `SetUp` and `FEN` (each if present, in that order) after the seven
+  roster tags and after any ECO extras. `SetUp` without `FEN` is not
+  emitted. `test-promotion-in.pgn` and `test-setup-in.pgn` are now
+  byte-identical under `-7` (with and without `-e`); `odds.pgn` still
+  differs for Latin-1 bytes and null moves, documented above. The
+  separate gap that `consistent_FEN_tags` does not add a Chess960
+  `Variant` tag is unchanged.
 - Also seen, already documented above: NAG/comment interleaving
   (`test-nagcomments.pgn`), comments across a variation boundary
   (`test-splitvariants.pgn`) and Latin-1 tag bytes (`odds.pgn`).

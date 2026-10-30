@@ -334,6 +334,20 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 				return err
 			}
 		}
+		// output.c print_algebraic_game: a game with a FEN tag also gets
+		// Variant, SetUp and FEN (in that order, each if present) so the
+		// movetext stays replayable.
+		if _, hasFEN := g.Tag("FEN"); hasFEN {
+			for _, name := range []string{"Variant", "SetUp", "FEN"} {
+				value, ok := g.Tag(name)
+				if !ok {
+					continue
+				}
+				if _, err := fmt.Fprintf(w.w, "[%s %q]\n", name, value); err != nil {
+					return err
+				}
+			}
+		}
 		return nil
 	}
 
