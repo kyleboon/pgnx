@@ -481,13 +481,8 @@ func runFilter(cmd *cobra.Command, args []string) error {
 // FENPattern and FENPatternI lines are positional criteria (taglines.c
 // process_tag_line), everything else is a tag criterion.
 func addCriterion(m *filter.TagMatcher, pc *filter.PositionCriteria, c filter.Criterion) error {
-	switch c.Tag {
-	case "FEN":
-		return pc.AddFEN(c.Value)
-	case "FENPattern":
-		return pc.AddPattern(c.Value, false, c.Label)
-	case "FENPatternI":
-		return pc.AddPattern(c.Value, true, c.Label)
+	if c.IsPositional() {
+		return pc.AddCriterion(c)
 	}
 	return m.Add(c)
 }

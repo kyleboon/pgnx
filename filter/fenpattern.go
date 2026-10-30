@@ -69,13 +69,19 @@ func (s *PatternSet) Empty() bool { return s == nil || s.root == nil }
 
 // Add parses pattern and inserts it (fenmatcher.c add_fen_pattern). When
 // inverse is true the colour-reversed pattern (ranks mirrored, piece
-// colours swapped) is added as well, labelled label+"I" when label is
-// non-empty; its material constraint, if any, is the same constraint,
-// which is then matched for either colour.
+// colours swapped) is added as well, labelled label+"I" (so "I" for an
+// unlabelled pattern, as the C tool's --fenpatterni does); its material
+// constraint, if any, is the same constraint, which is then matched for
+// either colour.
 //
 // A malformed pattern or constraint returns an error and leaves the set
 // unchanged. A pattern already present returns ErrDuplicatePattern.
 func (s *PatternSet) Add(pattern string, inverse bool, label string) error {
+	return s.add(pattern, inverse, label, label+"I")
+}
+
+// add is Add with an explicit label for the colour-reversed pattern.
+func (s *PatternSet) add(pattern string, inverse bool, label, inverseLabel string) error {
 	ranks, rest, err := splitPattern(pattern)
 	if err != nil {
 		return err
@@ -99,15 +105,11 @@ func (s *PatternSet) Add(pattern string, inverse bool, label string) error {
 	if !inverse {
 		return err
 	}
-	rlabel := ""
-	if label != "" {
-		rlabel = label + "I"
-	}
 	rranks, _, rerr := splitPattern(reverseFENPattern(strings.Join(ranks, "/")))
 	if rerr != nil {
 		return rerr // cannot happen: reversal preserves well-formedness
 	}
-	if ierr := s.insert(rranks, rlabel, constraint); ierr != nil && err == nil {
+	if ierr := s.insert(rranks, inverseLabel, constraint); ierr != nil && err == nil {
 		err = ierr
 	}
 	return err

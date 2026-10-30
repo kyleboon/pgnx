@@ -174,13 +174,50 @@ func TestPatternSetInverse(t *testing.T) {
 		t.Errorf("black form: (%q, %v)", label, ok)
 	}
 
-	// An empty label stays empty for the inverse.
+	// An unlabelled pattern's inverse is labelled "I", as --fenpatterni
+	// does in C (add_fen_pattern receives "" and appends "I").
 	var e PatternSet
 	if err := e.Add("*/*/*/*/???Np???/????P???/*/*", true, ""); err != nil {
 		t.Fatal(err)
 	}
-	if label, ok := e.Match(board(t, black)); !ok || label != "" {
-		t.Errorf("empty-label inverse: (%q, %v)", label, ok)
+	if label, ok := e.Match(board(t, white)); !ok || label != "" {
+		t.Errorf("unlabelled original: (%q, %v)", label, ok)
+	}
+	if label, ok := e.Match(board(t, black)); !ok || label != "I" {
+		t.Errorf("unlabelled inverse: (%q, %v)", label, ok)
+	}
+
+	// An unlabelled FENPatternI criteria line leaves the inverse
+	// unlabelled too (taglines.c passes a NULL label; see AddCriterion).
+	for _, line := range []string{
+		`FENPatternI "*/*/*/*/???Np???/????P???/*/*"`,
+		`FENPatternI "*/*/*/*/???Np???/????P???/*/*"   `,
+	} {
+		c, err := ParseCriterion(line)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var pc PositionCriteria
+		if err := pc.AddCriterion(c); err != nil {
+			t.Fatal(err)
+		}
+		if label, ok := pc.Patterns.Match(board(t, black)); !ok || label != "" {
+			t.Errorf("%q inverse: (%q, %v)", line, label, ok)
+		}
+	}
+	labelled, err := ParseCriterion(`FENPatternI "*/*/*/*/???Np???/????P???/*/*" Nd4th`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pc PositionCriteria
+	if err := pc.AddCriterion(labelled); err != nil {
+		t.Fatal(err)
+	}
+	if label, ok := pc.Patterns.Match(board(t, black)); !ok || label != "Nd4thI" {
+		t.Errorf("labelled line inverse: (%q, %v)", label, ok)
+	}
+	if err := pc.AddCriterion(Criterion{Tag: "White", Value: "x"}); !errors.Is(err, ErrNotPositionalCriterion) {
+		t.Errorf("tag criterion: err = %v", err)
 	}
 
 	// Inverse of a constrained pattern keeps the constraint (C drops the

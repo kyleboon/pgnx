@@ -183,6 +183,35 @@ func (pc *PositionCriteria) AddPattern(pattern string, inverse bool, label strin
 	return pc.Patterns.Add(pattern, inverse, label)
 }
 
+// ErrNotPositionalCriterion is returned (wrapped) by
+// PositionCriteria.AddCriterion for a criterion that is not positional
+// (see Criterion.IsPositional).
+var ErrNotPositionalCriterion = errors.New("not a positional criterion")
+
+// AddCriterion adds a positional -t line (Criterion.IsPositional): a FEN
+// line through AddFEN, a FENPattern line through AddPattern without the
+// inverse, a FENPatternI line with it. An unlabelled FENPatternI line
+// leaves the colour-reversed pattern unlabelled rather than labelling it
+// "I": taglines.c process_tag_line passes a NULL label when nothing
+// follows the pattern, and add_fen_pattern then adds the reversed pattern
+// with "" instead of label+"I" (fenmatcher.c:197-207). Only the
+// --fenpatterni flag, whose label is the empty string rather than NULL,
+// gets the "I" label.
+func (pc *PositionCriteria) AddCriterion(c Criterion) error {
+	switch c.Tag {
+	case "FEN":
+		return pc.AddFEN(c.Value)
+	case "FENPattern":
+		return pc.AddPattern(c.Value, false, c.Label)
+	case "FENPatternI":
+		if c.Label == "" {
+			return pc.Patterns.add(c.Value, true, "", "")
+		}
+		return pc.AddPattern(c.Value, true, c.Label)
+	}
+	return fmt.Errorf("%s: %w", c.Tag, ErrNotPositionalCriterion)
+}
+
 // sideOK applies the WhoseMove restriction to a position.
 func (pc *PositionCriteria) sideOK(c chess.Color) bool {
 	switch pc.WhoseMove {
