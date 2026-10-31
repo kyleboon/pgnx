@@ -119,7 +119,12 @@ func decodeSAN(text string, b *chess.Board) (chess.Move, error) {
 		if promo != chess.NoPiece && m.Promotion != promo {
 			continue
 		}
-		if promo == chess.NoPiece && m.Promotion != chess.NoPiece {
+		if promo == chess.NoPiece && m.Promotion != chess.NoPiece && m.Promotion != chess.Queen {
+			// Implicit promotion: a pawn move written without a promotion
+			// piece that reaches the last rank is a queen promotion, as in
+			// map.c determine_move_details ("Since the move string doesn't
+			// tell us, we have to assume a queen"). Keeping only the queen
+			// move leaves exactly one candidate.
 			continue
 		}
 		if fromFile != -1 && m.From.File != fromFile {

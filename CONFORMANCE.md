@@ -444,3 +444,60 @@ remaining diffs are pre-existing classes already documented here.
 - Also seen, already documented above: NAG/comment interleaving
   (`test-nagcomments.pgn`), comments across a variation boundary
   (`test-splitvariants.pgn`) and Latin-1 tag bytes (`odds.pgn`).
+
+## Differential-testing findings (2026-10-31 TWIC corpus run)
+
+`scripts/twicdiff.sh` runs both tools over every file of a directory in
+parallel (`convert -f san`, byte comparison, a `.diff` kept per divergent
+file) and is the repeatable in-the-wild regression check behind the
+beads `pgnx-twic` epic. The corpus is the 749 TWIC issues 920–1668
+(about 3.6M games; local only, `twic/` is gitignored). Baseline before
+this epic, 2026-10-29: 588/749 issues identical, 161 divergent, 928
+games rejected by pgnx. After the five sibling fixes (Latin-1 bytes,
+Chess960 castling rights, tag quoting, stray movetext tokens,
+black-to-move numbering): 740/749 identical, 9 divergent, 227 rejected,
+70 stray-token warnings. Two new classes surfaced and were fixed; the
+run then stands at 744/749 identical, 5 divergent, 226 rejected, 70
+warnings (663 s wall, 8 workers).
+
+- **Fixed — `convert` did not add `SetUp "1"` to a FEN game.** grammar.c
+  `consistent_FEN_tags` runs on every parsed game before `apply_move_list`,
+  whether or not criteria are in force, and silently adds the missing
+  `SetUp` tag ("such a common problem that it makes more sense just to
+  silently correct it"). pgnx did this only inside `filter.Evaluate`, so
+  `pgnx filter` matched the oracle and `pgnx convert` did not (TWIC 1267,
+  1393, 1426: a Chess960 event, two games tagged with the standard start
+  FEN, one adjourned-game fragment). `filter.ConsistentFENTags` is now
+  exported and `convert` calls it before replaying; following the C tool
+  it also drops a game with `SetUp "1"` and no FEN tag, or an unparsable
+  FEN, which pgn-extract emits nowhere (pgnx logs it and exits 2; the C
+  tool logs "Missing FEN Tag to accompany SetUp Tag" and exits 0).
+  `TestConvertAddsSetUpToFENGame`/`TestConvertDropsSetUpWithoutFEN`.
+  The separate gap that `consistent_FEN_tags` also adds
+  `[Variant "chess 960"]` to an untagged Chess960 start is unchanged.
+- **Fixed — a pawn move to the last rank with no promotion piece.**
+  `69. Kf5 b1 0-1` (TWIC 970) is accepted by the C tool as `b1=Q+`:
+  map.c `determine_move_details` reclassifies a `PAWN_MOVE` whose
+  destination is the last rank as a promotion and, "since the move
+  string doesn't tell us", assumes a queen. pgnx rejected the game.
+  `replay.decodeSAN` now keeps the queen candidate when no promotion
+  piece is written, for SAN, captures and bare long-algebraic pawn moves
+  alike; `san`, `lalg` and `uci` output of such a move matches the
+  oracle (`b8=Q`, `b7b8Q`). `TestDecodeSAN`.
+- **Remaining divergences, all one documented class.** The five issues
+  still differing (TWIC 1071, 1182, 1196, 1260, 1469) are games whose
+  movetext ends in a malformed result — `-` (with `[Result "-"]`),
+  `1-O`, `00-1`, `0-2` — or hits two move numbers in a row after stray
+  tokens (`34. R R 35.`). The C grammar ends the move list, reports
+  "Missing result" and emits the tag section with the Result tag as the
+  movetext (plus, for the consecutive-move-number case, a phantom
+  tagless game); pgnx keeps the moves and emits them with `*`, or
+  rejects the game when the moves do not replay. See the missing-result
+  entry under the 2026-10-29 findings and the `-1`/`-2` entry under
+  stray tokens; these are recovery artefacts and are documented, not
+  copied.
+- **Remaining rejections are genuine.** The games pgnx still rejects are
+  rejected by the C tool too (the outputs are identical), chiefly `--`
+  null moves on the main line, illegal castling and impossible piece
+  moves, plus the stray-token games whose skipped word shifts the move
+  colours.

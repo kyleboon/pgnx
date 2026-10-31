@@ -2,6 +2,7 @@ package filter
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/kyleboon/pgnx/chess"
@@ -47,25 +48,38 @@ func ensureValidResultTag(g *pgn.Game) {
 	}
 }
 
-// consistentFENTags is grammar.c consistent_FEN_tags: a game with a
-// valid FEN tag but no SetUp tag silently gains SetUp "1"; SetUp "1"
-// without a FEN tag, or an unparsable FEN, makes the game inconsistent
-// (it is then rejected by Evaluate).
-func consistentFENTags(g *pgn.Game) bool {
-	consistent := true
+// ConsistentFENTags is grammar.c consistent_FEN_tags, which pgn-extract
+// runs on every parsed game before replaying it, whether or not any
+// criteria are in force. A game with a valid FEN tag but no SetUp tag
+// silently gains SetUp "1" ("such a common problem that it makes more
+// sense just to silently correct it"); SetUp "1" without a FEN tag, or an
+// unparsable FEN, is inconsistent and returns a non-nil error, and
+// pgn-extract emits such a game nowhere. Evaluate calls it; so does the
+// convert command, since the C tool applies it regardless of filtering.
+func ConsistentFENTags(g *pgn.Game) error {
 	setup, hasSetup := g.Tag("SetUp")
 	fen, hasFEN := g.Tag("FEN")
 	if hasSetup && setup == "1" && !hasFEN {
-		consistent = false
+		return errSetUpWithoutFEN
 	}
 	if hasFEN {
 		if _, err := chess.FromFEN(fen); err != nil {
-			consistent = false
-		} else if !hasSetup {
+			return fmt.Errorf("invalid FEN tag %q: %w", fen, err)
+		}
+		if !hasSetup {
 			setTag(g, "SetUp", "1")
 		}
 	}
-	return consistent
+	return nil
+}
+
+var errSetUpWithoutFEN = errors.New(`SetUp "1" tag without a FEN tag`)
+
+// consistentFENTags reports whether ConsistentFENTags accepts g (adding
+// the SetUp tag as a side effect); Evaluate treats a false result as a
+// non-match.
+func consistentFENTags(g *pgn.Game) bool {
+	return ConsistentFENTags(g) == nil
 }
 
 // checkResult is the end-of-game result consistency check in apply.c

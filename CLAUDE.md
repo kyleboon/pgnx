@@ -22,6 +22,10 @@ scripts/difftest.sh <input.pgn> [format]
 # Filter runs: PGNX_CMD selects the subcommand, C_FLAGS/PGNX_FLAGS add
 # verbatim arguments to each binary:
 PGNX_CMD=filter C_FLAGS='-TpFischer' PGNX_FLAGS='--player Fischer' scripts/difftest.sh <input.pgn>
+# Corpus differential over a directory of PGN files, one process per file in
+# parallel (JOBS, default 8); keeps a .diff per divergent file. The local
+# TWIC corpus (twic/, gitignored, ~3.6M games) takes about 3 minutes:
+scripts/twicdiff.sh [pgn-dir] [out-dir]   # defaults twic/twic/pgn, twic/diff
 ```
 
 ## Architecture

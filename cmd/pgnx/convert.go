@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/kyleboon/pgnx/filter"
 	"github.com/kyleboon/pgnx/output"
 	"github.com/kyleboon/pgnx/pgn"
 	"github.com/spf13/cobra"
@@ -164,6 +165,11 @@ func runConvert(cmd *cobra.Command, args []string) error {
 
 	total, succeeded, ioErr := forEachGame(cmd, args, logW, logW, func(src string, n int, g *pgn.Game) error {
 		opts.Tags.Observe(g)
+		// grammar.c consistent_FEN_tags: add a missing SetUp "1" to a FEN
+		// game; drop a game whose SetUp/FEN tags are inconsistent.
+		if err := filter.ConsistentFENTags(g); err != nil {
+			return err
+		}
 		r, replayErr, problem := replayGame(g, keepBroken)
 		if replayErr != nil && !keepBroken {
 			return replayErr

@@ -30,6 +30,13 @@ func TestDecodeSAN(t *testing.T) {
 		{"rnbqkb1r/pppppppp/5n2/8/8/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 1", "Nfd2", "f3d2"},
 		{"8/P6k/8/8/8/8/8/K7 w - - 0 1", "a8=Q", "a7a8q"},
 		{"8/P6k/8/8/8/8/8/K7 w - - 0 1", "a8Q", "a7a8q"},
+		// implicit promotion: no piece named, so a queen is assumed (map.c
+		// determine_move_details), for white, black, captures and bare
+		// long-algebraic pawn moves alike.
+		{"8/P6k/8/8/8/8/8/K7 w - - 0 1", "a8", "a7a8q"},
+		{"8/P6k/8/8/8/8/8/K7 w - - 0 1", "a7a8", "a7a8q"},
+		{"n7/1P5k/8/8/8/8/8/K7 w - - 0 1", "bxa8", "b7a8q"},
+		{"k7/8/8/8/8/8/1p6/K7 b - - 0 1", "b1", "b2b1q"},
 		{"r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "O-O", "e1g1"},
 		{"r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "0-0-0", "e1c1"},
 		{"rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq g3 0 2", "Qh4#", "d8h4"},
