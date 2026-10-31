@@ -9,6 +9,9 @@ pgnx is a Go port of pgn-extract (David J. Barnes' C tool for processing chess P
 ## Commands
 
 ```sh
+mise install                        # pinned Go + GoReleaser (mise.toml)
+mise run ci                         # exactly what CI runs: build, vet, gofmt -l, test -race, goreleaser check
+mise run snapshot                   # full release dry-run into dist/, no tag or token needed
 go build ./...                      # build everything
 go build -o pgnx ./cmd/pgnx        # build the CLI binary
 go test ./...                      # full test suite (fast, a few seconds)
@@ -50,6 +53,15 @@ The C pgn-extract implementation is the behavioral reference, and this shapes ho
 - `CONFORMANCE.md` documents all known intentional divergences and open concerns. **Before "fixing" any output difference from the C tool, check CONFORMANCE.md first** — several divergences are deliberate (e.g. NAG/comment interleaving order, null-move rejection, `--keep-broken` always emitting Source format). New divergences found in testing should either be fixed with oracle justification or documented there, not silently patched around.
 - `MIGRATION.md` maps the C tool's flags to pgnx subcommands/flags; update it when adding CLI surface.
 
+
+## CI and releasing
+
+- `.github/workflows/ci.yml` runs `mise run ci` on ubuntu, macos and windows for pushes to `main` and PRs, then a snapshot release on ubuntu. Make CI green by making `mise run ci` pass locally; the two are the same command.
+- **Releasing is a human act**: a maintainer pushes a `v*` semver tag and `.github/workflows/release.yml` runs GoReleaser (`.goreleaser.yaml`), publishing the GitHub Release and the Homebrew cask in `kyleboon/homebrew-tap`. Never create or push a `v*` tag yourself. Tags not on `main` are refused. See `docs/adr/0001-release-via-tag-push-and-homebrew-tap.md`.
+- The version comes from `-ldflags -X main.version=...` (set by GoReleaser) with a `debug.ReadBuildInfo` fallback in `cmd/pgnx/version.go`; there is no version constant to bump.
+- Before touching `.goreleaser.yaml` run `mise run release-check`, then `mise run snapshot` and inspect `dist/`.
+- Actions are pinned to commit SHAs with a `# vX.Y.Z` comment; Dependabot bumps them. Keep the pin and the comment together when editing.
+- The C-oracle differential (`scripts/golden-difftest.sh`, expected divergences in `scripts/golden-difftest-known.txt`) runs only via the manual `C oracle difftest` workflow.
 
 ## Agent skills
 

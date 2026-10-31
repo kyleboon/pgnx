@@ -1,0 +1,119 @@
+# GoReleaser configuration for pgnx. Validate with `goreleaser check`
+# (mise run release-check); dry-run with `mise run snapshot`.
+#
+# Releases are cut by .github/workflows/release.yml when a human pushes a
+# v* tag. See docs/adr/0001-release-via-tag-push-and-homebrew-tap.md.
+version: 2
+
+project_name: pgnx
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: pgnx
+    main: ./cmd/pgnx
+    binary: pgnx
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .Commit }}
+      - -X main.date={{ .CommitDate }}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - LICENSE
+      - README.md
+      - MIGRATION.md
+      - CONFORMANCE.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  use: github
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Other changes
+      order: 999
+  filters:
+    exclude:
+      - '^docs(\(.*\))?:'
+      - '^test(\(.*\))?:'
+      - '^chore(\(.*\))?:'
+      - '^ci(\(.*\))?:'
+      - '^Merge '
+
+release:
+  github:
+    owner: kyleboon
+    name: pgnx
+  # A tag with a pre-release suffix (v0.2.0-rc1) becomes a GitHub
+  # prerelease and, below, does not touch the Homebrew formula.
+  prerelease: auto
+  draft: false
+  footer: |
+    ## Install
+
+    ```sh
+    brew install kyleboon/tap/pgnx          # macOS / Linux
+    go install github.com/kyleboon/pgnx/cmd/pgnx@{{ .Tag }}
+    ```
+
+    Or download the archive for your platform above and verify it against
+    `checksums.txt`. Windows binaries are not code-signed, so SmartScreen
+    will warn on first run.
+
+homebrew_casks:
+  - name: pgnx
+    binaries: [pgnx]
+    repository:
+      owner: kyleboon
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Casks
+    homepage: https://github.com/kyleboon/pgnx
+    description: Search, filter and reformat chess games in PGN; a Go port of pgn-extract
+    license: GPL-3.0-only
+    skip_upload: auto
+    commit_author:
+      name: goreleaser-bot
+      email: bot@goreleaser.com
+    commit_msg_template: "pgnx {{ .Tag }}"
+    # The binaries are not notarised; clear the quarantine attribute so
+    # macOS Gatekeeper does not block them. Remove once signing is in place.
+    hooks:
+      post:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/pgnx"]
+          end

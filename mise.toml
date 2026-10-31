@@ -1,0 +1,61 @@
+# Tool versions and tasks for pgnx. One entry point for humans, agents and CI:
+#
+#   mise install        # install the pinned Go and GoReleaser
+#   mise run ci         # exactly what .github/workflows/ci.yml runs
+#   mise run snapshot   # dry-run a release into dist/ (no tag, no token)
+#
+# Releasing is a human act: push a v* tag. See docs/adr/0001-release-via-tag-push-and-homebrew-tap.md.
+
+[tools]
+go = "1.27.3"
+goreleaser = "2.19.0"
+
+[env]
+# Never let Go silently download a different toolchain than the one pinned
+# above; go.mod's "go" line is the minimum for library consumers, not what
+# CI builds with.
+GOTOOLCHAIN = "local"
+CGO_ENABLED = "0"
+
+[tasks.build]
+description = "Compile every package"
+run = "go build ./..."
+
+[tasks.vet]
+description = "go vet"
+run = "go vet ./..."
+
+[tasks.fmt-check]
+description = "Fail if any Go file is not gofmt-clean"
+# mise runs inline scripts with `cmd /c` on Windows; this one needs bash
+# (present on every GitHub runner, including windows-latest).
+shell = "bash -c"
+run = '''
+set -euo pipefail
+unformatted=$(gofmt -l .)
+if [ -n "$unformatted" ]; then
+  echo "gofmt: these files need formatting:" >&2
+  echo "$unformatted" >&2
+  exit 1
+fi
+'''
+
+[tasks.test]
+description = "Full test suite with the race detector"
+run = "go test -race ./..."
+
+[tasks.release-check]
+description = "Validate .goreleaser.yaml"
+run = "goreleaser check"
+
+[tasks.ci]
+description = "Everything CI runs on push and pull request"
+depends = ["build", "vet", "fmt-check", "test", "release-check"]
+
+[tasks.snapshot]
+description = "Build a full release locally into dist/ without a tag or GitHub token"
+run = "goreleaser release --snapshot --clean --skip=publish"
+
+[tasks.difftest]
+description = "Differential test against the C pgn-extract oracle (needs C_BIN, see scripts/difftest.sh)"
+run = "scripts/difftest.sh"
