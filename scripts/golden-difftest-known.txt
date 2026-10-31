@@ -1,0 +1,7 @@
+# Golden inputs that are known to diverge from the C oracle under a plain
+# `convert` (SAN) run. Each is documented in CONFORMANCE.md; a divergence on
+# any file NOT listed here fails scripts/golden-difftest.sh. Remove a line
+# when its divergence is fixed.
+nested-comment.pgn
+test-nagcomments.pgn
+test-splitvariants.pgn

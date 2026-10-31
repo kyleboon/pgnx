@@ -26,9 +26,26 @@ phasing plan.
 
 ## Install
 
+Homebrew (macOS and Linux):
+
+```sh
+brew install kyleboon/tap/pgnx
+```
+
+Prebuilt binaries for Linux, macOS and Windows (amd64 and arm64) are on the
+[releases page](https://github.com/kyleboon/pgnx/releases), with a
+`checksums.txt` to verify them against. The binaries are not code-signed:
+Windows SmartScreen warns on first run, and on macOS the Homebrew cask clears
+the quarantine attribute for you; a manually downloaded binary may need
+`xattr -d com.apple.quarantine pgnx`.
+
+With a Go toolchain:
+
 ```sh
 go install github.com/kyleboon/pgnx/cmd/pgnx@latest
 ```
+
+`pgnx --version` reports the version, commit and build date.
 
 ## CLI
 
@@ -177,6 +194,33 @@ move generation, legality, and Zobrist hashing.
   pgnx's subcommands and flags
 - [CONFORMANCE.md](CONFORMANCE.md) — documented intentional differences
   from the C tool, and known gaps
+
+## Developing and releasing
+
+[mise](https://mise.jdx.dev) pins the Go and GoReleaser versions and defines
+the tasks CI runs, so local and CI runs are identical:
+
+```sh
+mise install          # pinned Go + GoReleaser
+mise run ci           # build, vet, gofmt, go test -race, goreleaser check
+mise run snapshot     # full release dry-run into dist/ (no tag, no token)
+```
+
+CI runs `mise run ci` on Linux, macOS and Windows for every push to `main`
+and every pull request. Releasing is a human decision: push a semver tag and
+the release workflow builds every target, publishes a GitHub Release with
+`checksums.txt`, and updates the Homebrew tap.
+
+```sh
+git tag -a v0.2.0 -m "pgnx 0.2.0"
+git push origin v0.2.0
+```
+
+A tag such as `v0.2.0-rc1` becomes a prerelease and leaves the Homebrew cask
+untouched. Tags not on `main` are refused. See
+[docs/adr/0001](docs/adr/0001-release-via-tag-push-and-homebrew-tap.md) for
+the reasoning and `scripts/release-setup-wizard.sh` for the one-time setup
+(tap repo and token).
 
 ## Credit
 

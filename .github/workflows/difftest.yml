@@ -1,0 +1,48 @@
+# Differential test against the C pgn-extract oracle. Manual only: it
+# builds David J. Barnes' C implementation from source, then runs
+# scripts/golden-difftest.sh, which diffs pgnx against it over every golden
+# input. Divergences already documented in CONFORMANCE.md are expected and
+# listed in scripts/golden-difftest-known.txt; anything else fails the run.
+name: C oracle difftest
+
+on:
+  workflow_dispatch:
+    inputs:
+      pgn_extract_ref:
+        description: Git ref of kentdjb/pgn-extract to build
+        default: main
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  difftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check out and build C pgn-extract
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: kentdjb/pgn-extract
+          ref: ${{ inputs.pgn_extract_ref }}
+          path: pgn-extract
+      - run: make -C pgn-extract -j
+
+      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+        with:
+          cache: true
+
+      - name: Diff pgnx against the C tool over the golden corpus
+        run: scripts/golden-difftest.sh
+        env:
+          C_BIN: ${{ github.workspace }}/pgn-extract/build/bin/pgn-extract
+
+      - name: Keep diffs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: difftest-diffs
+          path: difftest-out/
+          retention-days: 7

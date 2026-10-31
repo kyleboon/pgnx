@@ -1,0 +1,5 @@
+# Normalise every text file to LF in the working tree on every platform.
+# Windows git defaults to core.autocrlf=true, which turns checked-out Go
+# files into CRLF; gofmt then reports all of them as unformatted, and the
+# golden PGN corpus must stay byte-identical to the C oracle's output.
+* text=auto eol=lf
