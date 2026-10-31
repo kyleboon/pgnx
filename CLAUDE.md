@@ -51,6 +51,20 @@ The C pgn-extract implementation is the behavioral reference, and this shapes ho
 - `MIGRATION.md` maps the C tool's flags to pgnx subcommands/flags; update it when adding CLI surface.
 
 
+## Agent skills
+
+### Issue tracker
+
+Issues live in Beads (`bd`), not GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` at the root and ADRs under `docs/adr/`. See `docs/agents/domain.md`.
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:1105d646 -->
 ## Beads Issue Tracker
 
