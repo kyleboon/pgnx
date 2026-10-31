@@ -15,7 +15,8 @@ goreleaser = "2.19.0"
 # above; go.mod's "go" line is the minimum for library consumers, not what
 # CI builds with.
 GOTOOLCHAIN = "local"
-CGO_ENABLED = "0"
+# Do not set CGO_ENABLED=0 here: `go test -race` needs cgo on linux and
+# windows. Release binaries are built cgo-free by .goreleaser.yaml instead.
 
 [tasks.build]
 description = "Compile every package"
