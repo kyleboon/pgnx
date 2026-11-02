@@ -194,25 +194,12 @@ func Apply(g *pgn.Game, e Entry) {
 	if g == nil {
 		return
 	}
-	kept := make([]pgn.Tag, 0, len(g.Tags)+4)
-	for _, tag := range g.Tags {
-		if !isECOTag(tag.Name) {
-			kept = append(kept, tag)
-		}
+	for _, name := range tagNames {
+		g.DeleteTag(name)
 	}
-	g.Tags = kept
 	for _, tag := range e.Tags() {
 		g.SetTag(tag.Name, tag.Value)
 	}
-}
-
-func isECOTag(name string) bool {
-	for _, n := range tagNames {
-		if n == name {
-			return true
-		}
-	}
-	return false
 }
 
 // FilePrefix returns the base name of the file an -E/--eco-split game is

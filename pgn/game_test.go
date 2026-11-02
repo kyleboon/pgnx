@@ -43,3 +43,29 @@ func TestSetTagReplacesLastOccurrenceInPlaceOrAppends(t *testing.T) {
 		t.Errorf("SetTag on a game with no tags = %v, want %v", empty.Tags, want)
 	}
 }
+
+// TestDeleteTagRemovesEveryOccurrence pins the other tag-mutating method:
+// every occurrence of the name goes, the other tags keep their order, and
+// a name the game lacks changes nothing.
+func TestDeleteTagRemovesEveryOccurrence(t *testing.T) {
+	g := &Game{Tags: []Tag{
+		{Name: "ECO", Value: "B99"},
+		{Name: "Event", Value: "E"},
+		{Name: "ECO", Value: "C00"},
+		{Name: "Site", Value: "S"},
+	}}
+	g.DeleteTag("ECO")
+	g.DeleteTag("Opening")
+	want := []Tag{{Name: "Event", Value: "E"}, {Name: "Site", Value: "S"}}
+	if !reflect.DeepEqual(g.Tags, want) {
+		t.Errorf("tags after DeleteTag = %v, want %v", g.Tags, want)
+	}
+	if _, ok := g.Tag("ECO"); ok {
+		t.Error("Tag(ECO) still found")
+	}
+	var empty Game
+	empty.DeleteTag("ECO")
+	if len(empty.Tags) != 0 {
+		t.Errorf("DeleteTag on a game with no tags = %v", empty.Tags)
+	}
+}
