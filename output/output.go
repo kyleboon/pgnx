@@ -262,27 +262,6 @@ func (w *Writer) writeMovetextGame(g *pgn.Game, r *replay.Result) error {
 	return err
 }
 
-// normalisedResult returns the Result tag value the C oracle would emit
-// for a tag (value, present) and terminating token. Its parser's
-// check_result (grammar.c) rewrites the short form "1/2" to "1/2-1/2"
-// and fills an absent, empty or "?" tag from the token; its replay
-// (apply.c play_moves) then replaces any tag that is still not one of
-// the four PGN results with "*". With neither tag nor token the roster
-// default "*" applies.
-func normalisedResult(value string, present bool, token string) string {
-	if present && value == "1/2" {
-		value = "1/2-1/2"
-	}
-	if token != "" && (!present || value == "" || value == "?") {
-		value, present = token, true
-	}
-	switch value {
-	case "1-0", "0-1", "1/2-1/2", "*":
-		return value
-	}
-	return "*"
-}
-
 // writeTag prints one tag line. It is the only place a tag reaches the
 // output, so pgn-extract's quoting (see quoteTagValue) applies everywhere.
 func (w *Writer) writeTag(name, value string) error {
@@ -316,12 +295,11 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 	for _, rt := range sevenTagRoster {
 		rosterSet[rt.name] = true
 		value, ok := g.Tag(rt.name)
-		switch {
-		case rt.name == "Result":
-			value = normalisedResult(value, ok, g.Result)
-		case !ok:
+		if !ok {
 			// A present-but-empty roster tag is preserved as ""; only a
-			// genuinely missing tag gets the standard default.
+			// genuinely missing tag gets the standard default. The Result
+			// value is written as given: its normalisation is the
+			// pipeline's job, before the game reaches the writer.
 			value = rt.deflt
 		}
 		if err := w.writeTag(rt.name, value); err != nil {

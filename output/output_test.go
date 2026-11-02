@@ -229,13 +229,13 @@ func TestNoResultsKeepsTag(t *testing.T) {
 // TestEmptyVsMissingRosterTags pins that a roster tag that is present but
 // empty in the source is preserved as empty, while a genuinely missing tag
 // gets the standard default — the oracle does NOT conflate the two. The
-// Result tag is the exception: absent or empty, it is filled from the
-// game's actual result (movetext terminator). Oracle:
+// writer treats Result like the other six: the oracle fills an empty
+// Result from the movetext terminator in its parser, which in pgnx is
+// pipeline.Normalise's job before the game reaches the writer. Oracle:
 //
 //	printf '[Round ""]\n[Result "*"]\n\n1. e4 *\n' | pgn-extract --quiet
 //	printf '[Result "*"]\n\n1. e4 *\n' | pgn-extract --quiet
-//	printf '[Event ""]\n[Site ""]\n[Date ""]\n[Round ""]\n[White ""]\n[Black ""]\n[Result ""]\n\n1. e4 *\n' | pgn-extract --quiet
-//	printf '[Result ""]\n\n1. e4 e5 1-0\n' | pgn-extract --quiet
+//	printf '[Event ""]\n[Site ""]\n[Date ""]\n[Round ""]\n[White ""]\n[Black ""]\n[Result "*"]\n\n1. e4 *\n' | pgn-extract --quiet
 func TestEmptyVsMissingRosterTags(t *testing.T) {
 	cases := []struct {
 		name string
@@ -253,14 +253,9 @@ func TestEmptyVsMissingRosterTags(t *testing.T) {
 			want: "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n1. e4 *\n\n",
 		},
 		{
-			name: "all empty preserved except Result",
-			src:  "[Event \"\"]\n[Site \"\"]\n[Date \"\"]\n[Round \"\"]\n[White \"\"]\n[Black \"\"]\n[Result \"\"]\n\n1. e4 *\n",
+			name: "all empty preserved",
+			src:  "[Event \"\"]\n[Site \"\"]\n[Date \"\"]\n[Round \"\"]\n[White \"\"]\n[Black \"\"]\n[Result \"*\"]\n\n1. e4 *\n",
 			want: "[Event \"\"]\n[Site \"\"]\n[Date \"\"]\n[Round \"\"]\n[White \"\"]\n[Black \"\"]\n[Result \"*\"]\n\n1. e4 *\n\n",
-		},
-		{
-			name: "empty Result takes game result",
-			src:  "[Result \"\"]\n\n1. e4 e5 1-0\n",
-			want: "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"1-0\"]\n\n1. e4 e5 1-0\n\n",
 		},
 	}
 	for _, tc := range cases {
@@ -586,18 +581,19 @@ func parseGame(t *testing.T, src string) *pgn.Game {
 	return s.Game()
 }
 
-func TestResultTagNormalisation(t *testing.T) {
+// The writer trusts the Result tag it is given (normalising it is the
+// pipeline's job): a present tag is written verbatim, and only an absent
+// one gets the roster default "*".
+func TestResultTagTrusted(t *testing.T) {
 	cases := []struct {
 		src  string
 		want string
 	}{
-		{"[Result \"1/2\"]\n\n1. e4 1/2-1/2\n", "1/2-1/2"},
-		{"[Result \"1/2\"]\n\n1. e4 *\n", "1/2-1/2"},
-		{"[Result \"?\"]\n\n1. e4 1-0\n", "1-0"},
-		{"[Result \"\"]\n\n1. e4 0-1\n", "0-1"},
-		{"1. e4 0-1\n", "0-1"},
-		{"[Result \"1:0\"]\n\n1. e4 1-0\n", "*"},
-		{"[Result \"1-0\"]\n\n1. e4 0-1\n", "1-0"}, // disagreement is filter's business
+		{"[Result \"1/2\"]\n\n1. e4 1/2-1/2\n", "1/2"},
+		{"[Result \"?\"]\n\n1. e4 1-0\n", "?"},
+		{"[Result \"1:0\"]\n\n1. e4 1-0\n", "1:0"},
+		{"[Result \"1-0\"]\n\n1. e4 0-1\n", "1-0"},
+		{"1. e4 0-1\n", "*"},
 		{"[Event \"x\"]\n\n*\n", "*"},
 	}
 	for _, c := range cases {

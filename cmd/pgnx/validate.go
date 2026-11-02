@@ -5,13 +5,15 @@ import (
 	"io"
 
 	"github.com/kyleboon/pgnx/pgn"
+	"github.com/kyleboon/pgnx/pipeline"
 	"github.com/kyleboon/pgnx/replay"
 	"github.com/spf13/cobra"
 )
 
 // newValidateCmd builds the "pgnx validate" subcommand: it reads PGN games
-// from its input (files, or stdin when none are given), replays each one,
-// and reports which games fail. Unlike convert, validate's per-game
+// from its input (files, or stdin when none are given), normalises and
+// replays each one, and reports which games fail: a game is valid when
+// convert would emit it without a failure. Unlike convert, validate's per-game
 // findings are a primary output rather than incidental logging, so they go
 // to stdout; --summary suppresses them in favor of a single tally line.
 func newValidateCmd() *cobra.Command {
@@ -53,6 +55,9 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	}
 
 	total, succeeded, ioErr := forEachGame(cmd, args, findings, logW, func(src string, n int, g *pgn.Game) error {
+		if err := pipeline.Normalise(g); err != nil {
+			return err
+		}
 		_, err := replay.Game(g, replay.Options{})
 		return err
 	})

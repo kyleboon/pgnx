@@ -48,13 +48,6 @@ func TestEvaluateResultCriterionSeesPreFixTag(t *testing.T) {
 	mustMatch(t, src, &Options{Tags: m, FixResultTags: true}, false)
 }
 
-func TestEvaluateResultNormalisedBeforeTags(t *testing.T) {
-	m := &TagMatcher{}
-	m.AddPrefix("Result", "1/2-1/2")
-	mustMatch(t, "[Result \"1/2\"]\n\n1. e4 1/2-1/2\n", &Options{Tags: m}, true)
-	mustMatch(t, "[Result \"?\"]\n\n1. e4 1/2-1/2\n", &Options{Tags: m}, true)
-}
-
 func TestEvaluateNoBadResults(t *testing.T) {
 	_, err := eval(t, "[Result \"1-0\"]\n\n1. e4 0-1\n", &Options{NoBadResults: true})
 	if !errors.Is(err, ErrBadResult) {
@@ -64,12 +57,13 @@ func TestEvaluateNoBadResults(t *testing.T) {
 }
 
 func TestEvaluateSetup(t *testing.T) {
-	fenGame := "[FEN \"4k3/8/8/8/8/8/8/4K2R w K - 0 1\"]\n\n1. Rh2 *\n"
-	mustMatch(t, fenGame, &Options{Setup: NoSetup}, false) // SetUp "1" is added first
+	// Evaluate trusts the tags: a FEN game gains its SetUp "1" from
+	// pipeline.Normalise before Evaluate ever sees it.
+	fenGame := "[SetUp \"1\"]\n[FEN \"4k3/8/8/8/8/8/8/4K2R w K - 0 1\"]\n\n1. Rh2 *\n"
+	mustMatch(t, fenGame, &Options{Setup: NoSetup}, false)
 	mustMatch(t, fenGame, &Options{Setup: OnlySetup}, true)
 	mustMatch(t, foolsMate, &Options{Setup: NoSetup}, true)
 	mustMatch(t, foolsMate, &Options{Setup: OnlySetup}, false)
-	mustMatch(t, "[SetUp \"1\"]\n\n1. e4 *\n", &Options{}, false)
 }
 
 func TestEvaluateTagFailureShortCircuits(t *testing.T) {
