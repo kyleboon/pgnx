@@ -13,13 +13,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// destination is where a route sends a processed game.
-type destination int
+// routeTarget names the destination a route sends a processed game to.
+type routeTarget int
 
 const (
 	// nowhere: the game is not written (validate; a filter game the
 	// Selector held back; a matched game under --suppress-matched).
-	nowhere destination = iota
+	nowhere routeTarget = iota
 	// toOutput: the run's main destination (--output, or the --eco-split
 	// files).
 	toOutput
@@ -34,14 +34,14 @@ const (
 // stops after it. stop is the Selector's decision; it is returned
 // alongside the pipeline's Outcome, never folded into it. n is the game's
 // 1-based number across all inputs.
-type route func(n int, o pipeline.Outcome) (dest destination, stop bool)
+type route func(n int, o pipeline.Outcome) (target routeTarget, stop bool)
 
 // routeAll is convert's route: every game to the output, never stopping.
-func routeAll(int, pipeline.Outcome) (destination, bool) { return toOutput, false }
+func routeAll(int, pipeline.Outcome) (routeTarget, bool) { return toOutput, false }
 
 // routeNowhere is validate's route: nothing is written; the game is only
 // reported.
-func routeNowhere(int, pipeline.Outcome) (destination, bool) { return nowhere, false }
+func routeNowhere(int, pipeline.Outcome) (routeTarget, bool) { return nowhere, false }
 
 // run is one invocation of a command that sends games through the
 // pipeline: the setup convert and filter share (newRun) and the per-game
@@ -63,7 +63,7 @@ type run struct {
 	route route
 	// output is the main destination; unmatched is the --unmatched
 	// destination, nil when the command has none.
-	output, unmatched gameWriter
+	output, unmatched destination
 	// stdout is the one buffer every destination on stdout shares, so
 	// that games to --output and --unmatched, both "-", stay in input
 	// order; created on first use.
@@ -198,32 +198,33 @@ func (r *run) game(n int, g *pgn.Game) gameVerdict {
 	if o.Status == pipeline.Rejected {
 		return gameVerdict{Errors: []error{o.Reason}}
 	}
-	dest, stop := r.route(n, o)
-	if err := r.write(dest, o); err != nil {
+	target, stop := r.route(n, o)
+	if err := r.write(target, o); err != nil {
 		return gameVerdict{Errors: []error{err}, Stop: stop}
 	}
 	return verdict(o, stop)
 }
 
-// write sends o's game to dest. A Broken game is written without its
-// (partial) replay, which the writer renders in Source format: the only
-// format a broken game is emitted in (CONFORMANCE.md, --keep-broken).
-func (r *run) write(dest destination, o pipeline.Outcome) error {
-	var w gameWriter
-	switch dest {
+// write sends o's game to the destination target names. A Broken game
+// is written without its (partial) replay, which the writer renders in
+// Source format: the only format a broken game is emitted in
+// (CONFORMANCE.md, --keep-broken).
+func (r *run) write(target routeTarget, o pipeline.Outcome) error {
+	var d destination
+	switch target {
 	case toOutput:
-		w = r.output
+		d = r.output
 	case toUnmatched:
-		w = r.unmatched
+		d = r.unmatched
 	}
-	if w == nil {
+	if d == nil {
 		return nil
 	}
 	rep := o.Replay
 	if o.Status == pipeline.Broken {
 		rep = nil
 	}
-	return writeGameTo(w, o.Game, rep)
+	return writeGameTo(d, o.Game, rep)
 }
 
 // exec reads every game from args (or stdin) through game, closes the
@@ -251,9 +252,9 @@ func (r *run) exec(args []string) error {
 // file named by the string flag flagName, or stdout (through the run's
 // shared stdout buffer). The returned Closer flushes and closes whatever
 // was opened.
-func (r *run) openDestination(flagName string, splitLevel int) (gameWriter, error) {
+func (r *run) openDestination(flagName string, splitLevel int) (destination, error) {
 	if splitLevel > 0 {
-		return newECOSplitWriters(splitLevel, r.opts), nil
+		return newECOSplitDestination(splitLevel, r.opts), nil
 	}
 	out, closer, err := openOutput(r.cmd, flagName)
 	if err != nil {
@@ -264,9 +265,9 @@ func (r *run) openDestination(flagName string, splitLevel int) (gameWriter, erro
 		if r.stdout == nil {
 			r.stdout = bufio.NewWriter(out)
 		}
-		return &bufferedWriter{w: output.NewWriter(r.stdout, r.opts), buf: r.stdout}, nil
+		return &bufferedDestination{w: output.NewWriter(r.stdout, r.opts), buf: r.stdout}, nil
 	}
-	return newBufferedWriter(out, closer, r.opts), nil
+	return newBufferedDestination(out, closer, r.opts), nil
 }
 
 // plural returns "" when n == 1, else "s", matching the C oracle's

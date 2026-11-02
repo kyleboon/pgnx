@@ -373,7 +373,7 @@ func runFilter(cmd *cobra.Command, args []string) error {
 	// output unless --suppress-matched, the rest to --unmatched, and its
 	// stop-after decision ends the run.
 	sel := filter.NewSelector(selOpts)
-	r.route = func(n int, o pipeline.Outcome) (destination, bool) {
+	r.route = func(n int, o pipeline.Outcome) (routeTarget, bool) {
 		d := sel.Decide(n, o.Matched)
 		switch {
 		case d.Emit && !suppressMatched:

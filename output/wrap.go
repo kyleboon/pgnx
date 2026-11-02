@@ -10,7 +10,7 @@ const defaultLineWidth = 75
 // the current line. A token that is itself wider than width is placed
 // alone on its own line. Each line reaches w in one Write; lineWriter
 // does no buffering of its own, so the caller's writer decides when
-// bytes reach the sink (see NewWriter).
+// bytes reach the file (see NewWriter).
 type lineWriter struct {
 	w       io.Writer
 	width   int

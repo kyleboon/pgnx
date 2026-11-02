@@ -21,10 +21,10 @@ func (failingWriter) Write(p []byte) (int, error) { return 0, errDiskFull }
 
 // TestDestinationBuffersAndReportsWriteErrorAtClose pins the destination
 // type's contract: games are buffered for the whole run, so a write the
-// sink refuses does not fail the game, and Close flushes the buffer and
+// file refuses does not fail the game, and Close flushes the buffer and
 // reports the failure, which is what makes a full disk exit 2.
 func TestDestinationBuffersAndReportsWriteErrorAtClose(t *testing.T) {
-	d := newBufferedWriter(failingWriter{}, nil, output.Options{Format: output.SAN})
+	d := newBufferedDestination(failingWriter{}, nil, output.Options{Format: output.SAN})
 	s := pgn.NewScanner(strings.NewReader(fools), pgn.ParserOptions{})
 	if !s.Next() {
 		t.Fatal(s.Err())
@@ -35,7 +35,7 @@ func TestDestinationBuffersAndReportsWriteErrorAtClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := writeGameTo(d, g, r); err != nil {
-		t.Fatalf("a buffered write must not reach the sink: %v", err)
+		t.Fatalf("a buffered write must not reach the file: %v", err)
 	}
 	if err := d.Close(); !errors.Is(err, errDiskFull) {
 		t.Errorf("Close: got %v, want %v", err, errDiskFull)
@@ -62,8 +62,8 @@ func TestConvertExitsTwoWhenOutputCannotBeWritten(t *testing.T) {
 
 // TestFilterUnmatchedToStdoutKeepsGameOrder pins that --output and
 // --unmatched both on stdout interleave matched and unmatched games in
-// input order, as one buffer per sink requires when two destinations
-// share it.
+// input order, which takes one buffer per file (here stdout) when two
+// destinations share it.
 func TestFilterUnmatchedToStdoutKeepsGameOrder(t *testing.T) {
 	in := "[White \"Fischer\"]\n\n1. e4 *\n\n[White \"Tal\"]\n\n1. d4 *\n\n[White \"Fischer\"]\n\n1. c4 *\n"
 	out, _, code := runCLI(t, in, "filter", "--quiet", "--player", "Fischer", "--unmatched", "-")

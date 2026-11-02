@@ -588,7 +588,7 @@ notes for triage:
 `convert`, `filter` and `validate` now share one per-game sequence in
 `cmd/pgnx/run.go` (observe tags, `pipeline.Process`, route, write) and
 one setup helper; `filter`'s private copies of the replay and ECO stages
-are gone, and its callback only routes the outcome through
+are gone, and its route only sends the outcome through
 `filter.Selector`, `--suppress-matched` and `--unmatched`. No output
 changed: `TestFilterNoCriteriaEqualsConvertOverGoldenInputs` pins
 byte-identical output, diagnostics and exit codes for `convert` and
