@@ -1,6 +1,8 @@
 package filter
 
 import (
+	"errors"
+
 	"github.com/kyleboon/pgnx/pgn"
 	"github.com/kyleboon/pgnx/replay"
 )
@@ -79,6 +81,17 @@ type Options struct {
 	// positional match (--markmatches). "FEN" inserts the position's FEN
 	// instead.
 	MarkMatches string
+}
+
+// Validate reports the first way in which o is not a usable set of
+// criteria (the rules pgn-extract's argument handling enforces before
+// any game is read). The command layer maps a non-nil error to a usage
+// error; a zero Options is valid.
+func (o *Options) Validate() error {
+	if o.Checkmate && (o.Stalemate || o.Insufficient) {
+		return errors.New("checkmate cannot be combined with stalemate or insufficient material")
+	}
+	return nil
 }
 
 // Evaluate reports whether g (with its replay r, which may be partial
