@@ -435,18 +435,81 @@ func TestSourceFormatNilReplay(t *testing.T) {
 	}
 }
 
-// TestNilReplayRequiresSource pins that WriteGame refuses a nil
-// replay.Result for any format other than Source, erroring before
-// anything is written.
-func TestNilReplayRequiresSource(t *testing.T) {
-	g, _ := gameAndReplay(t, fools)
-	var buf bytes.Buffer
-	w := NewWriter(&buf, Options{Format: SAN})
-	if err := w.WriteGame(g, nil); err == nil {
-		t.Error("expected error for nil replay with Format SAN, got nil")
+// brokenSrc is a game whose fourth ply is illegal (the black knight cannot
+// reach f3), so replay stops after three plies with a partial Result.
+const brokenSrc = "[Event \"Casual\"]\n[White \"A\"]\n[Black \"B\"]\n[Result \"*\"]\n\n1. e4 e5 2. Nf3 Nf3 $1 {oops} *\n"
+
+// brokenWant is brokenSrc rendered in Source format: the roster defaults
+// and the moves exactly as written, whatever format was asked for.
+const brokenWant = "[Event \"Casual\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"A\"]\n[Black \"B\"]\n[Result \"*\"]\n\n" +
+	"1. e4 e5 2. Nf3 Nf3 $1 { oops } *\n\n"
+
+// brokenGame parses brokenSrc and replays it, returning the partial
+// replay (three plies) the failure leaves behind.
+func brokenGame(t *testing.T) (*pgn.Game, *replay.Result) {
+	t.Helper()
+	g := parseGame(t, brokenSrc)
+	r, err := replay.Game(g, replay.Options{})
+	if err == nil {
+		t.Fatal("brokenSrc replayed without error")
 	}
-	if buf.Len() != 0 {
-		t.Errorf("expected no output on error, got:\n%q", buf.String())
+	if r == nil || len(r.Moves) != 3 {
+		t.Fatalf("partial replay: %+v", r)
+	}
+	return g, r
+}
+
+// TestNilReplayRendersSource pins that a game written without a replay
+// is rendered in Source format whatever Options.Format says: Source is the
+// only format that needs no replay, so it is how a broken game (one whose
+// moves did not fully replay) reaches the output. UCI is the format that
+// strips the most (move numbers, NAGs, comments) and so would differ most
+// if its options leaked into the fallback; EPD would have no tags at all.
+func TestNilReplayRendersSource(t *testing.T) {
+	g, _ := brokenGame(t)
+	for _, f := range []Format{SAN, Source, LAlg, HAlg, ELAlg, XLAlg, UCI, EPD, FEN} {
+		var buf bytes.Buffer
+		w := NewWriter(&buf, Options{Format: f})
+		if err := w.WriteGame(g, nil); err != nil {
+			t.Errorf("%v: %v", f, err)
+			continue
+		}
+		if buf.String() != brokenWant {
+			t.Errorf("%v: got:\n%q\nwant:\n%q", f, buf.String(), brokenWant)
+		}
+	}
+}
+
+// TestPartialReplayRendersSource pins the other half of the broken-game
+// contract: a Source writer given the partial replay a failed replay
+// leaves behind renders every move as written, not only the plies that
+// replayed, and the same bytes as the nil-replay fallback.
+func TestPartialReplayRendersSource(t *testing.T) {
+	g, partial := brokenGame(t)
+	var buf bytes.Buffer
+	w := NewWriter(&buf, Options{Format: Source})
+	if err := w.WriteGame(g, partial); err != nil {
+		t.Fatal(err)
+	}
+	if buf.String() != brokenWant {
+		t.Errorf("got:\n%q\nwant:\n%q", buf.String(), brokenWant)
+	}
+}
+
+// TestNilReplayFallbackKeepsOtherOptions pins that the Source fallback is
+// only a change of format: the line width, roster and comment stripping
+// the writer was built with still apply to a broken game.
+func TestNilReplayFallbackKeepsOtherOptions(t *testing.T) {
+	g, _ := brokenGame(t)
+	var buf bytes.Buffer
+	w := NewWriter(&buf, Options{Format: LAlg, LineWidth: 12, SevenTagRoster: true, NoComments: true, NoNAGs: true})
+	if err := w.WriteGame(g, nil); err != nil {
+		t.Fatal(err)
+	}
+	want := "[Event \"Casual\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"A\"]\n[Black \"B\"]\n[Result \"*\"]\n\n" +
+		"1. e4 e5 2.\nNf3 Nf3 *\n\n"
+	if buf.String() != want {
+		t.Errorf("got:\n%q\nwant:\n%q", buf.String(), want)
 	}
 }
 
