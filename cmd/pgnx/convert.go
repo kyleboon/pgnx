@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kyleboon/pgnx/filter"
 	"github.com/kyleboon/pgnx/output"
 	"github.com/kyleboon/pgnx/pgn"
 	"github.com/kyleboon/pgnx/pipeline"
@@ -164,31 +163,21 @@ func runConvert(cmd *cobra.Command, args []string) error {
 	}
 	defer dest.Close()
 
+	// convert is filter with no criteria: the pipeline decides everything
+	// about a game; this callback only observes its tags (before anything
+	// is written, so unrecognised tags order as the oracle's do), runs the
+	// pipeline and writes every game that is not Rejected.
+	pipe := pipeline.New(pipeline.Config{ECO: ecoSet.table, KeepBroken: keepBroken})
 	total, succeeded, ioErr := forEachGame(cmd, args, logW, logW, func(src string, n int, g *pgn.Game) error {
 		opts.Tags.Observe(g)
-		// A game Normalise rejects is emitted nowhere, even with
-		// --keep-broken (ADR 0002).
-		if err := pipeline.Normalise(g); err != nil {
+		o := pipe.Process(g)
+		if o.Status == pipeline.Rejected {
+			return o.Reason
+		}
+		if err := writeGameTo(dest, o.Game, o.Replay, o.Status == pipeline.Broken); err != nil {
 			return err
 		}
-		r, replayErr, problem := replayGame(g, keepBroken)
-		if replayErr != nil && !keepBroken {
-			return replayErr
-		}
-		ecoSet.classify(g, r)
-		// convert is filter with no criteria: the criteria stage still
-		// runs so the replay-time tag rewrites (apply.c play_moves: an
-		// invalid Result tag becomes "*") happen as they do in the C tool.
-		if _, err := filter.Evaluate(g, r, nil); err != nil {
-			return err
-		}
-		if err := writeGameTo(dest, g, r, replayErr); err != nil {
-			return err
-		}
-		if replayErr == nil {
-			return problem
-		}
-		return replayErr
+		return problems(o)
 	})
 
 	if !quiet {

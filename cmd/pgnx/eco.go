@@ -80,7 +80,8 @@ func (s ecoSettings) logSkipped(w io.Writer, path string) {
 
 // classify replaces g's ECO tags from the table when a line matches.
 // r may be partial (a broken game kept with --keep-broken); a nil r is
-// never matched.
+// never matched. filter's until pgnx-deepen.5 routes it through the
+// pipeline, which classifies itself.
 func (s ecoSettings) classify(g *pgn.Game, r *replay.Result) {
 	if s.table == nil || r == nil {
 		return
@@ -156,21 +157,21 @@ func (s *ecoSplitWriters) Close() error {
 	return first
 }
 
-// writeGame writes g with w, or (when its replay failed and the game is
-// being kept) with sourceW, since only Source format can render a game
-// without replay detail.
-func writeGame(g *pgn.Game, r *replay.Result, replayErr error, w, sourceW *output.Writer) error {
-	if replayErr != nil {
+// writeGame writes g with w, or (when broken: its replay failed and the
+// game is being kept) with sourceW, since only Source format can render
+// a game without replay detail.
+func writeGame(g *pgn.Game, r *replay.Result, broken bool, w, sourceW *output.Writer) error {
+	if broken {
 		return sourceW.WriteGame(g, nil)
 	}
 	return w.WriteGame(g, r)
 }
 
 // writeGameTo resolves the destination for g and writes it.
-func writeGameTo(dest gameWriters, g *pgn.Game, r *replay.Result, replayErr error) error {
+func writeGameTo(dest gameWriters, g *pgn.Game, r *replay.Result, broken bool) error {
 	w, sourceW, err := dest.writersFor(g)
 	if err != nil {
 		return err
 	}
-	return writeGame(g, r, replayErr, w, sourceW)
+	return writeGame(g, r, broken, w, sourceW)
 }
