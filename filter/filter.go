@@ -175,7 +175,7 @@ func Evaluate(g *pgn.Game, r *replay.Result, o *Options) (bool, error) {
 		nMoveRule = matchNMoveRule(g, r, o.NMoveRule, o.MarkMatches, startPly, stop)
 	}
 	if o.AddLabelTag && label != "" {
-		setTag(g, "MatchLabel", label)
+		g.SetTag("MatchLabel", label)
 	}
 	if stop >= len(r.Moves) {
 		// The result check lives at the last move of the walk; a walk cut

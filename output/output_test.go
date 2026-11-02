@@ -653,3 +653,72 @@ func TestRosterFENTags(t *testing.T) {
 		t.Errorf("got:\n%q\nwant:\n%q", buf.String(), want)
 	}
 }
+
+// TestTagValuesQuotedTheOracleWay feeds a value holding `"` and `\` through
+// every tag-emitting path and pins pgn-extract's quoting rule. The oracle
+// (lex.c gather_string, output.c output_tag) stores a tag value with its
+// source escape pairs intact and prints it verbatim inside double quotes,
+// so `\"`, `\\` and a lone `\d` pass through unchanged. A bare `"` can only
+// arrive programmatically (SetTag); escaping it is the one liberty taken,
+// since the oracle could never hold one. Go's %q escaping (`\\`, `\"` for
+// every backslash and quote) must appear on no path. The EPD c0 comment
+// copies values raw (output.c format_epd_game_comment), with no quoting.
+func TestTagValuesQuotedTheOracleWay(t *testing.T) {
+	const (
+		raw     = `a\"b\\c\d` // as parsed from [X "a\"b\\c\d"]
+		bare    = `x"y`       // set programmatically
+		bareOut = `x\"y`
+		fen     = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+	)
+	src := "[Event \"" + raw + "\"]\n" +
+		"[Annotator \"" + raw + "\"]\n" + // well-known, fixed order
+		"[HashCode \"" + raw + "\"]\n" + // predefined trailing
+		"[Foo \"" + raw + "\"]\n" + // unrecognised
+		"[Opening \"" + raw + "\"]\n" + // RosterExtras under SevenTagRoster
+		"[FEN \"" + fen + "\"]\n[SetUp \"1\"]\n" +
+		"[Variant \"" + raw + "\"]\n" + // Variant/SetUp/FEN trailer under SevenTagRoster
+		"[Result \"*\"]\n\n1. e4 *\n"
+	newGame := func() (*pgn.Game, *replay.Result) {
+		g, r := gameAndReplay(t, src)
+		g.SetTag("Site", bare) // roster tag
+		g.SetTag("Bar", bare)  // unrecognised, appended
+		return g, r
+	}
+	render := func(opts Options) string {
+		g, r := newGame()
+		var buf bytes.Buffer
+		if err := NewWriter(&buf, opts).WriteGame(g, r); err != nil {
+			t.Fatal(err)
+		}
+		return buf.String()
+	}
+
+	seven := "[Event \"" + raw + "\"]\n[Site \"" + bareOut + "\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n"
+	allTags := seven +
+		"[Opening \"" + raw + "\"]\n[Annotator \"" + raw + "\"]\n" +
+		"[Variant \"" + raw + "\"]\n[SetUp \"1\"]\n[FEN \"" + fen + "\"]\n" +
+		"[HashCode \"" + raw + "\"]\n" +
+		"[Foo \"" + raw + "\"]\n[Bar \"" + bareOut + "\"]\n"
+
+	for _, tc := range []struct {
+		name string
+		opts Options
+		want string
+	}{
+		{"all tags", Options{Format: SAN}, allTags + "\n1. e4 *\n\n"},
+		{"fen format shares the tag section", Options{Format: FEN}, allTags + "\n" + fen + "\nrnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1\n\n"},
+		{"seven-tag roster with extras and FEN trailer",
+			Options{Format: SAN, SevenTagRoster: true, RosterExtras: []string{"ECO", "Opening"}},
+			seven + "[Opening \"" + raw + "\"]\n[Variant \"" + raw + "\"]\n[SetUp \"1\"]\n[FEN \"" + fen + "\"]\n\n1. e4 *\n\n"},
+		{"explicit roster",
+			Options{Format: SAN, Roster: []string{"Event", "Site", "Foo", "Bar", "Missing"}},
+			"[Event \"" + raw + "\"]\n[Site \"" + bareOut + "\"]\n[Foo \"" + raw + "\"]\n[Bar \"" + bareOut + "\"]\n[Missing \"\"]\n\n1. e4 *\n\n"},
+		{"epd comment copies values raw", Options{Format: EPD},
+			"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - c0 - " + raw + " " + bare + "; c1 *;\n" +
+				"rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 c0 - " + raw + " " + bare + "; c1 *;\n\n"},
+	} {
+		if got := render(tc.opts); got != tc.want {
+			t.Errorf("%s: got:\n%s\nwant:\n%s", tc.name, got, tc.want)
+		}
+	}
+}
