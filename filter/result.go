@@ -59,7 +59,7 @@ func checkResult(g *pgn.Game, r *replay.Result, fix, reject bool) error {
 				corrected = "0-1"
 			}
 		} else if !strings.HasPrefix(tag, "1/2") && fix {
-			if b, err := r.FinalBoard(); err == nil && (b.IsStalemate() || b.InsufficientMaterial()) {
+			if b := r.FinalBoard(); b != nil && (b.IsStalemate() || b.InsufficientMaterial()) {
 				corrected = "1/2-1/2"
 			}
 		}

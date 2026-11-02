@@ -226,9 +226,10 @@ func (pc *PositionCriteria) sideOK(c chess.Color) bool {
 // matches is apply.c position_matches: the placement key against the
 // -x/FEN set, else the Polyglot hash against the -H set, then the
 // whose-move restriction; a position found that way has the empty label.
-// If that fails the patterns are tried (building the board from the
-// FEN), and the whose-move restriction is applied again.
-func (pc *PositionCriteria) matches(pos replay.Position) (label string, ok bool) {
+// If that fails the patterns are tried against b, the board of pos (nil
+// when the criteria hold no patterns), and the whose-move restriction is
+// applied again.
+func (pc *PositionCriteria) matches(pos replay.Position, b *chess.Board) (label string, ok bool) {
 	_, found := pc.placements[pos.Placement]
 	if !found {
 		_, found = pc.hashes[pos.Zobrist]
@@ -236,11 +237,7 @@ func (pc *PositionCriteria) matches(pos replay.Position) (label string, ok bool)
 	if found && pc.sideOK(pos.SideToMove) {
 		return "", true
 	}
-	if pc.Patterns.Empty() {
-		return "", false
-	}
-	b, err := chess.FromFEN(pos.FEN)
-	if err != nil {
+	if b == nil {
 		return "", false
 	}
 	label, ok = pc.Patterns.Match(b)
@@ -248,18 +245,6 @@ func (pc *PositionCriteria) matches(pos replay.Position) (label string, ok bool)
 		return "", false
 	}
 	return label, true
-}
-
-// plyNumber is the absolute ply number of the move that leads to pos:
-// 1 for the standard starting position, 2*(n-1)+1 (White to move) or
-// 2*(n-1)+2 (Black) for a position with fullmove number n, as play_moves
-// counts plies.
-func plyNumber(pos replay.Position) int {
-	p := 2*(pos.FullmoveNumber-1) + 1
-	if pos.SideToMove == chess.Black {
-		p++
-	}
-	return p
 }
 
 // matchPositions is the positional part of apply.c play_moves over g's
@@ -301,9 +286,16 @@ func (w *positionWalk) walk(moves []*pgn.Move, r *replay.Result, limit int, pref
 	if r == nil || len(r.Positions) == 0 {
 		return false, "", 0
 	}
-	p0 := plyNumber(r.Positions[0])
+	// Patterns need the board itself; it is walked alongside the
+	// positions by applying the replayed moves, and only when there are
+	// patterns to test.
+	var b *chess.Board
+	if !w.pc.Patterns.Empty() {
+		b = r.StartBoard()
+	}
+	p0 := r.Positions[0].PlyNumber()
 	if p0 >= w.startPly {
-		if l, ok := w.pc.matches(r.Positions[0]); ok {
+		if l, ok := w.pc.matches(r.Positions[0], b); ok {
 			matched, label = true, l
 			if w.mark != "" && prefix != nil {
 				*prefix = append([]string{markComment(w.mark, r.Positions[0])}, *prefix...)
@@ -333,9 +325,12 @@ func (w *positionWalk) walk(moves []*pgn.Move, r *replay.Result, limit int, pref
 			}
 		}
 
+		if b != nil {
+			b.Apply(r.Moves[i].Move)
+		}
 		if check && !matched {
 			pos := r.Positions[i+1]
-			if l, ok := w.pc.matches(pos); ok {
+			if l, ok := w.pc.matches(pos, b); ok {
 				matched, label = true, l
 				if w.mark != "" {
 					moves[i].Comments = append(moves[i].Comments, markComment(w.mark, pos))

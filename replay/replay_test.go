@@ -110,21 +110,64 @@ func TestPositionClocks(t *testing.T) {
 	}
 }
 
-func TestFinalBoardRoundTrip(t *testing.T) {
+func TestBoardsOnDemand(t *testing.T) {
 	g := parseOne(t, "1. f3 e5 2. g4 Qh4# 0-1\n")
 	r, err := Game(g, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := r.FinalBoard()
+	start, final := r.StartBoard(), r.FinalBoard()
+	if start.FEN() != r.Positions[0].FEN {
+		t.Errorf("StartBoard FEN = %s", start.FEN())
+	}
+	if final.FEN() != r.Positions[4].FEN || !final.IsCheckmate() {
+		t.Errorf("FinalBoard FEN = %s", final.FEN())
+	}
+	// The boards are the caller's to mutate: applying the game's typed
+	// moves to StartBoard walks the positions, and a later call still
+	// returns the start position.
+	for i, mi := range r.Moves {
+		start.Apply(mi.Move)
+		if start.FEN() != r.Positions[i+1].FEN {
+			t.Errorf("after move %d: %s, want %s", i, start.FEN(), r.Positions[i+1].FEN)
+		}
+	}
+	if r.StartBoard().FEN() != r.Positions[0].FEN {
+		t.Error("StartBoard was mutated through the returned board")
+	}
+	if (&Result{}).StartBoard() != nil || (&Result{}).FinalBoard() != nil || (*Result)(nil).FinalBoard() != nil {
+		t.Error("empty result should have no boards")
+	}
+}
+
+// TestBoardsOfPartialReplay pins that a replay stopped by an illegal move
+// still offers the boards of its partial result: the final board is the
+// position the failing move was attempted from.
+func TestBoardsOfPartialReplay(t *testing.T) {
+	g := parseOne(t, "1. e4 e5 2. Nf3 Nf3 *\n") // no black knight reaches f3
+	r, err := Game(g, Options{})
+	if err == nil {
+		t.Fatal("expected replay failure")
+	}
+	if len(r.Positions) != 4 || r.FinalBoard().FEN() != r.Positions[3].FEN {
+		t.Errorf("partial FinalBoard = %s, positions %d", r.FinalBoard().FEN(), len(r.Positions))
+	}
+	if r.StartBoard().FEN() != r.Positions[0].FEN {
+		t.Errorf("partial StartBoard = %s", r.StartBoard().FEN())
+	}
+}
+
+// TestVariationBoards pins that a variation's Result carries boards of
+// its own: its start is the position before the move it branches from.
+func TestVariationBoards(t *testing.T) {
+	g := parseOne(t, "1. e4 e5 (1... c5 2. Nf3) 2. Nf3 *\n")
+	r, err := Game(g, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if b.FEN() != r.Positions[4].FEN || !b.IsCheckmate() {
-		t.Errorf("FinalBoard FEN = %s", b.FEN())
-	}
-	if _, err := (&Result{}).FinalBoard(); err == nil {
-		t.Error("empty result should fail")
+	v := r.Moves[1].Variations[0]
+	if v.StartBoard().FEN() != r.Positions[1].FEN || v.FinalBoard().FEN() != v.Positions[2].FEN {
+		t.Errorf("variation boards: start %s final %s", v.StartBoard().FEN(), v.FinalBoard().FEN())
 	}
 }
 
@@ -159,5 +202,88 @@ func TestReplayPlacementKeyPerPly(t *testing.T) {
 	}
 	if r.Positions[0].Placement == r.Positions[1].Placement {
 		t.Error("Placement unchanged after 1.f3")
+	}
+}
+
+// TestEnPassantRecorded pins that replay marks an en passant capture on
+// the MoveInfo, so that renderers need not infer it from the previous
+// position's FEN, and that an ordinary pawn-takes-pawn is not marked.
+func TestEnPassantRecorded(t *testing.T) {
+	g := parseOne(t, "1. e4 a6 2. e5 f5 3. exf6 *\n")
+	r, err := Game(g, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ep := r.Moves[4]
+	if !ep.EnPassant || ep.Captured != chess.Pawn || ep.Move.To.String() != "f6" {
+		t.Errorf("exf6: %+v, want EnPassant with a captured pawn", ep)
+	}
+	for i := 0; i < 4; i++ {
+		if r.Moves[i].EnPassant {
+			t.Errorf("move %d marked en passant", i)
+		}
+	}
+
+	g = parseOne(t, "1. e4 d5 2. exd5 *\n")
+	r, err = Game(g, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Moves[2].EnPassant || r.Moves[2].Captured != chess.Pawn {
+		t.Errorf("exd5: %+v, want a plain pawn capture", r.Moves[2])
+	}
+}
+
+// TestPlyNumber pins Position.PlyNumber to pgn-extract's play_moves
+// convention (apply.c: plies = move_number*2 - (to_move == WHITE ? 1 : 0)):
+// the absolute, one-based number of the move about to be played, so the
+// standard start is ply 1 and a FEN start derives from the FEN's move
+// number and side to move. A fullmove field below 1 is clamped to 1 as
+// new_fen_board does.
+func TestPlyNumber(t *testing.T) {
+	cases := []struct {
+		src  string
+		want []int // per position, in order
+	}{
+		{"1. e4 e5 2. Nf3 *\n", []int{1, 2, 3, 4}},
+		{"[FEN \"8/8/8/8/8/8/k7/4K2R w K - 0 40\"]\n\n40. O-O *\n", []int{79, 80}},
+		{"[FEN \"8/8/8/8/8/8/k7/4K2R b K - 0 40\"]\n\n40... Kb2 41. Ke2 *\n", []int{80, 81, 82}},
+		{"[FEN \"7k/3P4/7K/8/8/8/8/8 w - - 6 0\"]\n\nd8=Q *\n", []int{1, 2}},
+		{"[FEN \"7k/3P4/7K/8/8/8/8/8 b - - 6 0\"]\n\nKg8 *\n", []int{2, 3}},
+	}
+	for _, c := range cases {
+		g := parseOne(t, c.src)
+		r, err := Game(g, Options{})
+		if err != nil {
+			t.Fatalf("%q: %v", c.src, err)
+		}
+		if len(r.Positions) != len(c.want) {
+			t.Fatalf("%q: %d positions, want %d", c.src, len(r.Positions), len(c.want))
+		}
+		for i, want := range c.want {
+			if got := r.Positions[i].PlyNumber(); got != want {
+				t.Errorf("%q: Positions[%d].PlyNumber() = %d, want %d", c.src, i, got, want)
+			}
+		}
+		// PlyCount is the number of plies completed: one less than the
+		// ply number of the final position (apply.c half_moves_played).
+		if got, want := r.PlyCount(), c.want[len(c.want)-1]-1; got != want {
+			t.Errorf("%q: PlyCount() = %d, want %d", c.src, got, want)
+		}
+	}
+}
+
+// TestFullmoveClampedInFEN pins that a FEN tag whose fullmove field is 0
+// starts at move 1 in every typed field and in the FEN replay emits, as
+// the C tool's new_fen_board clamps it (oracle: -Wfen prints "... 6 1").
+func TestFullmoveClampedInFEN(t *testing.T) {
+	g := parseOne(t, "[FEN \"7k/3P4/7K/8/8/8/8/8 w - - 6 0\"]\n\nd8=Q *\n")
+	r, err := Game(g, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := r.Positions[0]
+	if p.FullmoveNumber != 1 || p.FEN != "7k/3P4/7K/8/8/8/8/8 w - - 6 1" {
+		t.Errorf("start position: %+v", p)
 	}
 }
