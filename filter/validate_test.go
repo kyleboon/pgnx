@@ -1,6 +1,9 @@
 package filter
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestValidateCheckmateExclusiveWithOtherEndStates(t *testing.T) {
 	if err := (&Options{Checkmate: true}).Validate(); err != nil {
@@ -96,5 +99,38 @@ func TestValidateCountsAndSequences(t *testing.T) {
 		if err := o.Validate(); err == nil {
 			t.Errorf("%+v: want error", o)
 		}
+	}
+}
+
+func TestPositionCriteriaValidateMatchPlyLimit(t *testing.T) {
+	// argsfile.c: a --matchplylimit below the depth the -x lines imply
+	// "conflicts with existing higher limit", whichever came first.
+	pc := lineCriteria(t, "e4 c5 Nf3 d6 d4 cxd4") // depth 6+8 = 14
+	pc.MatchPlyLimit = 14
+	if err := pc.Validate(); err != nil {
+		t.Fatalf("limit at depth: %v", err)
+	}
+	pc.MatchPlyLimit = 5
+	err := pc.Validate()
+	if err == nil || !strings.Contains(err.Error(), "5") || !strings.Contains(err.Error(), "14") {
+		t.Errorf("limit below depth must quote both numbers: %v", err)
+	}
+	if err := (&PositionCriteria{MatchPlyLimit: -1}).Validate(); err == nil {
+		t.Error("negative limit: want error")
+	}
+	if err := (&PositionCriteria{MatchPlyLimit: 5}).Validate(); err != nil {
+		t.Errorf("limit without lines: %v", err)
+	}
+	var nilPC *PositionCriteria
+	if err := nilPC.Validate(); err != nil {
+		t.Errorf("nil: %v", err)
+	}
+}
+
+func TestValidateDelegatesToPositions(t *testing.T) {
+	pc := lineCriteria(t, "e4 c5 Nf3 d6 d4 cxd4")
+	pc.MatchPlyLimit = 5
+	if err := (&Options{Positions: pc}).Validate(); err == nil {
+		t.Error("want the positional error")
 	}
 }

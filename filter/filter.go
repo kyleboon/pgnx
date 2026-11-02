@@ -114,7 +114,7 @@ func (o *Options) Validate() error {
 			return fmt.Errorf("sequence %d is empty", i+1)
 		}
 	}
-	return nil
+	return o.Positions.Validate()
 }
 
 // validNMoveRule reports whether n is a value NMoveRule may hold: 0 (no
