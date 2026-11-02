@@ -618,3 +618,14 @@ golden input, the golden suite is unchanged, and a filter-mode
 differential (`PGNX_CMD=filter scripts/difftest.sh`, no criteria,
 `-TpCarlsen` and `--checkmate`) over 21 TWIC issues showed no
 divergence.
+
+## Epic corpus result (2026-11-02, beads `pgnx-deepen`)
+
+On the epic's integration tip, the full TWIC convert differential
+(`scripts/twicdiff.sh`, SAN, 749 issues) reproduced the 2026-10-31
+baseline exactly: 744/749 identical, the same five divergent issues
+(twic1071, twic1182, twic1196, twic1260, twic1469: the documented
+"missing result" class), 226 rejected games and 70 warnings with
+identical per-file counts; and filter mode (`-TpCarlsen`,
+`--checkmate`, and `-n` against `--unmatched`) was byte-identical over
+twic1000, twic1250 and twic1500.
