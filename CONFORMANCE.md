@@ -158,6 +158,27 @@ differences:
   `filter` therefore agree with each other; the `-n` emission of a game
   whose tags the C tool itself called inconsistent is a recovery artefact
   and is not copied. `TestFilterRejectsSetUpWithoutFEN`.
+- **Verified: an invalid Result tag is rewritten to `*` on the unmatched
+  path too.** `filter.Evaluate` applies the `apply.c` `play_moves` rule
+  (an unrecognised Result tag becomes `*`) after the tag criteria have
+  seen the tag as written, whether or not they passed (`pgnx-deepen.3`,
+  commit 1b36160). Checked against the oracle on 2026-11-02: the C tool's
+  non-matching branch replays the game before writing it to `-n`
+  (`check_move_validity` repeats the rule), so `-n` carries `*` as well,
+  and the tag criteria see the raw value (`-Tr1:` matches, `-Tr*` does
+  not); with no criteria, and with a `*` movetext result, likewise:
+
+  ```sh
+  printf '[Event "x"]\n[Result "1:0"]\n\n1. e4 1-0\n' | pgn-extract -TpZZZ -n/dev/stdout -o/dev/null --quiet
+  # prints the game with [Result "*"] and the 1-0 token, logging
+  # "Inconsistent result strings * vs 1-0"
+  printf '[Event "x"]\n[Result "1:0"]\n\n1. e4 *\n' | pgn-extract -TpZZZ -n/dev/stdout -o/dev/null --quiet
+  # prints the game with [Result "*"]
+  ```
+
+  `pgnx filter --player ZZZ --unmatched -`, `pgnx convert`, `--result 1:`
+  and `--result '*'` give byte-identical output for the same inputs.
+  `TestEvaluateInvalidResultTagBecomesStar`.
 - **The summary line counts matched games.** `filter` prints
   `"N game(s) matched out of M."` where N counts every game that satisfied
   the criteria (including games held back by `--select-only`/
