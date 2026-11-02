@@ -55,9 +55,26 @@ func (pc *PositionCriteria) Empty() bool {
 
 // LineDepth is the search depth implied by the -x lines added so far:
 // the longest line's ply count plus 8 (moves.c
-// compose_positional_variation), or 0 when no line was added. The CLI
+// compose_positional_variation), or 0 when no line was added. Validate
 // rejects a MatchPlyLimit below it, as the C tool does (argsfile.c).
 func (pc *PositionCriteria) LineDepth() int { return pc.lineDepth }
+
+// Validate reports whether pc's modifiers are usable: MatchPlyLimit
+// cannot be negative, and when set it cannot be below the depth the -x
+// lines imply (argsfile.c "conflicts with existing higher limit",
+// whichever was given first). A nil pc is valid.
+func (pc *PositionCriteria) Validate() error {
+	if pc == nil {
+		return nil
+	}
+	if pc.MatchPlyLimit < 0 {
+		return errors.New("match ply limit cannot be negative")
+	}
+	if pc.MatchPlyLimit > 0 && pc.MatchPlyLimit < pc.lineDepth {
+		return fmt.Errorf("match ply limit of %d conflicts with the search depth of %d implied by the position lines", pc.MatchPlyLimit, pc.lineDepth)
+	}
+	return nil
+}
 
 // effectiveLimit is the ply number after which the positional search
 // stops (apply.c apply_move_list): MatchPlyLimit if set, else the -x

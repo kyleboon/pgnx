@@ -96,19 +96,20 @@ func TestFilterStopAfterAcrossFiles(t *testing.T) {
 	}
 }
 
+// TestFilterConflictingFlags pins the exit-code mapping: a flag that
+// cannot be mapped, two flags for one setting, and an invariant the
+// filter package's validators refuse (their rules are unit-tested there)
+// are all usage errors.
 func TestFilterConflictingFlags(t *testing.T) {
 	for _, args := range [][]string{
-		{"--checkmate", "--stalemate"},
-		{"--fifty", "--seventy-five"},
-		{"--higher-rated-winner", "--lower-rated-winner"},
+		{"--checkmate", "--stalemate"},             // filter.Options.Validate
+		{"--fifty", "--seventy-five"},              // filter.Options.SetNMoveRule
+		{"--first-game", "5", "--game-limit", "2"}, // filter.SelectorOptions.Validate
 		{"--no-setup-tags", "--only-setup-tags"},
 		{"--moves", "0"},
-		{"--min-moves", "10", "--max-moves", "5"},
 		{"--select-only", "3,2"},
 		{"--tag", "White Fischer"},
 		{"--material", "kx k"},
-		{"--repetition=-1"},
-		{"--first-game", "5", "--game-limit", "2"},
 	} {
 		_, errOut, code := runCLI(t, fools, append([]string{"filter"}, args...)...)
 		if code != 1 {
@@ -296,8 +297,7 @@ func TestFilterPositionalUsageErrors(t *testing.T) {
 	for _, args := range [][]string{
 		{"--hash", "xyz"},
 		{"--hash", "0123456789abcdef0"},
-		{"--position", "e4 c5 Nf3 d6 d4 cxd4", "--match-ply-limit", "5"},
-		{"--match-ply-limit", "5", "--position", "e4 c5 Nf3 d6 d4 cxd4"},
+		{"--position", "e4 c5 Nf3 d6 d4 cxd4", "--match-ply-limit", "5"}, // filter.PositionCriteria.Validate
 		{"--match-ply-limit", "0"},
 		{"--white-to-move", "--black-to-move"},
 		{"--start-ply", "0"},
@@ -310,10 +310,6 @@ func TestFilterPositionalUsageErrors(t *testing.T) {
 		if code != 1 {
 			t.Errorf("%v: exit %d, want 1 (%s)", args, code, errOut)
 		}
-	}
-	_, errOut, code := runCLI(t, fools, "filter", "--position", "e4 c5 Nf3 d6 d4 cxd4", "--match-ply-limit", "5")
-	if code != 1 || !strings.Contains(errOut, "5") || !strings.Contains(errOut, "14") {
-		t.Errorf("limit error must quote both numbers: %q", errOut)
 	}
 	// --exact-order / --sequence-anywhere without sequences are no-ops.
 	out, _, code := runCLI(t, fools, "filter", "--quiet", "--exact-order", "--sequence-anywhere")

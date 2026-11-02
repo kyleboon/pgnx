@@ -56,6 +56,20 @@ type SelectorOptions struct {
 	GameLimit int
 }
 
+// Validate reports whether o is usable: the counts cannot be negative,
+// and FirstGame cannot lie beyond GameLimit (no game could then match).
+func (o SelectorOptions) Validate() error {
+	for name, n := range map[string]int{"stop-after count": o.StopAfter, "first game": o.FirstGame, "game limit": o.GameLimit} {
+		if n < 0 {
+			return fmt.Errorf("%s cannot be negative", name)
+		}
+	}
+	if o.FirstGame > 0 && o.GameLimit > 0 && o.FirstGame > o.GameLimit {
+		return fmt.Errorf("first game %d is beyond the game limit of %d", o.FirstGame, o.GameLimit)
+	}
+	return nil
+}
+
 // Decision is Selector.Decide's verdict for one game.
 type Decision struct {
 	Emit        bool // write to the matched output
