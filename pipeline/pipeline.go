@@ -4,10 +4,11 @@
 // the source; this package corrects and judges it. See ADR 0002.
 //
 // The stages are normalisation (Normalise), replay, disposition against
-// keep-broken, ECO classification and criteria evaluation. Every command
-// is a caller; commands differ only in what they do with the outcome.
-// Each stage touches only its game and read-only configuration, so the
-// stages are safe to run concurrently over different games; everything
-// order-sensitive (tag-registry observation, selection, routing, writing)
-// stays with the caller.
+// keep-broken, ECO classification and criteria evaluation; New builds a
+// Pipeline for a run's Config and Process runs the stages over one game,
+// returning its Outcome. Every command is a caller; commands differ only
+// in what they do with the outcome. Each stage touches only its game and
+// read-only configuration, so the stages are safe to run concurrently
+// over different games; everything order-sensitive (tag-registry
+// observation, selection, routing, writing) stays with the caller.
 package pipeline

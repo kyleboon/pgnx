@@ -260,19 +260,28 @@ were fixed; the rest are the documented differences above.
   now applies the same rule: a parsed unit with zero tags, zero moves, and
   an empty result is skipped rather than returned. Verified: pgnx's output
   over `eco.pgn` is now byte-identical to the C oracle's.
-- **Open divergence — tags-only game (no moves, no result) is emitted by
-  pgnx, discarded by the C oracle.** A "game" consisting of a complete tag
-  section but no movetext and no result token — a stub record some
-  real-world PGN collections contain, e.g. a placeholder entry with
-  `[Event]`/`[Site]`/etc. filled in but the game itself never played out —
-  is dropped entirely by pgn-extract (`grammar.c`'s `parse_game` requires
-  at least one move or a result token, in addition to tags, before it will
-  emit a game), but pgnx's parser has no such check for the tags-only case
-  and emits a full seven-tag header plus a bare `*` result line. This is
-  the mirror image of the comment-only phantom-game case fixed above
-  (there: no tags, no moves, no result, discarded on both sides now; here:
-  tags present, no moves, no result, discarded only by the C oracle).
-  Repro:
+- **Intentional, behind a parser flag — tags-only game (no moves, no
+  result).** A "game" consisting of a complete tag section but no movetext
+  and no result token — a stub record some real-world PGN collections
+  contain, e.g. a placeholder entry with `[Event]`/`[Site]`/etc. filled in
+  but the game itself never played out — is never emitted by pgn-extract
+  (`grammar.c`'s `parse_game` returns `current_symbol != EOF_TOKEN`, so a
+  game that reaches end of input without a result token is never dealt
+  with). pgnx's parser used to yield it, and the CLI emitted a full
+  seven-tag header plus a bare `*`. Decided 2026-11-02 (ADR 0002, beads
+  `pgnx-tagsonly-game`): the parser skips it behind
+  `pgn.ParserOptions.SkipTagsOnly`, which all four commands set, so the
+  CLI's game counts and numbering match the oracle; the library default
+  keeps the record. The rule is "tags and an empty movetext" (no moves,
+  no result token, nothing the parser discarded, no comment), or any
+  game with no moves and no result token that ends at end of input; a
+  mid-file zero-move game whose movetext held a stray token or a comment
+  is still emitted, as the C tool emits it (the `+/-` forfeit in
+  `TestStrayTokensConformance`). Mid-file, a stub followed directly by
+  the next game's tags is not a game in either parser: both read tags
+  across blank lines, so the stub's tags run on into the next game's
+  (last occurrence wins) and the two outputs are identical.
+  `TestScannerSkipTagsOnly`, `TestTagsOnlyGameSkipped`. Repro:
 
   ```sh
   cat > tagsonly.pgn <<'EOF'
@@ -286,19 +295,16 @@ were fixed; the rest are the documented differences above.
 
   EOF
 
-  # C oracle: emits nothing.
+  # Both emit nothing and exit 0.
   pgn-extract -7 --quiet tagsonly.pgn
-
-  # pgnx: emits the full seven-tag header plus "*".
   pgnx convert --quiet --seven-tag-roster tagsonly.pgn
-  ```
 
-  Not fixed in this pass — `pgn.parser.parseGame`'s existing skip rule
-  (`len(g.Tags) == 0 && len(g.Moves) == 0 && g.Result == ""`) would need
-  to be loosened to also skip when tags are non-empty but moves and result
-  are both empty, which risks silently dropping legitimate tag-only
-  records other callers may rely on parsing; flagged here for a
-  deliberate decision rather than folded into this fix wave.
+  # Mid-file the stub's tags merge into the next game in both tools:
+  # one game, Event "u", White "Ghost", Result "1-0".
+  printf '[Event "t"]\n[White "Ghost"]\n[Result "1-0"]\n\n[Event "u"]\n\n1. d4 *\n' > stub.pgn
+  pgn-extract --quiet stub.pgn
+  pgnx convert --quiet stub.pgn
+  ```
 - **Fixed — invalid-UTF-8 bytes were corrupted to U+FFFD.** Several
   `odds.pgn` tag values (and many TWIC team/player/site tags) contain raw
   Latin-1 bytes (e.g. `0xE7`, `0xE9`). pgn-extract is byte-oriented and
@@ -431,10 +437,15 @@ to treat each as a move, fail the replay and emit nothing for the game
   pgn-extract --quiet dash1.pgn   # tags + "1/2-1/2", then a tagless "1. Nf3 1/2-1/2" game
   pgnx convert --quiet dash1.pgn  # "1. e4 e5 2. Nf3 1/2-1/2"
   ```
-- **Open divergence (unchanged):** when a file's last game is only stray
-  tokens (movetext `-`, nothing after), the C tool stops at EOF and emits
-  nothing; pgnx emits the tag section and `*`. This is the tags-only
-  divergence above; mid-file the two agree.
+- **Fixed (2026-11-02):** when a file's last game is only stray tokens
+  (movetext `-`, nothing after), the C tool stops at EOF and emits
+  nothing; pgnx used to emit the tag section and `*`. The tags-only skip
+  (`SkipTagsOnly`, see the tags-only entry above) now covers any game
+  with no moves and no result token that ends at end of input, so pgnx
+  emits nothing either, and logs no warning for the discarded token
+  (the C tool logs "Single '-' not allowed" but exits 0). Mid-file the
+  two agree as before: such a game is emitted as a zero-move game.
+  `TestTagsOnlyGameSkipped`.
 - **Known minor difference:** the C lexer gathers a move word from its own
   narrower character set, so `Nf3Z` is `Nf3` plus junk there; pgnx gathers
   the whole word and discards it.
@@ -550,3 +561,20 @@ those instead of re-parsing the FEN string. One parity fix fell out:
   plies from -1. The clamp now lives where the C tool has it, on the
   replay's starting board, so every consumer agrees.
   `TestFullmoveClampedInFEN`, `TestFullmoveZeroFEN`.
+
+## One pipeline per run (2026-11-02, beads `pgnx-deepen.4`)
+
+`pipeline.New(Config).Process(g)` now runs pgn-extract's `deal_with_game`
+sequence (normalise, replay, broken-ness against `--keep-broken`, ECO
+classification, criteria) for `convert` and `validate`; `filter` follows
+with `pgnx-deepen.5`. No output changed. Two notes for triage:
+
+- `validate` reports exactly what `convert` would fail on: a game
+  Normalise rejects, a replay failure, or a game with no result token
+  whose moves were dropped (a warning in `convert`, exit 2 there too).
+  Before, `validate` replayed the original moves and reported the illegal
+  move itself; now it reports the dropped moves. Both are findings.
+- The criteria stage runs in `validate` and `convert` with no criteria,
+  so the `apply.c` Result rewrite (an invalid tag becomes `*`) is applied
+  before anything is written, exactly as for `filter`; `validate` writes
+  nothing, so it is unobservable there.
