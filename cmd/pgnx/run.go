@@ -132,6 +132,22 @@ func newRun(cmd *cobra.Command, criteria *filter.Options) (*run, error) {
 	return r, nil
 }
 
+// newReportOnlyRun is the run of a command that writes no games
+// (validate): the pipeline has no ECO table, no criteria and does not
+// keep broken games, so a game fails exactly where convert would fail
+// on it, and every game is routed nowhere. It has no destinations, no
+// output options and no log of its own, so only game may be called on
+// it (exec and close need the destinations and the log that newRun
+// opens); the caller drives it through a runReport of its own. The tag
+// registry is observed, as game requires, and never read.
+func newReportOnlyRun() *run {
+	return &run{
+		tags:  output.NewTagRegistry(),
+		pipe:  pipeline.New(pipeline.Config{}),
+		route: routeNowhere,
+	}
+}
+
 // openUnmatched opens the file named by the string flag flagName as the
 // run's unmatched destination. Unmatched games are never divided by ECO
 // (grammar.c select_output_file routes only matched games through -E).
