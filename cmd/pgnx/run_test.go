@@ -1,10 +1,16 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/kyleboon/pgnx/output"
+	"github.com/kyleboon/pgnx/pipeline"
+	"github.com/spf13/cobra"
 )
 
 // TestFilterNoCriteriaEqualsConvertOverGoldenInputs pins "convert is
@@ -60,4 +66,34 @@ func TestFilterNoCriteriaEqualsConvertOverGoldenInputs(t *testing.T) {
 
 func indent(s string) string {
 	return "  " + strings.ReplaceAll(strings.TrimRight(s, "\n"), "\n", "\n  ")
+}
+
+type closerFunc func() error
+
+func (f closerFunc) Close() error { return f() }
+
+// TestExecFailsWhenADestinationCannotClose: a destination's close error
+// (a buffered destination flushes at close) is logged and fails the
+// run, even though every game succeeded; the summary still counts the
+// games.
+func TestExecFailsWhenADestinationCannotClose(t *testing.T) {
+	cmd := &cobra.Command{}
+	cmd.SetIn(strings.NewReader("1. e4 *\n"))
+	var log bytes.Buffer
+	r := &run{
+		cmd:   cmd,
+		logW:  &log,
+		tags:  output.NewTagRegistry(),
+		pipe:  pipeline.New(pipeline.Config{}),
+		route: routeNowhere,
+	}
+	r.closers = append(r.closers, closerFunc(func() error { return errors.New("out.pgn: flush: no space left on device") }))
+	err := r.exec(nil)
+	if !errors.Is(err, errProblems) {
+		t.Errorf("exec = %v, want errProblems", err)
+	}
+	if want := "out.pgn: flush: no space left on device\n1 game matched out of 1.\n"; log.String() != want {
+		t.Errorf("log = %q, want %q", log.String(), want)
+	}
+	r.close()
 }

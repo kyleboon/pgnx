@@ -3,6 +3,10 @@ package main
 import (
 	"fmt"
 	"io"
+	"iter"
+
+	"github.com/kyleboon/pgnx/pgn"
+	"github.com/kyleboon/pgnx/pipeline"
 )
 
 // gameVerdict is a command's verdict on one game, distinct from the
@@ -67,6 +71,34 @@ func (rep *runReport) game(it Item, v gameVerdict) {
 	if len(it.Skipped) > 0 || len(v.Errors) > 0 {
 		rep.failed++
 	}
+}
+
+// each drives fn over every game of seq (the games iterator), recording
+// each verdict, and stops reading as soon as a verdict says so. Err
+// items go straight to the report.
+func (rep *runReport) each(seq iter.Seq[Item], fn func(n int, g *pgn.Game) gameVerdict) {
+	for it := range seq {
+		var v gameVerdict
+		if it.Err == nil {
+			v = fn(it.Number, it.Game)
+		}
+		rep.game(it, v)
+		if v.Stop {
+			return
+		}
+	}
+}
+
+// verdict folds a pipeline outcome into the verdict on a game that was
+// routed (so not Rejected): the reason it is Broken and any warnings
+// are its errors, and stop is the route's decision.
+func verdict(o pipeline.Outcome, stop bool) gameVerdict {
+	v := gameVerdict{Stop: stop}
+	if o.Reason != nil {
+		v.Errors = append(v.Errors, o.Reason)
+	}
+	v.Errors = append(v.Errors, o.Warnings...)
+	return v
 }
 
 // fail records a failure of the run that is not a game's: an input that

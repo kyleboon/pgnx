@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/kyleboon/pgnx/pgn"
 	"github.com/spf13/cobra"
 )
 
@@ -66,6 +67,18 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newInfoCmd())
 
 	return root
+}
+
+// parserOptions builds the parser options for the games iterator from
+// the --nested-comments flag. Every command skips tags-only games (a tag
+// section with no movetext), which pgn-extract never emits, so counts
+// and numbering match the oracle (ADR 0002, CONFORMANCE.md).
+func parserOptions(cmd *cobra.Command) pgn.ParserOptions {
+	opts := pgn.ParserOptions{SkipTagsOnly: true}
+	if nested, err := cmd.Flags().GetBool("nested-comments"); err == nil {
+		opts.NestedComments = nested
+	}
+	return opts
 }
 
 // logWriter returns the writer that per-game error messages and the

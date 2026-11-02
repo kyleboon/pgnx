@@ -178,3 +178,40 @@ func TestReportSummaryLines(t *testing.T) {
 		t.Errorf("valid summary = %q", out.String())
 	}
 }
+
+// TestReportEachStopsWhenAsked: each drives fn over the iterator's
+// games, records every verdict, passes Err items straight to the
+// report, and stops reading once a verdict says so.
+func TestReportEachStopsWhenAsked(t *testing.T) {
+	items := []Item{
+		gameItem(1, 1),
+		{Source: "missing.pgn", Number: 1, Err: errors.New("no such file")},
+		gameItem(2, 4),
+		gameItem(3, 8),
+	}
+	yielded := 0
+	seq := func(yield func(Item) bool) {
+		for _, it := range items {
+			yielded++
+			if !yield(it) {
+				return
+			}
+		}
+	}
+	var log bytes.Buffer
+	rep := newRunReport(&log, &log)
+	var seen []int
+	rep.each(seq, func(n int, g *pgn.Game) gameVerdict {
+		seen = append(seen, n)
+		return gameVerdict{Stop: n == 2}
+	})
+	if len(seen) != 2 || seen[0] != 1 || seen[1] != 2 {
+		t.Errorf("fn saw games %v, want [1 2]", seen)
+	}
+	if yielded != 3 {
+		t.Errorf("iterator yielded %d items, want 3 (stopped after game 2)", yielded)
+	}
+	if rep.total != 2 || !rep.ioFailed || log.String() != "missing.pgn: no such file\n" {
+		t.Errorf("total %d ioFailed %v log %q", rep.total, rep.ioFailed, log.String())
+	}
+}
