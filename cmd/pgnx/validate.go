@@ -6,7 +6,6 @@ import (
 
 	"github.com/kyleboon/pgnx/pgn"
 	"github.com/kyleboon/pgnx/pipeline"
-	"github.com/kyleboon/pgnx/replay"
 	"github.com/spf13/cobra"
 )
 
@@ -54,12 +53,12 @@ func runValidate(cmd *cobra.Command, args []string) error {
 		defer logCloser.Close()
 	}
 
+	// "Valid" means convert would emit the game with no failure: the same
+	// pipeline, with no ECO table, no criteria and broken games not kept,
+	// so a Rejected game or a warning is a finding.
+	pipe := pipeline.New(pipeline.Config{})
 	total, succeeded, ioErr := forEachGame(cmd, args, findings, logW, func(src string, n int, g *pgn.Game) error {
-		if err := pipeline.Normalise(g); err != nil {
-			return err
-		}
-		_, err := replay.Game(g, replay.Options{})
-		return err
+		return problems(pipe.Process(g))
 	})
 
 	if summary {

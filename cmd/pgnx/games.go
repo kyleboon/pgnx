@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/kyleboon/pgnx/pgn"
-	"github.com/kyleboon/pgnx/replay"
+	"github.com/kyleboon/pgnx/pipeline"
 	"github.com/spf13/cobra"
 )
 
@@ -99,7 +99,10 @@ func forEachGame(cmd *cobra.Command, files []string, w, ioW io.Writer, fn func(s
 // already produced for them) stand. stopped reports that fn asked to
 // stop (errStop); no further games are read from r in that case.
 func scanGames(cmd *cobra.Command, src string, r io.Reader, w, ioW io.Writer, total, succeeded int, fn func(src string, n int, g *pgn.Game) error) (_, _ int, err error, stopped bool) {
-	opts := pgn.ParserOptions{}
+	// Every command skips tags-only games (a tag section with no
+	// movetext), which pgn-extract never emits, so counts and numbering
+	// match the oracle (ADR 0002, CONFORMANCE.md).
+	opts := pgn.ParserOptions{SkipTagsOnly: true}
 	if nested, err := cmd.Flags().GetBool("nested-comments"); err == nil {
 		opts.NestedComments = nested
 	}
@@ -141,21 +144,13 @@ func scanGames(cmd *cobra.Command, src string, r io.Reader, w, ioW io.Writer, to
 	return total, succeeded, nil, false
 }
 
-// replayGame replays g for output. A game whose movetext has no
-// terminating result token and does not replay is not rejected: pgn-extract
-// never replays such a game at all (grammar.c parse_game reports "Missing
-// result" and discards the moves), emitting the tag section with the
-// Result tag as the movetext. replayGame does the same for that case only
-// (unless keepBroken, which wants the moves back), dropping the moves and
-// returning problem to report once the game has been written. Otherwise
-// replayErr is the replay failure, if any. See CONFORMANCE.md.
-func replayGame(g *pgn.Game, keepBroken bool) (r *replay.Result, replayErr, problem error) {
-	r, replayErr = replay.Game(g, replay.Options{})
-	if replayErr != nil && !keepBroken && g.Result == "" && len(g.Moves) > 0 {
-		g.Moves = nil
-		r, _ = replay.Game(g, replay.Options{})
-		problem = fmt.Errorf("no result token and the moves do not replay (%v); moves dropped", replayErr)
-		replayErr = nil
+// problems folds a pipeline outcome into the forEachGame callback's
+// error-as-control protocol: the reason a game is Broken or Rejected,
+// and any warnings, all of which make the game count as a failure. nil
+// when the game is OK with no warnings.
+func problems(o pipeline.Outcome) error {
+	if o.Reason == nil && len(o.Warnings) == 0 {
+		return nil
 	}
-	return r, replayErr, problem
+	return errors.Join(append([]error{o.Reason}, o.Warnings...)...)
 }

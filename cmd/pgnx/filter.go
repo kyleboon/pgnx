@@ -9,6 +9,7 @@ import (
 	"github.com/kyleboon/pgnx/output"
 	"github.com/kyleboon/pgnx/pgn"
 	"github.com/kyleboon/pgnx/pipeline"
+	"github.com/kyleboon/pgnx/replay"
 	"github.com/spf13/cobra"
 )
 
@@ -459,9 +460,9 @@ func runFilter(cmd *cobra.Command, args []string) error {
 		d := sel.Decide(n, isMatch)
 		switch {
 		case d.Emit && !suppressMatched:
-			err = writeGameTo(matched, g, r, replayErr)
+			err = writeGameTo(matched, g, r, replayErr != nil)
 		case d.ToUnmatched && unmatched != nil:
-			err = writeGameTo(unmatched, g, r, replayErr)
+			err = writeGameTo(unmatched, g, r, replayErr != nil)
 		}
 		if err != nil {
 			return err
@@ -523,4 +524,20 @@ func criteriaTagNames(cmd *cobra.Command) []string {
 		}
 	}
 	return names
+}
+
+// replayGame is filter's copy of the pipeline's replay stage until
+// pgnx-deepen.5 routes filter through pipeline.Process: a game whose
+// movetext has no terminating result token and does not replay has its
+// moves dropped (pgn-extract never replays such a game; see
+// CONFORMANCE.md), unless keepBroken, which wants the moves back.
+func replayGame(g *pgn.Game, keepBroken bool) (r *replay.Result, replayErr, problem error) {
+	r, replayErr = replay.Game(g, replay.Options{})
+	if replayErr != nil && !keepBroken && g.Result == "" && len(g.Moves) > 0 {
+		g.Moves = nil
+		r, _ = replay.Game(g, replay.Options{})
+		problem = fmt.Errorf("no result token and the moves do not replay (%v); moves dropped", replayErr)
+		replayErr = nil
+	}
+	return r, replayErr, problem
 }
