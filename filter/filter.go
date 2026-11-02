@@ -101,6 +101,28 @@ func (o *Options) Validate() error {
 	if o.Bounds.MaxPly != 0 && o.Bounds.MinPly > o.Bounds.MaxPly {
 		return fmt.Errorf("lower length bound of %d plies exceeds the upper bound of %d", o.Bounds.MinPly, o.Bounds.MaxPly)
 	}
+	if !validNMoveRule(o.NMoveRule) {
+		return fmt.Errorf("N-move rule must be 50 or 75, not %d", o.NMoveRule)
+	}
+	return nil
+}
+
+// validNMoveRule reports whether n is a value NMoveRule may hold: 0 (no
+// rule), 50 (--fifty) or 75 (--seventyfive).
+func validNMoveRule(n int) bool { return n == 0 || n == 50 || n == 75 }
+
+// SetNMoveRule sets NMoveRule to n (50 or 75). Setting it again to the
+// same value is allowed; changing it from one rule to the other is an
+// error, as the C tool's --fifty and --seventyfive conflict with a
+// previous setting of each other (argsfile.c).
+func (o *Options) SetNMoveRule(n int) error {
+	if n == 0 || !validNMoveRule(n) {
+		return fmt.Errorf("N-move rule must be 50 or 75, not %d", n)
+	}
+	if o.NMoveRule != 0 && o.NMoveRule != n {
+		return fmt.Errorf("%d-move rule conflicts with the %d-move rule already set", n, o.NMoveRule)
+	}
+	o.NMoveRule = n
 	return nil
 }
 

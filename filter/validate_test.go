@@ -47,3 +47,34 @@ func TestValidateBounds(t *testing.T) {
 		}
 	}
 }
+
+func TestSetNMoveRuleConflict(t *testing.T) {
+	// argsfile.c: --fifty then --seventyfive "conflicts with a previous
+	// setting"; repeating the same rule is fine.
+	o := &Options{}
+	if err := o.SetNMoveRule(50); err != nil || o.NMoveRule != 50 {
+		t.Fatalf("first: %v, NMoveRule %d", err, o.NMoveRule)
+	}
+	if err := o.SetNMoveRule(50); err != nil {
+		t.Fatalf("repeat: %v", err)
+	}
+	if err := o.SetNMoveRule(75); err == nil || o.NMoveRule != 50 {
+		t.Errorf("change: err %v, NMoveRule %d", err, o.NMoveRule)
+	}
+	if err := (&Options{}).SetNMoveRule(40); err == nil {
+		t.Error("40 is not a rule: want error")
+	}
+}
+
+func TestValidateNMoveRule(t *testing.T) {
+	for _, n := range []int{0, 50, 75} {
+		if err := (&Options{NMoveRule: n}).Validate(); err != nil {
+			t.Errorf("%d: %v", n, err)
+		}
+	}
+	for _, n := range []int{-1, 40, 125} {
+		if err := (&Options{NMoveRule: n}).Validate(); err == nil {
+			t.Errorf("%d: want error", n)
+		}
+	}
+}
