@@ -1,9 +1,6 @@
 package output
 
-import (
-	"bufio"
-	"io"
-)
+import "io"
 
 // defaultLineWidth is used when Options.LineWidth is zero.
 const defaultLineWidth = 75
@@ -11,9 +8,11 @@ const defaultLineWidth = 75
 // lineWriter accumulates whitespace-separated tokens and flushes them as
 // lines no wider than width, breaking before the token that would overflow
 // the current line. A token that is itself wider than width is placed
-// alone on its own line.
+// alone on its own line. Each line reaches w in one Write; lineWriter
+// does no buffering of its own, so the caller's writer decides when
+// bytes reach the sink (see NewWriter).
 type lineWriter struct {
-	w       *bufio.Writer
+	w       io.Writer
 	width   int
 	line    []byte
 	noSpace bool // suppress the separating space before the next token
@@ -24,7 +23,7 @@ func newLineWriter(w io.Writer, width int) *lineWriter {
 	if width <= 0 {
 		width = defaultLineWidth
 	}
-	return &lineWriter{w: bufio.NewWriter(w), width: width}
+	return &lineWriter{w: w, width: width}
 }
 
 // WriteToken appends a single token (no embedded spaces) to the current
@@ -64,23 +63,16 @@ func (lw *lineWriter) flushLine() {
 	if len(lw.line) == 0 {
 		return
 	}
+	lw.line = append(lw.line, '\n')
 	if _, err := lw.w.Write(lw.line); err != nil {
-		lw.err = err
-		return
-	}
-	if _, err := lw.w.Write([]byte("\n")); err != nil {
 		lw.err = err
 		return
 	}
 	lw.line = lw.line[:0]
 }
 
-// Close flushes any remaining partial line and the underlying buffered
-// writer.
+// Close flushes any remaining partial line.
 func (lw *lineWriter) Close() error {
 	lw.flushLine()
-	if lw.err != nil {
-		return lw.err
-	}
-	return lw.w.Flush()
+	return lw.err
 }

@@ -130,7 +130,6 @@ func runConvert(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer r.close()
 	r.route = routeAll
-	return r.exec(args)
+	return r.finish(r.exec(args))
 }

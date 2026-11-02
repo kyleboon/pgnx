@@ -195,7 +195,10 @@ type Writer struct {
 }
 
 // NewWriter returns a Writer that writes rendered games to w according to
-// opts.
+// opts. The Writer buffers nothing: every tag line and every wrapped
+// movetext line is one Write to w, so w should be buffered (a
+// bufio.Writer the caller flushes when the run is done) when it is a
+// file or a pipe.
 func NewWriter(w io.Writer, opts Options) *Writer {
 	if opts.Tags == nil {
 		opts.Tags = NewTagRegistry()

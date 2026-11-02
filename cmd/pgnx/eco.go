@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -78,65 +79,85 @@ func (s ecoSettings) logSkipped(w io.Writer, path string) {
 	}
 }
 
-// gameWriters picks the pair of writers (the format writer and its Source
-// fallback for broken games) a game is written with.
-type gameWriters interface {
-	writersFor(g *pgn.Game) (w, sourceW *output.Writer, err error)
+// gameWriter is a destination for games: the output.Writer a game is
+// written with (one fixed writer, or one per ECO file under --eco-split).
+// Every writer renders into one bufio.Writer per sink that lives for the
+// whole run (ADR 0003: the output package writes a line at a time, so an
+// unbuffered file would cost a syscall per tag line). Close flushes the
+// buffers and closes the files, returning the first error, so an output
+// that could not be written in full (a full disk) still fails the run.
+type gameWriter interface {
+	writerFor(g *pgn.Game) (*output.Writer, error)
 	io.Closer
 }
 
-// fixedWriters writes every game to the same destination.
-type fixedWriters struct{ w, sourceW *output.Writer }
-
-func (f fixedWriters) writersFor(*pgn.Game) (*output.Writer, *output.Writer, error) {
-	return f.w, f.sourceW, nil
+// bufferedWriter is one sink (a file, or stdout) with its run-wide
+// buffer and the one output.Writer that renders into it.
+type bufferedWriter struct {
+	w   *output.Writer
+	buf *bufio.Writer
+	// file is closed after the final flush; nil for stdout.
+	file io.Closer
 }
 
-func (fixedWriters) Close() error { return nil }
+// newBufferedWriter buffers dst for the run and closes file, when not
+// nil, at Close.
+func newBufferedWriter(dst io.Writer, file io.Closer, opts output.Options) *bufferedWriter {
+	buf := bufio.NewWriter(dst)
+	return &bufferedWriter{w: output.NewWriter(buf, opts), buf: buf, file: file}
+}
+
+func (b *bufferedWriter) writerFor(*pgn.Game) (*output.Writer, error) { return b.w, nil }
+
+// Close flushes what the run buffered and closes the file. A flush error
+// is the write error the sink refused with; it wins over a close error.
+func (b *bufferedWriter) Close() error {
+	err := b.buf.Flush()
+	if b.file != nil {
+		if cerr := b.file.Close(); err == nil {
+			err = cerr
+		}
+	}
+	return err
+}
 
 // ecoSplitWriters implements --eco-split: each game goes to the file named
 // by eco.FilePrefix of its ECO tag, in the current directory, opened in
-// append mode on first use and kept open for the run (eco.c
-// open_eco_output_file; the C tool reopens per game, which is observably
-// the same). All writers share the run's options and TagRegistry.
+// append mode on first use and kept open (and buffered) for the run
+// (eco.c open_eco_output_file; the C tool reopens per game, which is
+// observably the same). All writers share the run's options and
+// TagRegistry.
 type ecoSplitWriters struct {
-	level            int
-	opts, sourceOpts output.Options
-	files            map[string]*os.File
-	writers          map[string]fixedWriters
+	level int
+	opts  output.Options
+	files map[string]*bufferedWriter
 }
 
-func newECOSplitWriters(level int, opts, sourceOpts output.Options) *ecoSplitWriters {
-	return &ecoSplitWriters{
-		level:      level,
-		opts:       opts,
-		sourceOpts: sourceOpts,
-		files:      map[string]*os.File{},
-		writers:    map[string]fixedWriters{},
-	}
+func newECOSplitWriters(level int, opts output.Options) *ecoSplitWriters {
+	return &ecoSplitWriters{level: level, opts: opts, files: map[string]*bufferedWriter{}}
 }
 
-func (s *ecoSplitWriters) writersFor(g *pgn.Game) (*output.Writer, *output.Writer, error) {
+func (s *ecoSplitWriters) writerFor(g *pgn.Game) (*output.Writer, error) {
 	ecoTag, _ := g.Tag("ECO")
 	name := eco.FilePrefix(ecoTag, s.level) + ".pgn"
-	if fw, ok := s.writers[name]; ok {
-		return fw.w, fw.sourceW, nil
+	if bw, ok := s.files[name]; ok {
+		return bw.w, nil
 	}
 	f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	fw := fixedWriters{w: output.NewWriter(f, s.opts), sourceW: output.NewWriter(f, s.sourceOpts)}
-	s.files[name] = f
-	s.writers[name] = fw
-	return fw.w, fw.sourceW, nil
+	bw := newBufferedWriter(f, f, s.opts)
+	s.files[name] = bw
+	return bw.w, nil
 }
 
-// Close closes every file opened so far, returning the first error.
+// Close flushes and closes every file opened so far, returning the first
+// error.
 func (s *ecoSplitWriters) Close() error {
 	var first error
-	for name, f := range s.files {
-		if err := f.Close(); err != nil && first == nil {
+	for name, bw := range s.files {
+		if err := bw.Close(); err != nil && first == nil {
 			first = err
 		}
 		delete(s.files, name)
@@ -144,21 +165,13 @@ func (s *ecoSplitWriters) Close() error {
 	return first
 }
 
-// writeGame writes g with w, or (when broken: its replay failed and the
-// game is being kept) with sourceW, since only Source format can render
-// a game without replay detail.
-func writeGame(g *pgn.Game, r *replay.Result, broken bool, w, sourceW *output.Writer) error {
-	if broken {
-		return sourceW.WriteGame(g, nil)
-	}
-	return w.WriteGame(g, r)
-}
-
-// writeGameTo resolves the destination for g and writes it.
-func writeGameTo(dest gameWriters, g *pgn.Game, r *replay.Result, broken bool) error {
-	w, sourceW, err := dest.writersFor(g)
+// writeGameTo resolves the destination for g and writes it with its
+// replay r: nil for a broken game, which the writer then renders in
+// Source format, the only format that needs no replay.
+func writeGameTo(dest gameWriter, g *pgn.Game, r *replay.Result) error {
+	w, err := dest.writerFor(g)
 	if err != nil {
 		return err
 	}
-	return writeGame(g, r, broken, w, sourceW)
+	return w.WriteGame(g, r)
 }

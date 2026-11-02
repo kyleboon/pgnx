@@ -387,12 +387,12 @@ func runFilter(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer r.close()
 
 	flags := cmd.Flags()
 	suppressMatched, _ := flags.GetBool("suppress-matched")
 	if unmatchedPath, _ := flags.GetString("unmatched"); unmatchedPath != "" {
 		if err := r.openUnmatched("unmatched"); err != nil {
+			r.close()
 			return err
 		}
 	}
@@ -415,7 +415,7 @@ func runFilter(cmd *cobra.Command, args []string) error {
 	// suppresses it along with the matched games.
 	r.matched = sel.Matched
 	r.quiet = r.quiet || suppressMatched
-	return r.exec(args)
+	return r.finish(r.exec(args))
 }
 
 // addCriterion sends a parsed -t line to the matcher it belongs to: FEN,
