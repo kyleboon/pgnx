@@ -84,6 +84,24 @@ type Options struct {
 	MarkMatches string
 }
 
+// AddCriterion adds a parsed -t line to the matcher it belongs to: a
+// positional criterion (FEN, FENPattern, FENPatternI; see
+// Criterion.IsPositional) to Positions, everything else to Tags
+// (taglines.c process_tag_line). Either matcher is created when nil, so
+// a Tags configured beforehand (Substring, Soundex) is kept.
+func (o *Options) AddCriterion(c Criterion) error {
+	if c.IsPositional() {
+		if o.Positions == nil {
+			o.Positions = &PositionCriteria{}
+		}
+		return o.Positions.AddCriterion(c)
+	}
+	if o.Tags == nil {
+		o.Tags = &TagMatcher{}
+	}
+	return o.Tags.Add(c)
+}
+
 // TagNames returns the tag names o's tag criteria mention, in
 // first-insertion order (see TagMatcher.TagNames); nil when o is nil or
 // has no tag criteria.

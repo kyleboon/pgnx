@@ -182,3 +182,41 @@ func TestTagNamesInFirstInsertionOrder(t *testing.T) {
 		t.Errorf("no matcher: %v", got)
 	}
 }
+
+func TestOptionsAddCriterionRoutes(t *testing.T) {
+	// taglines.c process_tag_line: FEN, FENPattern and FENPatternI lines
+	// are sought positions; everything else is a tag criterion.
+	o := &Options{Tags: &TagMatcher{Substring: true}}
+	for _, line := range []string{
+		`White "Fischer"`,
+		`FEN "` + initialFEN + `"`,
+		`FENPattern "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR" start`,
+	} {
+		c, err := ParseCriterion(line)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := o.AddCriterion(c); err != nil {
+			t.Fatalf("%s: %v", line, err)
+		}
+	}
+	if got := o.TagNames(); !reflect.DeepEqual(got, []string{"White"}) {
+		t.Errorf("tag names %v", got)
+	}
+	if !o.Tags.Substring {
+		t.Error("the configured matcher must be kept")
+	}
+	if o.Positions.Empty() || len(o.Positions.placements) != 1 || o.Positions.Patterns.Empty() {
+		t.Errorf("positions not routed: %+v", o.Positions)
+	}
+	// A matcher is created on demand.
+	bare := &Options{}
+	c, _ := ParseCriterion(`Black "Tal"`)
+	if err := bare.AddCriterion(c); err != nil || bare.Tags.Empty() {
+		t.Errorf("on-demand matcher: err %v tags %+v", err, bare.Tags)
+	}
+	c, _ = ParseCriterion(`FEN "not a fen"`)
+	if err := bare.AddCriterion(c); err == nil {
+		t.Error("bad FEN: want error")
+	}
+}
