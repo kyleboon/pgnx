@@ -110,21 +110,64 @@ func TestPositionClocks(t *testing.T) {
 	}
 }
 
-func TestFinalBoardRoundTrip(t *testing.T) {
+func TestBoardsOnDemand(t *testing.T) {
 	g := parseOne(t, "1. f3 e5 2. g4 Qh4# 0-1\n")
 	r, err := Game(g, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := r.FinalBoard()
+	start, final := r.StartBoard(), r.FinalBoard()
+	if start.FEN() != r.Positions[0].FEN {
+		t.Errorf("StartBoard FEN = %s", start.FEN())
+	}
+	if final.FEN() != r.Positions[4].FEN || !final.IsCheckmate() {
+		t.Errorf("FinalBoard FEN = %s", final.FEN())
+	}
+	// The boards are the caller's to mutate: applying the game's typed
+	// moves to StartBoard walks the positions, and a later call still
+	// returns the start position.
+	for i, mi := range r.Moves {
+		start.Apply(mi.Move)
+		if start.FEN() != r.Positions[i+1].FEN {
+			t.Errorf("after move %d: %s, want %s", i, start.FEN(), r.Positions[i+1].FEN)
+		}
+	}
+	if r.StartBoard().FEN() != r.Positions[0].FEN {
+		t.Error("StartBoard was mutated through the returned board")
+	}
+	if (&Result{}).StartBoard() != nil || (&Result{}).FinalBoard() != nil || (*Result)(nil).FinalBoard() != nil {
+		t.Error("empty result should have no boards")
+	}
+}
+
+// TestBoardsOfPartialReplay pins that a replay stopped by an illegal move
+// still offers the boards of its partial result: the final board is the
+// position the failing move was attempted from.
+func TestBoardsOfPartialReplay(t *testing.T) {
+	g := parseOne(t, "1. e4 e5 2. Nf3 Nf3 *\n") // no black knight reaches f3
+	r, err := Game(g, Options{})
+	if err == nil {
+		t.Fatal("expected replay failure")
+	}
+	if len(r.Positions) != 4 || r.FinalBoard().FEN() != r.Positions[3].FEN {
+		t.Errorf("partial FinalBoard = %s, positions %d", r.FinalBoard().FEN(), len(r.Positions))
+	}
+	if r.StartBoard().FEN() != r.Positions[0].FEN {
+		t.Errorf("partial StartBoard = %s", r.StartBoard().FEN())
+	}
+}
+
+// TestVariationBoards pins that a variation's Result carries boards of
+// its own: its start is the position before the move it branches from.
+func TestVariationBoards(t *testing.T) {
+	g := parseOne(t, "1. e4 e5 (1... c5 2. Nf3) 2. Nf3 *\n")
+	r, err := Game(g, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if b.FEN() != r.Positions[4].FEN || !b.IsCheckmate() {
-		t.Errorf("FinalBoard FEN = %s", b.FEN())
-	}
-	if _, err := (&Result{}).FinalBoard(); err == nil {
-		t.Error("empty result should fail")
+	v := r.Moves[1].Variations[0]
+	if v.StartBoard().FEN() != r.Positions[1].FEN || v.FinalBoard().FEN() != v.Positions[2].FEN {
+		t.Errorf("variation boards: start %s final %s", v.StartBoard().FEN(), v.FinalBoard().FEN())
 	}
 }
 

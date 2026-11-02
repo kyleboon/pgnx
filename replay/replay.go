@@ -13,9 +13,15 @@ type Options struct{}
 
 // Result is the outcome of replaying a sequence of moves (a main line or a
 // variation) against a starting position.
+//
+// Applying Moves[i].Move to the board of Positions[i] yields Positions[i+1],
+// so a caller that needs a board at every ply walks the typed moves from
+// StartBoard; Result itself keeps only the first and last boards.
 type Result struct {
 	Moves     []MoveInfo // parallel to the source []*pgn.Move
 	Positions []Position // len = len(Moves)+1; [0] is the starting position
+
+	start, final *chess.Board // boards of Positions[0] and the last Position
 }
 
 // MoveInfo describes one replayed ply.
@@ -122,6 +128,8 @@ func (p Position) PlyNumber() int {
 func replayMoves(moves []*pgn.Move, b *chess.Board) (*Result, error) {
 	r := &Result{
 		Positions: make([]Position, 0, len(moves)+1),
+		start:     b.Copy(),
+		final:     b, // mutated below; the last position when replay stops
 	}
 	r.Positions = append(r.Positions, positionOf(b))
 
@@ -219,12 +227,23 @@ func (r *Result) PlyCount() int {
 	return r.Positions[len(r.Positions)-1].PlyNumber() - 1
 }
 
-// FinalBoard reconstructs the last position reached from its FEN. It is a
-// convenience for predicates that need the board itself (stalemate,
-// insufficient material); Result does not retain a Board per ply.
-func (r *Result) FinalBoard() (*chess.Board, error) {
-	if r == nil || len(r.Positions) == 0 {
-		return nil, fmt.Errorf("replay: empty result has no final position")
+// StartBoard returns a copy of the board of Positions[0], the caller's to
+// mutate: applying the typed Moves to it in order walks the line's
+// positions. It is nil for an empty Result.
+func (r *Result) StartBoard() *chess.Board {
+	if r == nil || r.start == nil {
+		return nil
 	}
-	return chess.FromFEN(r.Positions[len(r.Positions)-1].FEN)
+	return r.start.Copy()
+}
+
+// FinalBoard returns a copy of the board of the last Position reached (for
+// a partial Result, the position the failing move was attempted from), for
+// predicates that need the board itself (stalemate, insufficient
+// material). It is nil for an empty Result.
+func (r *Result) FinalBoard() *chess.Board {
+	if r == nil || r.final == nil {
+		return nil
+	}
+	return r.final.Copy()
 }
