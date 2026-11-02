@@ -2,6 +2,7 @@ package filter
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/kyleboon/pgnx/pgn"
 	"github.com/kyleboon/pgnx/replay"
@@ -93,6 +94,12 @@ func (o *Options) Validate() error {
 	}
 	if o.HigherRatedWinner && o.LowerRatedWinner {
 		return errors.New("higher-rated winner and lower-rated winner are mutually exclusive")
+	}
+	if o.Bounds.MinPly < 0 || o.Bounds.MaxPly < 0 {
+		return errors.New("length bounds cannot be negative")
+	}
+	if o.Bounds.MaxPly != 0 && o.Bounds.MinPly > o.Bounds.MaxPly {
+		return fmt.Errorf("lower length bound of %d plies exceeds the upper bound of %d", o.Bounds.MinPly, o.Bounds.MaxPly)
 	}
 	return nil
 }

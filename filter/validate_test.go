@@ -27,3 +27,23 @@ func TestValidateRatedWinnerExclusive(t *testing.T) {
 		t.Error("both: want error")
 	}
 }
+
+func TestValidateBounds(t *testing.T) {
+	var ok Bounds
+	ok.SetMinMoves(10)
+	ok.SetMaxMoves(10)
+	if err := (&Options{Bounds: ok}).Validate(); err != nil {
+		t.Fatalf("exactly 10 moves: %v", err)
+	}
+	if err := (&Options{Bounds: Bounds{MinPly: 40}}).Validate(); err != nil {
+		t.Fatalf("lower bound only: %v", err)
+	}
+	var inverted Bounds
+	inverted.SetMinMoves(10)
+	inverted.SetMaxMoves(5)
+	for _, b := range []Bounds{inverted, {MinPly: -1}, {MaxPly: -3}} {
+		if err := (&Options{Bounds: b}).Validate(); err == nil {
+			t.Errorf("%+v: want error", b)
+		}
+	}
+}
