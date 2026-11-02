@@ -84,6 +84,16 @@ type Options struct {
 	MarkMatches string
 }
 
+// TagNames returns the tag names o's tag criteria mention, in
+// first-insertion order (see TagMatcher.TagNames); nil when o is nil or
+// has no tag criteria.
+func (o *Options) TagNames() []string {
+	if o == nil {
+		return nil
+	}
+	return o.Tags.TagNames()
+}
+
 // Validate reports the first way in which o is not a usable set of
 // criteria (the rules pgn-extract's argument handling enforces before
 // any game is read). The command layer maps a non-nil error to a usage

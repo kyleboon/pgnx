@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -151,5 +152,33 @@ func TestSelectorOptionsValidate(t *testing.T) {
 		if err := o.Validate(); err == nil {
 			t.Errorf("%+v: want error", o)
 		}
+	}
+}
+
+func TestTagNamesInFirstInsertionOrder(t *testing.T) {
+	m := &TagMatcher{}
+	for _, line := range []string{`WhiteElo >= "2500"`, `Event "Linares"`, `WhiteElo < "2700"`} {
+		c, err := ParseCriterion(line)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := m.Add(c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m.AddPrefix("Player", "Kasparov")
+	want := []string{"WhiteElo", "Event", "Player"}
+	if got := m.TagNames(); !reflect.DeepEqual(got, want) {
+		t.Errorf("TagNames = %v, want %v", got, want)
+	}
+	if got := (&Options{Tags: m}).TagNames(); !reflect.DeepEqual(got, want) {
+		t.Errorf("Options.TagNames = %v, want %v", got, want)
+	}
+	var none *Options
+	if got := none.TagNames(); got != nil {
+		t.Errorf("nil Options: %v", got)
+	}
+	if got := (&Options{}).TagNames(); got != nil {
+		t.Errorf("no matcher: %v", got)
 	}
 }
