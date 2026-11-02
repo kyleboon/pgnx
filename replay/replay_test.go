@@ -161,3 +161,32 @@ func TestReplayPlacementKeyPerPly(t *testing.T) {
 		t.Error("Placement unchanged after 1.f3")
 	}
 }
+
+// TestEnPassantRecorded pins that replay marks an en passant capture on
+// the MoveInfo, so that renderers need not infer it from the previous
+// position's FEN, and that an ordinary pawn-takes-pawn is not marked.
+func TestEnPassantRecorded(t *testing.T) {
+	g := parseOne(t, "1. e4 a6 2. e5 f5 3. exf6 *\n")
+	r, err := Game(g, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ep := r.Moves[4]
+	if !ep.EnPassant || ep.Captured != chess.Pawn || ep.Move.To.String() != "f6" {
+		t.Errorf("exf6: %+v, want EnPassant with a captured pawn", ep)
+	}
+	for i := 0; i < 4; i++ {
+		if r.Moves[i].EnPassant {
+			t.Errorf("move %d marked en passant", i)
+		}
+	}
+
+	g = parseOne(t, "1. e4 d5 2. exd5 *\n")
+	r, err = Game(g, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Moves[2].EnPassant || r.Moves[2].Captured != chess.Pawn {
+		t.Errorf("exd5: %+v, want a plain pawn capture", r.Moves[2])
+	}
+}

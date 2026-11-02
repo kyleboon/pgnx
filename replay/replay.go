@@ -24,6 +24,7 @@ type MoveInfo struct {
 	Move       chess.Move
 	Piece      chess.Piece
 	Captured   chess.PieceType // NoPiece if quiet
+	EnPassant  bool            // a pawn capturing en passant (Captured is Pawn)
 	IsCheck    bool
 	IsMate     bool
 	Variations []*Result // parallel to the pgn.Move's Variations
@@ -115,7 +116,7 @@ func replayMoves(moves []*pgn.Move, b *chess.Board) (*Result, error) {
 
 		san := sanFor(m, b)
 		piece := b.PieceAt(m.From)
-		captured := capturedPieceType(m, b)
+		captured, enPassant := capturedPieceType(m, b)
 
 		// Variations replay from the position before this move, so branch
 		// off a copy of b prior to applying m.
@@ -149,6 +150,7 @@ func replayMoves(moves []*pgn.Move, b *chess.Board) (*Result, error) {
 			Move:       m,
 			Piece:      piece,
 			Captured:   captured,
+			EnPassant:  enPassant,
 			IsCheck:    isCheck,
 			IsMate:     isMate,
 			Variations: variations,
@@ -160,14 +162,15 @@ func replayMoves(moves []*pgn.Move, b *chess.Board) (*Result, error) {
 }
 
 // capturedPieceType returns the type of piece m captures on b, before m is
-// applied, or chess.NoPiece if m is not a capture. En passant captures the
-// pawn beside m.To rather than the piece (if any) on m.To.
-func capturedPieceType(m chess.Move, b *chess.Board) chess.PieceType {
+// applied, or chess.NoPiece if m is not a capture, and whether the capture
+// is en passant: a pawn moving to b's en passant square takes the pawn
+// beside m.To rather than the (empty) square itself.
+func capturedPieceType(m chess.Move, b *chess.Board) (chess.PieceType, bool) {
 	mover := b.PieceAt(m.From)
 	if mover.Type == chess.Pawn && b.HasEP && m.To == b.EPSquare {
-		return chess.Pawn
+		return chess.Pawn, true
 	}
-	return b.PieceAt(m.To).Type
+	return b.PieceAt(m.To).Type, false
 }
 
 // positionOf snapshots b's current FEN, Zobrist hash and placement key.
