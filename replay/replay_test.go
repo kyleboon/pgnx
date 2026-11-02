@@ -190,3 +190,57 @@ func TestEnPassantRecorded(t *testing.T) {
 		t.Errorf("exd5: %+v, want a plain pawn capture", r.Moves[2])
 	}
 }
+
+// TestPlyNumber pins Position.PlyNumber to pgn-extract's play_moves
+// convention (apply.c: plies = move_number*2 - (to_move == WHITE ? 1 : 0)):
+// the absolute, one-based number of the move about to be played, so the
+// standard start is ply 1 and a FEN start derives from the FEN's move
+// number and side to move. A fullmove field below 1 is clamped to 1 as
+// new_fen_board does.
+func TestPlyNumber(t *testing.T) {
+	cases := []struct {
+		src  string
+		want []int // per position, in order
+	}{
+		{"1. e4 e5 2. Nf3 *\n", []int{1, 2, 3, 4}},
+		{"[FEN \"8/8/8/8/8/8/k7/4K2R w K - 0 40\"]\n\n40. O-O *\n", []int{79, 80}},
+		{"[FEN \"8/8/8/8/8/8/k7/4K2R b K - 0 40\"]\n\n40... Kb2 41. Ke2 *\n", []int{80, 81, 82}},
+		{"[FEN \"7k/3P4/7K/8/8/8/8/8 w - - 6 0\"]\n\nd8=Q *\n", []int{1, 2}},
+		{"[FEN \"7k/3P4/7K/8/8/8/8/8 b - - 6 0\"]\n\nKg8 *\n", []int{2, 3}},
+	}
+	for _, c := range cases {
+		g := parseOne(t, c.src)
+		r, err := Game(g, Options{})
+		if err != nil {
+			t.Fatalf("%q: %v", c.src, err)
+		}
+		if len(r.Positions) != len(c.want) {
+			t.Fatalf("%q: %d positions, want %d", c.src, len(r.Positions), len(c.want))
+		}
+		for i, want := range c.want {
+			if got := r.Positions[i].PlyNumber(); got != want {
+				t.Errorf("%q: Positions[%d].PlyNumber() = %d, want %d", c.src, i, got, want)
+			}
+		}
+		// PlyCount is the number of plies completed: one less than the
+		// ply number of the final position (apply.c half_moves_played).
+		if got, want := r.PlyCount(), c.want[len(c.want)-1]-1; got != want {
+			t.Errorf("%q: PlyCount() = %d, want %d", c.src, got, want)
+		}
+	}
+}
+
+// TestFullmoveClampedInFEN pins that a FEN tag whose fullmove field is 0
+// starts at move 1 in every typed field and in the FEN replay emits, as
+// the C tool's new_fen_board clamps it (oracle: -Wfen prints "... 6 1").
+func TestFullmoveClampedInFEN(t *testing.T) {
+	g := parseOne(t, "[FEN \"7k/3P4/7K/8/8/8/8/8 w - - 6 0\"]\n\nd8=Q *\n")
+	r, err := Game(g, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := r.Positions[0]
+	if p.FullmoveNumber != 1 || p.FEN != "7k/3P4/7K/8/8/8/8/8 w - - 6 1" {
+		t.Errorf("start position: %+v", p)
+	}
+}
