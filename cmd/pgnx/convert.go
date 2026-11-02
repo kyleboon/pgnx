@@ -126,7 +126,7 @@ func openOutput(cmd *cobra.Command, flagName string) (io.Writer, io.Closer, erro
 func runConvert(cmd *cobra.Command, args []string) error {
 	// convert is filter with no criteria: the pipeline decides everything
 	// about a game and every game that is not Rejected goes to the output.
-	r, err := newRun(cmd, nil, nil)
+	r, err := newRun(cmd, nil)
 	if err != nil {
 		return err
 	}

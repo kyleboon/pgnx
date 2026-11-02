@@ -1,6 +1,9 @@
 package filter
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/kyleboon/pgnx/pgn"
 	"github.com/kyleboon/pgnx/replay"
 )
@@ -79,6 +82,86 @@ type Options struct {
 	// positional match (--markmatches). "FEN" inserts the position's FEN
 	// instead.
 	MarkMatches string
+}
+
+// AddCriterion adds a parsed -t line to the matcher it belongs to: a
+// positional criterion (FEN, FENPattern, FENPatternI; see
+// Criterion.IsPositional) to Positions, everything else to Tags
+// (taglines.c process_tag_line). Either matcher is created when nil, so
+// a Tags configured beforehand (Substring, Soundex) is kept.
+func (o *Options) AddCriterion(c Criterion) error {
+	if c.IsPositional() {
+		if o.Positions == nil {
+			o.Positions = &PositionCriteria{}
+		}
+		return o.Positions.AddCriterion(c)
+	}
+	if o.Tags == nil {
+		o.Tags = &TagMatcher{}
+	}
+	return o.Tags.Add(c)
+}
+
+// TagNames returns the tag names o's tag criteria mention, in
+// first-insertion order (see TagMatcher.TagNames); nil when o is nil or
+// has no tag criteria.
+func (o *Options) TagNames() []string {
+	if o == nil {
+		return nil
+	}
+	return o.Tags.TagNames()
+}
+
+// Validate reports the first way in which o is not a usable set of
+// criteria (the rules pgn-extract's argument handling enforces before
+// any game is read). The command layer maps a non-nil error to a usage
+// error; a zero Options is valid.
+func (o *Options) Validate() error {
+	if o.Checkmate && (o.Stalemate || o.Insufficient) {
+		return errors.New("checkmate cannot be combined with stalemate or insufficient material")
+	}
+	if o.HigherRatedWinner && o.LowerRatedWinner {
+		return errors.New("higher-rated winner and lower-rated winner are mutually exclusive")
+	}
+	if o.Bounds.MinPly < 0 || o.Bounds.MaxPly < 0 {
+		return errors.New("length bounds cannot be negative")
+	}
+	if o.Bounds.MaxPly != 0 && o.Bounds.MinPly > o.Bounds.MaxPly {
+		return fmt.Errorf("lower length bound of %d plies exceeds the upper bound of %d", o.Bounds.MinPly, o.Bounds.MaxPly)
+	}
+	if !validNMoveRule(o.NMoveRule) {
+		return fmt.Errorf("N-move rule must be 50 or 75, not %d", o.NMoveRule)
+	}
+	for name, n := range map[string]int{"repetition count": o.Repetition, "piece count": o.PieceCount, "start ply": o.StartPly} {
+		if n < 0 {
+			return fmt.Errorf("%s cannot be negative", name)
+		}
+	}
+	for i, s := range o.Sequences {
+		if s == nil {
+			return fmt.Errorf("sequence %d is empty", i+1)
+		}
+	}
+	return o.Positions.Validate()
+}
+
+// validNMoveRule reports whether n is a value NMoveRule may hold: 0 (no
+// rule), 50 (--fifty) or 75 (--seventyfive).
+func validNMoveRule(n int) bool { return n == 0 || n == 50 || n == 75 }
+
+// SetNMoveRule sets NMoveRule to n (50 or 75). Setting it again to the
+// same value is allowed; changing it from one rule to the other is an
+// error, as the C tool's --fifty and --seventyfive conflict with a
+// previous setting of each other (argsfile.c).
+func (o *Options) SetNMoveRule(n int) error {
+	if n == 0 || !validNMoveRule(n) {
+		return fmt.Errorf("N-move rule must be 50 or 75, not %d", n)
+	}
+	if o.NMoveRule != 0 && o.NMoveRule != n {
+		return fmt.Errorf("%d-move rule conflicts with the %d-move rule already set", n, o.NMoveRule)
+	}
+	o.NMoveRule = n
+	return nil
 }
 
 // Evaluate reports whether g (with its replay r, which may be partial

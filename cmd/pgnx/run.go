@@ -80,11 +80,11 @@ type run struct {
 // newRun does the setup shared by convert and filter from the flags
 // addOutputFlags and addECOFlags register: output options, ECO options,
 // --keep-broken, --quiet, the log writer, the tag registry (seeded with
-// tagNames, the names the criteria mention, as the C lexer registers
-// them from -t files first), the main destination and the pipeline.
-// criteria and tagNames are nil for convert. Every error is a usage
-// error (exit 1). The caller must close the run.
-func newRun(cmd *cobra.Command, criteria *filter.Options, tagNames []string) (*run, error) {
+// the tag names the criteria mention, as the C lexer registers them from
+// -t files first), the main destination and the pipeline. criteria is
+// nil for convert. Every error is a usage error (exit 1). The caller
+// must close the run.
+func newRun(cmd *cobra.Command, criteria *filter.Options) (*run, error) {
 	opts, err := outputOptions(cmd)
 	if err != nil {
 		return nil, err
@@ -111,7 +111,7 @@ func newRun(cmd *cobra.Command, criteria *filter.Options, tagNames []string) (*r
 	// or not) so that unrecognised tags are ordered as the C oracle
 	// orders them: run-wide first-seen, criteria tag names first.
 	opts.Tags = output.NewTagRegistry()
-	for _, name := range tagNames {
+	for _, name := range criteria.TagNames() {
 		opts.Tags.ObserveName(name)
 	}
 	if opts.SevenTagRoster && ecoSet.classifying() {
