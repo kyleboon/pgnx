@@ -51,11 +51,11 @@ func newRunReport(w, ioW io.Writer) *runReport {
 	return &runReport{w: w, ioW: ioW}
 }
 
-// game records one item of the games iterator with the command's
-// verdict on it. An Err item is a source's failure: logged to ioW, not
-// a game. A game's skipped tokens are logged as warnings, then its
-// errors; it counts as failed if it has either.
-func (rep *runReport) game(it Item, v gameVerdict) {
+// record logs and counts one item of the games iterator with the
+// command's verdict on it. An Err item is a source's failure: logged to
+// ioW, not a game. A game's skipped tokens are logged as warnings, then
+// its errors; it counts as failed if it has either.
+func (rep *runReport) record(it Item, v gameVerdict) {
 	if it.Err != nil {
 		rep.fail(fmt.Errorf("%s: %w", it.Source, it.Err))
 		return
@@ -81,7 +81,7 @@ func (rep *runReport) each(seq iter.Seq[Item], fn func(n int, g *pgn.Game) gameV
 		if it.Err == nil {
 			v = fn(it.Number, it.Game)
 		}
-		rep.game(it, v)
+		rep.record(it, v)
 		if v.Stop {
 			return
 		}

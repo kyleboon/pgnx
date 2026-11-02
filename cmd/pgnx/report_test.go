@@ -18,8 +18,8 @@ func gameItem(n, line int, skipped ...error) Item {
 func TestReportCountsCleanGames(t *testing.T) {
 	var log bytes.Buffer
 	rep := newRunReport(&log, &log)
-	rep.game(gameItem(1, 1), gameVerdict{})
-	rep.game(gameItem(2, 5), gameVerdict{})
+	rep.record(gameItem(1, 1), gameVerdict{})
+	rep.record(gameItem(2, 5), gameVerdict{})
 	if rep.total != 2 || rep.succeeded() != 2 {
 		t.Errorf("total %d succeeded %d, want 2 2", rep.total, rep.succeeded())
 	}
@@ -37,8 +37,8 @@ func TestReportCountsCleanGames(t *testing.T) {
 func TestReportLogsEachErrorAndFailsTheGame(t *testing.T) {
 	var log bytes.Buffer
 	rep := newRunReport(&log, &log)
-	rep.game(gameItem(1, 1), gameVerdict{})
-	rep.game(gameItem(2, 7), gameVerdict{Errors: []error{errors.New("illegal move"), errors.New("moves dropped")}})
+	rep.record(gameItem(1, 1), gameVerdict{})
+	rep.record(gameItem(2, 7), gameVerdict{Errors: []error{errors.New("illegal move"), errors.New("moves dropped")}})
 	want := "in.pgn:7: game 2: illegal move\nin.pgn:7: game 2: moves dropped\n"
 	if log.String() != want {
 		t.Errorf("log = %q, want %q", log.String(), want)
@@ -57,8 +57,8 @@ func TestReportLogsEachErrorAndFailsTheGame(t *testing.T) {
 func TestReportSkippedTokensFailTheGame(t *testing.T) {
 	var log bytes.Buffer
 	rep := newRunReport(&log, &log)
-	rep.game(gameItem(1, 3, errors.New("skipped token \"-\"")), gameVerdict{})
-	rep.game(gameItem(2, 9, errors.New("skipped token \"-\"")), gameVerdict{Errors: []error{errors.New("bad")}})
+	rep.record(gameItem(1, 3, errors.New("skipped token \"-\"")), gameVerdict{})
+	rep.record(gameItem(2, 9, errors.New("skipped token \"-\"")), gameVerdict{Errors: []error{errors.New("bad")}})
 	want := "in.pgn:3: game 1: warning: skipped token \"-\"\n" +
 		"in.pgn:9: game 2: warning: skipped token \"-\"\n" +
 		"in.pgn:9: game 2: bad\n"
@@ -79,11 +79,11 @@ func TestReportSkippedTokensFailTheGame(t *testing.T) {
 func TestReportStopAfterStillLogsTheFailingGame(t *testing.T) {
 	var log bytes.Buffer
 	rep := newRunReport(&log, &log)
-	rep.game(gameItem(1, 1), gameVerdict{Stop: true})
+	rep.record(gameItem(1, 1), gameVerdict{Stop: true})
 	if rep.succeeded() != 1 || log.Len() != 0 {
 		t.Errorf("clean stop: succeeded %d log %q", rep.succeeded(), log.String())
 	}
-	rep.game(gameItem(2, 4), gameVerdict{Errors: []error{errors.New("broken")}, Stop: true})
+	rep.record(gameItem(2, 4), gameVerdict{Errors: []error{errors.New("broken")}, Stop: true})
 	if !strings.Contains(log.String(), "in.pgn:4: game 2: broken\n") {
 		t.Errorf("failing stop game not logged: %q", log.String())
 	}
@@ -99,8 +99,8 @@ func TestReportStopAfterStillLogsTheFailingGame(t *testing.T) {
 func TestReportIOErrorFailsTheRun(t *testing.T) {
 	var findings, ioLog bytes.Buffer
 	rep := newRunReport(&findings, &ioLog)
-	rep.game(gameItem(1, 1), gameVerdict{})
-	rep.game(Item{Source: "missing.pgn", Number: 1, Err: errors.New("no such file")}, gameVerdict{})
+	rep.record(gameItem(1, 1), gameVerdict{})
+	rep.record(Item{Source: "missing.pgn", Number: 1, Err: errors.New("no such file")}, gameVerdict{})
 	if rep.total != 1 || rep.succeeded() != 1 {
 		t.Errorf("total %d succeeded %d, want 1 1", rep.total, rep.succeeded())
 	}
@@ -118,14 +118,14 @@ func TestReportIOOnlyIgnoresFailedGames(t *testing.T) {
 	var log bytes.Buffer
 	rep := newRunReport(&log, &log)
 	rep.ioOnly = true
-	rep.game(gameItem(1, 2, errors.New("skipped token")), gameVerdict{})
+	rep.record(gameItem(1, 2, errors.New("skipped token")), gameVerdict{})
 	if !strings.Contains(log.String(), "warning: skipped token") {
 		t.Errorf("warning not logged: %q", log.String())
 	}
 	if err := rep.exit(); err != nil {
 		t.Errorf("exit = %v, want nil", err)
 	}
-	rep.game(Item{Source: "missing.pgn", Err: errors.New("no such file")}, gameVerdict{})
+	rep.record(Item{Source: "missing.pgn", Err: errors.New("no such file")}, gameVerdict{})
 	if !errors.Is(rep.exit(), errProblems) {
 		t.Errorf("exit after I/O error = %v, want errProblems", rep.exit())
 	}
@@ -137,7 +137,7 @@ func TestReportIOOnlyIgnoresFailedGames(t *testing.T) {
 func TestReportRunFailure(t *testing.T) {
 	var log bytes.Buffer
 	rep := newRunReport(&log, &log)
-	rep.game(gameItem(1, 1), gameVerdict{})
+	rep.record(gameItem(1, 1), gameVerdict{})
 	rep.fail(errors.New("out.pgn: write: no space left on device"))
 	if log.String() != "out.pgn: write: no space left on device\n" {
 		t.Errorf("log = %q", log.String())
@@ -153,8 +153,8 @@ func TestReportRunFailure(t *testing.T) {
 func TestReportSummaryLines(t *testing.T) {
 	var log bytes.Buffer
 	rep := newRunReport(&log, &log)
-	rep.game(gameItem(1, 1), gameVerdict{})
-	rep.game(gameItem(2, 3), gameVerdict{Errors: []error{errors.New("bad")}})
+	rep.record(gameItem(1, 1), gameVerdict{})
+	rep.record(gameItem(2, 3), gameVerdict{Errors: []error{errors.New("bad")}})
 	log.Reset()
 
 	var out bytes.Buffer

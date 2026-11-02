@@ -10,6 +10,10 @@ A Go port of pgn-extract: a library and CLI that parses, replays, selects, class
 A game exactly as it was written in the input: tags in source order, SAN as spelled, comments, NAGs and variations preserved. Nothing has been corrected or judged yet.
 _Avoid_: raw game, input game
 
+**Item**:
+One step of a run's game iterator: a parsed game, numbered across all inputs, with the tokens the parser skipped from it; or the failure of one source. The iterator reads nothing beyond the item it is yielding.
+_Avoid_: entry, event, record (that is what the report does with a verdict)
+
 **Source fidelity**:
 The parser's guarantee that a parsed game reflects the text it came from. Rewriting a game is never the parser's job.
 
@@ -28,6 +32,14 @@ _Avoid_: per-game loop, callback, deal_with_game
 **Outcome**:
 What the pipeline concludes about one game: its disposition, its reason if any, whether it matched the criteria, and the game and replay to emit.
 _Avoid_: result (reserved for the chess result)
+
+**Route**:
+A command's decision for one processed game that was not rejected: which destination it goes to (the output, the unmatched output, or nowhere) and whether the run stops after it. convert routes everything to the output, validate routes nowhere, filter routes by the Selector.
+_Avoid_: dispatch, callback
+
+**Verdict**:
+A command's judgement on one game once it has been routed and written: the faults the report logs and counts against it, and whether the run stops after it. The outcome is the pipeline's; the verdict is the command's.
+_Avoid_: result, status (that is the disposition)
 
 ### Dispositions
 
