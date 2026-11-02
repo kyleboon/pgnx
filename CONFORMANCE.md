@@ -290,9 +290,10 @@ were fixed; the rest are the documented differences above.
   strings/comments are skipped as unknown characters, as before. The
   scanner still streams one game at a time. Output wrapping counts bytes
   (`len`), as the C tool does. Covered by `pgn/bytes_test.go`. Tag output
-  must not re-escape these bytes (the `%q` quoting in `output/output.go`
-  is tracked separately); with raw quoting `difftest.sh` over `odds.pgn`
-  and several Latin-1 TWIC issues is clean.
+  must not re-escape these bytes (every tag line now goes through
+  `Writer.writeTag`/`quoteTagValue` in `output/output.go`, which escapes
+  only a bare `"`; no Go `%q` remains); with raw quoting `difftest.sh`
+  over `odds.pgn` and several Latin-1 TWIC issues is clean.
 - **Script scope note, not a bug:** `difftest.sh` runs both binaries with
   no flags beyond `--quiet`/`-f`/`-o` (per its usage: `<input.pgn>
   [format]`). `testdata/golden/infiles/nested-comment.pgn` is designed to

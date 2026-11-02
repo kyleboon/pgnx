@@ -188,7 +188,8 @@ func halfMovesPlayed(p replay.Position) int {
 
 // Apply replaces g's ECO classification with e: every ECO, Opening,
 // Variation and SubVariation tag is removed, then those present in e are
-// appended in that order (apply.c:1282-1314). Other tags keep their order.
+// set in that order (apply.c:1282-1314), which appends them. Other tags
+// keep their order.
 func Apply(g *pgn.Game, e Entry) {
 	if g == nil {
 		return
@@ -199,7 +200,10 @@ func Apply(g *pgn.Game, e Entry) {
 			kept = append(kept, tag)
 		}
 	}
-	g.Tags = append(kept, e.Tags()...)
+	g.Tags = kept
+	for _, tag := range e.Tags() {
+		g.SetTag(tag.Name, tag.Value)
+	}
 }
 
 func isECOTag(name string) bool {

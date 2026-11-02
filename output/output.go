@@ -283,6 +283,13 @@ func normalisedResult(value string, present bool, token string) string {
 	return "*"
 }
 
+// writeTag prints one tag line. It is the only place a tag reaches the
+// output, so pgn-extract's quoting (see quoteTagValue) applies everywhere.
+func (w *Writer) writeTag(name, value string) error {
+	_, err := fmt.Fprintf(w.w, "[%s %s]\n", name, quoteTagValue(value))
+	return err
+}
+
 // writeTags renders the tag section: the seven roster tags (using the
 // game's value if present, else the standard default) in fixed order,
 // then the oracle's well-known tags in its fixed order, then the oracle's
@@ -298,7 +305,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 	if len(w.opts.Roster) > 0 {
 		for _, name := range w.opts.Roster {
 			value, _ := g.Tag(name)
-			if _, err := fmt.Fprintf(w.w, "[%s %s]\n", name, quoteTagValue(value)); err != nil {
+			if err := w.writeTag(name, value); err != nil {
 				return err
 			}
 		}
@@ -317,7 +324,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 			// genuinely missing tag gets the standard default.
 			value = rt.deflt
 		}
-		if _, err := fmt.Fprintf(w.w, "[%s %s]\n", rt.name, quoteTagValue(value)); err != nil {
+		if err := w.writeTag(rt.name, value); err != nil {
 			return err
 		}
 	}
@@ -330,7 +337,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 			if !ok {
 				continue
 			}
-			if _, err := fmt.Fprintf(w.w, "[%s %s]\n", name, quoteTagValue(value)); err != nil {
+			if err := w.writeTag(name, value); err != nil {
 				return err
 			}
 		}
@@ -343,7 +350,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 				if !ok {
 					continue
 				}
-				if _, err := fmt.Fprintf(w.w, "[%s %q]\n", name, value); err != nil {
+				if err := w.writeTag(name, value); err != nil {
 					return err
 				}
 			}
@@ -360,7 +367,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 			continue
 		}
 		rosterSet[name] = true
-		if _, err := fmt.Fprintf(w.w, "[%s %s]\n", name, quoteTagValue(value)); err != nil {
+		if err := w.writeTag(name, value); err != nil {
 			return err
 		}
 	}
@@ -373,7 +380,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 			continue
 		}
 		rosterSet[name] = true
-		if _, err := fmt.Fprintf(w.w, "[%s %s]\n", name, quoteTagValue(value)); err != nil {
+		if err := w.writeTag(name, value); err != nil {
 			return err
 		}
 	}
@@ -394,7 +401,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 		return w.opts.Tags.index[rest[i].Name] < w.opts.Tags.index[rest[j].Name]
 	})
 	for _, t := range rest {
-		if _, err := fmt.Fprintf(w.w, "[%s %s]\n", t.Name, quoteTagValue(t.Value)); err != nil {
+		if err := w.writeTag(t.Name, t.Value); err != nil {
 			return err
 		}
 	}

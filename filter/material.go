@@ -350,7 +350,7 @@ func matchMaterial(g *pgn.Game, r *replay.Result, patterns []*MaterialPattern, m
 				if whiteMatches {
 					colour = "White"
 				}
-				setTag(g, "MaterialMatch", colour)
+				g.SetTag("MaterialMatch", colour)
 			}
 			return true
 		}
@@ -414,15 +414,4 @@ func addMatchComment(g *pgn.Game, moveIdx int, text string) {
 		return
 	}
 	g.Moves[moveIdx].Comments = append(g.Moves[moveIdx].Comments, text)
-}
-
-// setTag sets the last occurrence of name to value, or appends the tag.
-func setTag(g *pgn.Game, name, value string) {
-	for i := len(g.Tags) - 1; i >= 0; i-- {
-		if g.Tags[i].Name == name {
-			g.Tags[i].Value = value
-			return
-		}
-	}
-	g.Tags = append(g.Tags, pgn.Tag{Name: name, Value: value})
 }

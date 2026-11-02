@@ -24,10 +24,10 @@ func normaliseResult(g *pgn.Game) {
 	tag, ok := g.Tag("Result")
 	if ok && tag == "1/2" {
 		tag = "1/2-1/2"
-		setTag(g, "Result", tag)
+		g.SetTag("Result", tag)
 	}
 	if g.Result != "" && (!ok || tag == "" || tag == "?") {
-		setTag(g, "Result", g.Result)
+		g.SetTag("Result", g.Result)
 	}
 }
 
@@ -44,7 +44,7 @@ func validResult(s string) bool {
 // that is not one of the four PGN results is replaced by "*".
 func ensureValidResultTag(g *pgn.Game) {
 	if tag, ok := g.Tag("Result"); ok && !validResult(tag) {
-		setTag(g, "Result", "*")
+		g.SetTag("Result", "*")
 	}
 }
 
@@ -67,7 +67,7 @@ func ConsistentFENTags(g *pgn.Game) error {
 			return fmt.Errorf("invalid FEN tag %q: %w", fen, err)
 		}
 		if !hasSetup {
-			setTag(g, "SetUp", "1")
+			g.SetTag("SetUp", "1")
 		}
 	}
 	return nil
@@ -114,7 +114,7 @@ func checkResult(g *pgn.Game, r *replay.Result, fix, reject bool) error {
 			}
 		}
 		if corrected != "" {
-			setTag(g, "Result", corrected)
+			g.SetTag("Result", corrected)
 			g.Result = corrected
 		}
 	}
@@ -127,7 +127,7 @@ func checkResult(g *pgn.Game, r *replay.Result, fix, reject bool) error {
 	report := true
 	if fix {
 		if moveResult == "*" || tag == "*" {
-			setTag(g, "Result", moveResult)
+			g.SetTag("Result", moveResult)
 			report = false
 		}
 	} else if moveResult == "*" {
