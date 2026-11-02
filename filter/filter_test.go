@@ -134,6 +134,20 @@ func TestEvaluateInvalidResultTagBecomesStar(t *testing.T) {
 	if v, _ := g.Tag("Result"); v != "*" {
 		t.Errorf("Result = %q", v)
 	}
+
+	// Tag criteria see the tag as written (the rewrite is the first line
+	// of apply.c play_moves, after the tag checks), yet a game that fails
+	// them is rewritten too: the C tool's non-matching branch forces
+	// apply_move_list on it before writing it to the -n file.
+	star := &TagMatcher{}
+	star.AddPrefix("Result", "*")
+	g, r = replayed(t, "[Result \"1:0\"]\n\n1. e4 *\n")
+	if ok, err := Evaluate(g, r, &Options{Tags: star}); ok || err != nil {
+		t.Fatal(ok, err)
+	}
+	if v, _ := g.Tag("Result"); v != "*" {
+		t.Errorf("unmatched game: Result = %q, want *", v)
+	}
 }
 
 func TestEvaluatePartialResult(t *testing.T) {

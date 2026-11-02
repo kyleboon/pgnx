@@ -97,11 +97,15 @@ type Options struct {
 //     replayed game (replacing its ECO/Opening/Variation/SubVariation
 //     tags) before calling Evaluate, which is observably the same as the
 //     C tool classifying inside apply_move_list.
-//  4. The replay-time walk (apply.c play_moves) over the main line and,
+//  4. An invalid Result tag becomes "*" (the first line of apply.c
+//     play_moves and check_move_validity), after the tag checks have
+//     seen it as written but even when they failed, since the C tool's
+//     non-matching branch replays such a game before writing it to -n.
+//     Then the replay-time walk (play_moves) over the main line and,
 //     unless NoVariations, its variations, each main-line ply having the
 //     absolute ply number p (1 for a standard start; from a FEN,
-//     2*(Fullmove-1)+(Black?1:0)+1 for the first move). An invalid Result
-//     tag becomes "*". When positions are sought: the start position is
+//     2*(Fullmove-1)+(Black?1:0)+1 for the first move). When positions
+//     are sought: the start position is
 //     tested before any move when p >= StartPly, a match going to the
 //     front of the prefix comments; variations on a move are walked
 //     first, each with a fresh matched state, a match inside marking the
@@ -143,18 +147,23 @@ func Evaluate(g *pgn.Game, r *replay.Result, o *Options) (bool, error) {
 		r = &replay.Result{}
 	}
 
-	if o.Tags != nil && !o.Tags.Match(g) {
-		return false, nil
+	tagsMatch := o.Tags == nil || o.Tags.Match(g)
+	if tagsMatch && (o.HigherRatedWinner || o.LowerRatedWinner) && !RatedWinner(g, o.HigherRatedWinner, o.LowerRatedWinner) {
+		tagsMatch = false
 	}
-	if (o.HigherRatedWinner || o.LowerRatedWinner) && !RatedWinner(g, o.HigherRatedWinner, o.LowerRatedWinner) {
-		return false, nil
-	}
-	if _, hasSetup := g.Tag("SetUp"); (o.Setup == OnlySetup && !hasSetup) || (o.Setup == NoSetup && hasSetup) {
-		return false, nil
+	if _, hasSetup := g.Tag("SetUp"); tagsMatch && ((o.Setup == OnlySetup && !hasSetup) || (o.Setup == NoSetup && hasSetup)) {
+		tagsMatch = false
 	}
 
-	// apply_move_list / play_moves.
+	// apply_move_list / play_moves. The Result rewrite happens whether
+	// or not the tag checks passed: C's non-matching branch forces
+	// apply_move_list (check_move_validity, which repeats the rule) on a
+	// game that failed them before writing it to the -n file, so every
+	// game that reaches an output has a valid Result tag.
 	ensureValidResultTag(g)
+	if !tagsMatch {
+		return false, nil
+	}
 	startPly := o.StartPly
 	if startPly < 1 {
 		startPly = 1
