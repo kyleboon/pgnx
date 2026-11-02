@@ -134,3 +134,22 @@ func TestValidateDelegatesToPositions(t *testing.T) {
 		t.Error("want the positional error")
 	}
 }
+
+func TestSelectorOptionsValidate(t *testing.T) {
+	if err := (SelectorOptions{StopAfter: 2, FirstGame: 3, GameLimit: 9}).Validate(); err != nil {
+		t.Fatalf("valid: %v", err)
+	}
+	if err := (SelectorOptions{FirstGame: 3}).Validate(); err != nil {
+		t.Fatalf("first game without limit: %v", err)
+	}
+	for _, o := range []SelectorOptions{
+		{StopAfter: -1},
+		{FirstGame: -1},
+		{GameLimit: -1},
+		{FirstGame: 5, GameLimit: 2},
+	} {
+		if err := o.Validate(); err == nil {
+			t.Errorf("%+v: want error", o)
+		}
+	}
+}
