@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -202,14 +203,64 @@ func TestOutcomeReplayToEmitAndFaults(t *testing.T) {
 
 var errReason, errWarning = errors.New("reason"), errors.New("warning")
 
+// concurrentCriteria are criteria of every kind that keeps per-run
+// state in its matcher, each satisfied by most fixtures (so that the
+// checks after it run) and each writing into the game: tag criteria (a
+// regular expression and prefixes, the Result ones seeing the tag
+// before the apply.c rewrite), an -x line,
+// a labelled FEN pattern, a sequence and a material pattern, with
+// MarkMatches, AddMatchTag and AddLabelTag on.
+func concurrentCriteria(t *testing.T) *filter.Options {
+	t.Helper()
+	tags := &filter.TagMatcher{}
+	c, err := filter.ParseCriterion(`Event =~ "^[a-z]"`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tags.Add(c); err != nil {
+		t.Fatal(err)
+	}
+	tags.AddPrefix("Event", "n")
+	tags.AddPrefix("Result", "*")
+	tags.AddPrefix("Result", "0-1")
+	pc := &filter.PositionCriteria{}
+	if err := pc.AddLine("e4"); err != nil {
+		t.Fatal(err)
+	}
+	if err := pc.AddPattern("*/*/*/*/4P3/*/*/*", false, "KP"); err != nil {
+		t.Fatal(err)
+	}
+	seq, err := filter.ParseSequence("e4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	material, err := filter.ParseMaterial("1 kq1r2b2n2p8 kq1r2b2n2p8", filter.EitherColour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &filter.Options{
+		Tags:        tags,
+		Positions:   pc,
+		Sequences:   []*filter.Sequence{seq},
+		Material:    []*filter.MaterialPattern{material},
+		Bounds:      filter.Bounds{MinPly: 1},
+		MarkMatches: "MATCH",
+		AddMatchTag: true,
+		AddLabelTag: true,
+	}
+}
+
+// One Pipeline, with the matchers most likely to keep state, processes
+// many games at once (under -race) and every outcome equals the one a
+// fresh Pipeline reaches alone.
 func TestProcessConcurrent(t *testing.T) {
 	cfg := Config{
 		ECO:        ecoTable(t),
 		KeepBroken: true,
-		Criteria:   &filter.Options{Bounds: filter.Bounds{MinPly: 1}},
+		Criteria:   concurrentCriteria(t),
 	}
 	p := New(cfg)
-	srcs := []string{normal, broken, noResultBroken, stray, retiD5, badResultTag, setUpNoFEN}
+	srcs := []string{normal, broken, noResultBroken, stray, retiD5, badResultTag, setUpNoFEN, e4e5Marked}
 	const rounds = 20
 	var wg sync.WaitGroup
 	outcomes := make([]Outcome, len(srcs)*rounds)
@@ -222,13 +273,36 @@ func TestProcessConcurrent(t *testing.T) {
 		}(i, g)
 	}
 	wg.Wait()
+	matchedAny := false
 	for i, o := range outcomes {
 		want := New(cfg).Process(parse(t, srcs[i%len(srcs)]))
+		matchedAny = matchedAny || o.Matched
 		if o.Status != want.Status || o.Matched != want.Matched || len(o.Warnings) != len(want.Warnings) ||
-			(o.Reason == nil) != (want.Reason == nil) || len(o.Game.Tags) != len(want.Game.Tags) {
+			(o.Reason == nil) != (want.Reason == nil) || !reflect.DeepEqual(o.Game.Tags, want.Game.Tags) ||
+			!reflect.DeepEqual(marks(o.Game), marks(want.Game)) {
 			t.Errorf("game %d (%q): concurrent outcome differs: %+v vs %+v", i, srcs[i%len(srcs)], o, want)
 		}
 	}
+	if !matchedAny {
+		t.Error("no fixture matched the criteria: the later matchers never ran")
+	}
+	if o := New(cfg).Process(parse(t, e4e5Marked)); !o.Matched || len(marks(o.Game)) == 0 {
+		t.Errorf("e4e5Marked: matched %v marks %v; the criteria must be met and mark the game", o.Matched, marks(o.Game))
+	}
+}
+
+// e4e5Marked is a game concurrentCriteria matches and marks.
+const e4e5Marked = "[Event \"m\"]\n\n1. e4 e5 2. Nf3 Nc6 *\n"
+
+// marks are the comments on g's main-line moves, in order.
+func marks(g *pgn.Game) []string {
+	var out []string
+	for _, m := range g.Moves {
+		for _, c := range m.Comments {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // Classification precedes the criteria (the C tool classifies inside
