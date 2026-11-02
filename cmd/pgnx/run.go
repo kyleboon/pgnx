@@ -71,12 +71,12 @@ type run struct {
 }
 
 // newRun does the setup shared by convert and filter from the flags
-// addOutputFlags and addECOFlags register, in the order the commands
-// used to: output options, ECO options, --keep-broken, --quiet, the log
-// writer, the tag registry (seeded with tagNames, the names the criteria
-// mention, as the C lexer registers them from -t files first), the main
-// destination and the pipeline. criteria is nil for convert. Every error
-// is a usage error (exit 1). The caller must close the run.
+// addOutputFlags and addECOFlags register: output options, ECO options,
+// --keep-broken, --quiet, the log writer, the tag registry (seeded with
+// tagNames, the names the criteria mention, as the C lexer registers
+// them from -t files first), the main destination and the pipeline.
+// criteria and tagNames are nil for convert. Every error is a usage
+// error (exit 1). The caller must close the run.
 func newRun(cmd *cobra.Command, criteria *filter.Options, tagNames []string) (*run, error) {
 	opts, err := outputOptions(cmd)
 	if err != nil {

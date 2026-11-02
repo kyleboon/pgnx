@@ -39,8 +39,9 @@ func openLogFile(path string) (*os.File, error) {
 	return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 }
 
-// forEachGame is the shared per-game iteration used by convert, validate,
-// and info. It reads PGN text from each of files in turn (or from
+// forEachGame is the shared per-game iteration used by every command
+// (run.exec for convert and filter; validate and info call it directly).
+// It reads PGN text from each of files in turn (or from
 // cmd.InOrStdin() when files is empty, labeled "stdin" in messages),
 // parsing games one at a time and invoking fn for each with its 1-based
 // game number (counted across all files) and source label.
