@@ -104,6 +104,16 @@ func (o *Options) Validate() error {
 	if !validNMoveRule(o.NMoveRule) {
 		return fmt.Errorf("N-move rule must be 50 or 75, not %d", o.NMoveRule)
 	}
+	for name, n := range map[string]int{"repetition count": o.Repetition, "piece count": o.PieceCount, "start ply": o.StartPly} {
+		if n < 0 {
+			return fmt.Errorf("%s cannot be negative", name)
+		}
+	}
+	for i, s := range o.Sequences {
+		if s == nil {
+			return fmt.Errorf("sequence %d is empty", i+1)
+		}
+	}
 	return nil
 }
 

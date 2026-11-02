@@ -78,3 +78,23 @@ func TestValidateNMoveRule(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateCountsAndSequences(t *testing.T) {
+	seq, err := ParseSequence("e4 e5")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := (&Options{Repetition: 3, PieceCount: 7, StartPly: 5, Sequences: []*Sequence{seq}}).Validate(); err != nil {
+		t.Fatalf("valid counts: %v", err)
+	}
+	for _, o := range []*Options{
+		{Repetition: -1},
+		{PieceCount: -1},
+		{StartPly: -1},
+		{Sequences: []*Sequence{seq, nil}},
+	} {
+		if err := o.Validate(); err == nil {
+			t.Errorf("%+v: want error", o)
+		}
+	}
+}
