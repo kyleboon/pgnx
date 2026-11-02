@@ -4,7 +4,7 @@ pgnx is a Go port of [pgn-extract](https://www.cs.kent.ac.uk/people/staff/djb/pg
 David J. Barnes' C tool for searching, filtering, and reformatting chess
 games recorded in [PGN](https://en.wikipedia.org/wiki/Portable_Game_Notation).
 It provides both a reusable Go library (`chess`, `pgn`, `replay`, `filter`,
-`eco`, `output`) and a CLI (`pgnx`) that replays every game on an internal board
+`eco`, `pipeline`, `output`) and a CLI (`pgnx`) that replays every game on an internal board
 with full legality checking, the same semantic depth as the original.
 
 pgnx is licensed under [GPL-3.0](LICENSE), the same license as pgn-extract.

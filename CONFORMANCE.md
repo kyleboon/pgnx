@@ -136,6 +136,25 @@ differences:
   format wherever a matching/unmatched game would go, and still counted as
   broken (exit 2). The C tool with `--keepbroken` likewise evaluates what
   it managed to play, modulo the ordering notes above.
+- **A game with `SetUp "1"` and no FEN tag (or an unparsable FEN) is
+  emitted nowhere, not even to `--unmatched`.** In the C tool a
+  `consistent_FEN_tags` failure only makes the game a non-match: the main
+  output never sees it, but the non-matching branch of `deal_with_game`
+  (`grammar.c`) still replays it from the standard start and writes it,
+  `[SetUp "1"]` and all, to the `-n` file, exit 0:
+
+  ```sh
+  printf '[Event "a"]\n[SetUp "1"]\n\n1. e4 *\n' | pgn-extract -TpZZZ -n/dev/stdout -o/dev/null --quiet
+  # logs "Missing FEN Tag to accompany SetUp Tag" and prints the game
+  ```
+
+  pgnx normalises every game once, before replay, for every command
+  (`pipeline.Normalise`, ADR 0002), and a game that step rejects is
+  Rejected in the glossary's sense: logged, emitted nowhere (matched,
+  `--unmatched` and `--keep-broken` alike), exit 2. `convert` and
+  `filter` therefore agree with each other; the `-n` emission of a game
+  whose tags the C tool itself called inconsistent is a recovery artefact
+  and is not copied. `TestFilterRejectsSetUpWithoutFEN`.
 - **The summary line counts matched games.** `filter` prints
   `"N game(s) matched out of M."` where N counts every game that satisfied
   the criteria (including games held back by `--select-only`/
@@ -148,8 +167,8 @@ differences:
   outermost rook on the back rank, as `find_rook_starting_position` does.)
 - **Chess960 `Variant` tag is not added.** `consistent_FEN_tags` in the C
   tool also adds `[Variant "chess 960"]` to a FEN game whose start position
-  looks like a Chess960 setup but has no `Variant` tag. pgnx adds only the
-  `SetUp "1"` tag. Flagged as a gap (no golden case); revisit with the
+  looks like a Chess960 setup but has no `Variant` tag. `pipeline.Normalise`
+  adds only the `SetUp "1"` tag. Flagged as a gap (no golden case); revisit with the
   Chess960 work.
 
 ## Positional matching and ECO (Phase 3)
@@ -329,9 +348,18 @@ oracle as justification and one is documented.
   invalid Result tags (e.g. `"1:0"`) unchanged. The C parser's
   `check_result` (`grammar.c`) rewrites `"1/2"` to `"1/2-1/2"` and fills an
   absent, empty or `"?"` tag from the terminating token, and `play_moves`
-  (`apply.c`) replaces any remaining non-PGN value with `"*"`. The output
-  writer now applies the same normalisation to the Result roster tag;
-  `filter` applies it before tag matching as well.
+  (`apply.c`) replaces any remaining non-PGN value with `"*"`. The first
+  two rules are `pipeline.Normalise`, which every command runs once per
+  game before replay (ADR 0002); the third is the first step of the
+  criteria stage (`filter.Evaluate`, which `convert` runs with no
+  criteria), after tag criteria have seen the tag as written, as in C.
+  The output writer trusts the tags it is given and only supplies the
+  roster default `"*"` for an absent tag, so every format now prints the
+  same Result: until 2026-11-02 the writer normalised the SAN roster tag
+  at render time while the EPD `c1` comment printed the raw tag
+  (`[Result "?"]` with a `*` token gave `c1 ?;`, the oracle gives
+  `c1 *;`). `TestConvertEPDResultNormalised`,
+  `TestConvertRosterResultNormalised`.
 - **Open divergence — a game with moves but no result token.** When a
   game's movetext is not terminated by a result token, pgn-extract reports
   "Missing result" and, if the game is the last in the file, emits nothing
@@ -375,8 +403,8 @@ to treat each as a move, fail the replay and emit nothing for the game
   unrecognised movetext token "N"`; wording is not held to parity) and the
   game is emitted, but it counts as a problem, so the run exits 2 (the C
   tool exits 0). `Game.SkippedTokens` exposes them to library users.
-- **Fixed:** a game with no moves is printed with its (normalised) Result
-  tag as the movetext, not the result token and not a default `*`
+- **Fixed:** a game with no moves is printed with its Result tag (as
+  normalised by the pipeline) as the movetext, not the result token and not a default `*`
   (`output.c`, "Take account of a possible zero move game"). So `+/-`
   movetext with `[Result "+/-"]` gives the tag section with `[Result "*"]`
   and a bare `*`; `26. N 1/2-1/2` with `[Result "1-0"]` gives a bare `1-0`.
@@ -468,12 +496,16 @@ warnings (663 s wall, 8 workers).
   silently correct it"). pgnx did this only inside `filter.Evaluate`, so
   `pgnx filter` matched the oracle and `pgnx convert` did not (TWIC 1267,
   1393, 1426: a Chess960 event, two games tagged with the standard start
-  FEN, one adjourned-game fragment). `filter.ConsistentFENTags` is now
-  exported and `convert` calls it before replaying; following the C tool
-  it also drops a game with `SetUp "1"` and no FEN tag, or an unparsable
-  FEN, which pgn-extract emits nowhere (pgnx logs it and exits 2; the C
-  tool logs "Missing FEN Tag to accompany SetUp Tag" and exits 0).
-  `TestConvertAddsSetUpToFENGame`/`TestConvertDropsSetUpWithoutFEN`.
+  FEN, one adjourned-game fragment). The rule now lives in
+  `pipeline.Normalise`, which `convert`, `filter` and `validate` all run
+  on every game before replaying it (ADR 0002; at first it was a
+  `filter.ConsistentFENTags` call that only `convert` made). Following
+  the C tool's main output it also rejects a game with `SetUp "1"` and no
+  FEN tag, or an unparsable FEN: pgnx logs it and exits 2, emitting it
+  nowhere; the C tool logs "Missing FEN Tag to accompany SetUp Tag",
+  exits 0, and would still write the game to a `-n` file (see the
+  Filtering section). `TestConvertAddsSetUpToFENGame`/
+  `TestConvertDropsSetUpWithoutFEN`/`TestFilterRejectsSetUpWithoutFEN`.
   The separate gap that `consistent_FEN_tags` also adds
   `[Variant "chess 960"]` to an untagged Chess960 start is unchanged.
 - **Fixed — a pawn move to the last rank with no promotion piece.**
