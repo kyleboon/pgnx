@@ -49,10 +49,13 @@ held to parity; see below.
   `-A`/argsfile support are deferred to a later phase (see MIGRATION.md).
 - **`--keep-broken` always emits in Source format.** pgn-extract's
   `--keepbroken` re-emits a broken game in whatever `-W` format was
-  requested. pgnx's `convert --keep-broken` always emits broken games in
-  Source format (SAN exactly as parsed) regardless of `-f`, since the
-  replay detail (`replay.Result`) required by non-Source formats is
-  unavailable for a game that failed replay.
+  requested. pgnx's `convert --keep-broken` (and `filter --keep-broken`)
+  always emits broken games in Source format (SAN exactly as parsed)
+  regardless of `-f`: the moves after the failure have no replay detail
+  (`replay.Result`), which every other format needs. The rule lives in
+  the writer: `output.Writer.WriteGame` given no replay renders Source
+  with its other options (line width, roster, stripping) unchanged, and
+  the CLI writes a broken game without its partial replay.
 - **`validate`/`convert` I/O error lines go to stderr/`--log`, not
   stdout.** Unreadable input files are reported on the log writer
   (stderr by default, or `--log FILE`); they are not folded into
