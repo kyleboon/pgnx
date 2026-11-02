@@ -6,10 +6,7 @@ import (
 	"os"
 
 	"github.com/kyleboon/pgnx/filter"
-	"github.com/kyleboon/pgnx/output"
-	"github.com/kyleboon/pgnx/pgn"
 	"github.com/kyleboon/pgnx/pipeline"
-	"github.com/kyleboon/pgnx/replay"
 	"github.com/spf13/cobra"
 )
 
@@ -382,109 +379,43 @@ func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions,
 }
 
 func runFilter(cmd *cobra.Command, args []string) error {
-	opts, err := outputOptions(cmd)
-	if err != nil {
-		return err
-	}
 	fopts, selOpts, err := filterOptions(cmd)
 	if err != nil {
 		return err
 	}
-	ecoSet, err := ecoOptions(cmd)
+	r, err := newRun(cmd, fopts, criteriaTagNames(cmd))
 	if err != nil {
 		return err
 	}
+	defer r.close()
+
 	flags := cmd.Flags()
-	keepBroken, _ := flags.GetBool("keep-broken")
-	quiet, _ := flags.GetBool("quiet")
 	suppressMatched, _ := flags.GetBool("suppress-matched")
-	unmatchedPath, _ := flags.GetString("unmatched")
-
-	logW, logCloser, err := logWriter(cmd)
-	if err != nil {
-		return err
-	}
-	if logCloser != nil {
-		defer logCloser.Close()
-	}
-	if !quiet {
-		ecoPath, _ := flags.GetString("eco-file")
-		ecoSet.logSkipped(logW, ecoPath)
-	}
-
-	// One registry shared by every writer, fed criteria tag names and
-	// every parsed game, so unrecognised tags come out in the C oracle's
-	// run-wide first-seen order (its lexer registers names from -t files
-	// and from unmatched games too).
-	opts.Tags = output.NewTagRegistry()
-	for _, name := range criteriaTagNames(cmd) {
-		opts.Tags.ObserveName(name)
-	}
-	if opts.SevenTagRoster && ecoSet.classifying() {
-		opts.RosterExtras = ecoRosterExtras
-	}
-	matched, err := openDestination(cmd, "output", opts, ecoSet.split)
-	if err != nil {
-		return err
-	}
-	defer matched.Close()
-	var unmatched gameWriters
-	if unmatchedPath != "" {
-		// Unmatched games are never divided by ECO (grammar.c
-		// select_output_file routes only matched games through -E).
-		unmatched, err = openDestination(cmd, "unmatched", opts, 0)
-		if err != nil {
+	if unmatchedPath, _ := flags.GetString("unmatched"); unmatchedPath != "" {
+		if err := r.openUnmatched("unmatched"); err != nil {
 			return err
 		}
-		defer unmatched.Close()
 	}
 
+	// The Selector routes each processed game: matched games to the
+	// output unless --suppress-matched, the rest to --unmatched, and its
+	// stop-after decision ends the run.
 	sel := filter.NewSelector(selOpts)
-	total, succeeded, ioErr := forEachGame(cmd, args, logW, logW, func(src string, n int, g *pgn.Game) error {
-		opts.Tags.Observe(g)
-		// A game Normalise rejects is emitted nowhere, not even to
-		// --unmatched, even with --keep-broken (ADR 0002; CONFORMANCE.md
-		// records that pgn-extract -n would emit it).
-		if err := pipeline.Normalise(g); err != nil {
-			return err
-		}
-		r, replayErr, problem := replayGame(g, keepBroken)
-		if replayErr != nil && !keepBroken {
-			return replayErr
-		}
-		ecoSet.classify(g, r)
-		isMatch, err := filter.Evaluate(g, r, fopts)
-		if err != nil {
-			return err
-		}
-		d := sel.Decide(n, isMatch)
+	r.route = func(n int, o pipeline.Outcome) (destination, bool) {
+		d := sel.Decide(n, o.Matched)
 		switch {
 		case d.Emit && !suppressMatched:
-			err = writeGameTo(matched, g, r, replayErr != nil)
-		case d.ToUnmatched && unmatched != nil:
-			err = writeGameTo(unmatched, g, r, replayErr != nil)
+			return toOutput, d.Stop
+		case d.ToUnmatched:
+			return toUnmatched, d.Stop
 		}
-		if err != nil {
-			return err
-		}
-		if replayErr == nil {
-			replayErr = problem
-		}
-		if d.Stop {
-			return stopAfter(replayErr)
-		}
-		return replayErr
-	})
-
-	if !quiet && !suppressMatched {
-		count := sel.Matched()
-		fmt.Fprintf(logW, "%d game%s matched out of %d.\n", count, plural(count), total)
+		return nowhere, d.Stop
 	}
-
-	if ioErr != nil || succeeded < total {
-		return errProblems
-	}
-	return nil
+	// The summary counts the Selector's matches, and --suppress-matched
+	// suppresses it along with the matched games.
+	r.matched = sel.Matched
+	r.quiet = r.quiet || suppressMatched
+	return r.exec(args)
 }
 
 // addCriterion sends a parsed -t line to the matcher it belongs to: FEN,
@@ -524,20 +455,4 @@ func criteriaTagNames(cmd *cobra.Command) []string {
 		}
 	}
 	return names
-}
-
-// replayGame is filter's copy of the pipeline's replay stage until
-// pgnx-deepen.5 routes filter through pipeline.Process: a game whose
-// movetext has no terminating result token and does not replay has its
-// moves dropped (pgn-extract never replays such a game; see
-// CONFORMANCE.md), unless keepBroken, which wants the moves back.
-func replayGame(g *pgn.Game, keepBroken bool) (r *replay.Result, replayErr, problem error) {
-	r, replayErr = replay.Game(g, replay.Options{})
-	if replayErr != nil && !keepBroken && g.Result == "" && len(g.Moves) > 0 {
-		g.Moves = nil
-		r, _ = replay.Game(g, replay.Options{})
-		problem = fmt.Errorf("no result token and the moves do not replay (%v); moves dropped", replayErr)
-		replayErr = nil
-	}
-	return r, replayErr, problem
 }
