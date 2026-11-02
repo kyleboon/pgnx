@@ -35,21 +35,15 @@ func matchStalemate(r *replay.Result) bool {
 	if n := len(r.Moves); n > 0 && r.Moves[n-1].IsCheck {
 		return false
 	}
-	b, err := r.FinalBoard()
-	if err != nil {
-		return false
-	}
-	return b.IsStalemate()
+	b := r.FinalBoard()
+	return b != nil && b.IsStalemate()
 }
 
 // matchInsufficient reports whether the final position has insufficient
 // mating material by pgn-extract's definition.
 func matchInsufficient(r *replay.Result) bool {
-	b, err := r.FinalBoard()
-	if err != nil {
-		return false
-	}
-	return b.InsufficientMaterial()
+	b := r.FinalBoard()
+	return b != nil && b.InsufficientMaterial()
 }
 
 // matchNMoveRule reports whether the N-move rule (N = 50 or 75) was
@@ -85,7 +79,7 @@ func firstPly(r *replay.Result) int {
 	if len(r.Positions) == 0 {
 		return 1
 	}
-	return plyNumber(r.Positions[0])
+	return r.Positions[0].PlyNumber()
 }
 
 // matchRepetition reports whether some position occurs at least n times

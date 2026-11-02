@@ -317,11 +317,8 @@ func matchMaterial(g *pgn.Game, r *replay.Result, patterns []*MaterialPattern, m
 	if len(patterns) == 0 {
 		return true
 	}
-	if len(r.Positions) == 0 {
-		return false
-	}
-	board, err := chess.FromFEN(r.Positions[0].FEN)
-	if err != nil {
+	board := r.StartBoard()
+	if board == nil {
 		return false
 	}
 	n := countPieces(board)
@@ -377,11 +374,8 @@ func matchMaterial(g *pgn.Game, r *replay.Result, patterns []*MaterialPattern, m
 // position (the start, or after a capture) with exactly target pieces,
 // kings included. A match is marked like a material match.
 func matchPieceCount(g *pgn.Game, r *replay.Result, target int, mark string) bool {
-	if len(r.Positions) == 0 {
-		return false
-	}
-	board, err := chess.FromFEN(r.Positions[0].FEN)
-	if err != nil {
+	board := r.StartBoard()
+	if board == nil {
 		return false
 	}
 	count := 0

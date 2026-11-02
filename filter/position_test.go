@@ -483,16 +483,3 @@ func TestMatchPositionsNilAndPartial(t *testing.T) {
 		t.Error("sanity: after Nf3 Black is to move")
 	}
 }
-
-func TestPlyNumber(t *testing.T) {
-	_, r := replayed(t, "1. e4 e5 2. Nf3 *\n")
-	for i, want := range []int{1, 2, 3, 4} {
-		if got := plyNumber(r.Positions[i]); got != want {
-			t.Errorf("plyNumber(pos %d) = %d, want %d", i, got, want)
-		}
-	}
-	_, r = replayed(t, "[FEN \"4k3/8/8/8/8/8/8/4K2R b K - 0 60\"]\n\n60... Kd8 61. Ke2 *\n")
-	if got := plyNumber(r.Positions[0]); got != 120 {
-		t.Errorf("black-to-move start ply %d, want 120", got)
-	}
-}

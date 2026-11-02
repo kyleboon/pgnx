@@ -502,3 +502,19 @@ warnings (663 s wall, 8 workers).
   null moves on the main line, illegal castling and impossible piece
   moves, plus the stray-token games whose skipped word shifts the move
   colours.
+
+## Replay exposes typed facts (2026-11-02, beads `pgnx-deepen.2`)
+
+`replay.Position` now carries the ply number (`PlyNumber`, pgn-extract's
+`play_moves` count: the one-based number of the move about to be played)
+and `replay.MoveInfo` records en passant; output, filter and eco read
+those instead of re-parsing the FEN string. One parity fix fell out:
+
+- **Fixed — a FEN tag with a fullmove field of 0.** apply.c
+  `new_fen_board` clamps a move number below 1 to 1, so the oracle
+  numbers such a game from `1.` and its `-Wfen` output prints `... 6 1`
+  for the start position. pgnx numbered the movetext from 1 already
+  (output clamped on its own) but emitted the FEN with `0` and counted
+  plies from -1. The clamp now lives where the C tool has it, on the
+  replay's starting board, so every consumer agrees.
+  `TestFullmoveClampedInFEN`, `TestFullmoveZeroFEN`.
