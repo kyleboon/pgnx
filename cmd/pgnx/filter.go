@@ -8,6 +8,7 @@ import (
 	"github.com/kyleboon/pgnx/filter"
 	"github.com/kyleboon/pgnx/output"
 	"github.com/kyleboon/pgnx/pgn"
+	"github.com/kyleboon/pgnx/pipeline"
 	"github.com/spf13/cobra"
 )
 
@@ -440,6 +441,12 @@ func runFilter(cmd *cobra.Command, args []string) error {
 	sel := filter.NewSelector(selOpts)
 	total, succeeded, ioErr := forEachGame(cmd, args, logW, logW, func(src string, n int, g *pgn.Game) error {
 		opts.Tags.Observe(g)
+		// A game Normalise rejects is emitted nowhere, not even to
+		// --unmatched, even with --keep-broken (ADR 0002; CONFORMANCE.md
+		// records that pgn-extract -n would emit it).
+		if err := pipeline.Normalise(g); err != nil {
+			return err
+		}
 		r, replayErr, problem := replayGame(g, keepBroken)
 		if replayErr != nil && !keepBroken {
 			return replayErr

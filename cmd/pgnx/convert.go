@@ -9,6 +9,7 @@ import (
 	"github.com/kyleboon/pgnx/filter"
 	"github.com/kyleboon/pgnx/output"
 	"github.com/kyleboon/pgnx/pgn"
+	"github.com/kyleboon/pgnx/pipeline"
 	"github.com/spf13/cobra"
 )
 
@@ -165,9 +166,9 @@ func runConvert(cmd *cobra.Command, args []string) error {
 
 	total, succeeded, ioErr := forEachGame(cmd, args, logW, logW, func(src string, n int, g *pgn.Game) error {
 		opts.Tags.Observe(g)
-		// grammar.c consistent_FEN_tags: add a missing SetUp "1" to a FEN
-		// game; drop a game whose SetUp/FEN tags are inconsistent.
-		if err := filter.ConsistentFENTags(g); err != nil {
+		// A game Normalise rejects is emitted nowhere, even with
+		// --keep-broken (ADR 0002).
+		if err := pipeline.Normalise(g); err != nil {
 			return err
 		}
 		r, replayErr, problem := replayGame(g, keepBroken)
@@ -175,6 +176,12 @@ func runConvert(cmd *cobra.Command, args []string) error {
 			return replayErr
 		}
 		ecoSet.classify(g, r)
+		// convert is filter with no criteria: the criteria stage still
+		// runs so the replay-time tag rewrites (apply.c play_moves: an
+		// invalid Result tag becomes "*") happen as they do in the C tool.
+		if _, err := filter.Evaluate(g, r, nil); err != nil {
+			return err
+		}
 		if err := writeGameTo(dest, g, r, replayErr); err != nil {
 			return err
 		}

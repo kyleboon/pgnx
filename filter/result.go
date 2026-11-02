@@ -2,7 +2,6 @@ package filter
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/kyleboon/pgnx/chess"
@@ -15,21 +14,6 @@ import (
 // The CLI treats such a game like a broken one: logged, emitted nowhere,
 // exit status 2.
 var ErrBadResult = errors.New("filter: result tag disagrees with the game's result")
-
-// normaliseResult is pgn-extract's check_result (grammar.c), which its
-// parser applies to every game before any matching: a Result tag of
-// "1/2" becomes "1/2-1/2", and when the movetext ends with a result
-// token, an absent, empty or "?" Result tag is filled from it.
-func normaliseResult(g *pgn.Game) {
-	tag, ok := g.Tag("Result")
-	if ok && tag == "1/2" {
-		tag = "1/2-1/2"
-		g.SetTag("Result", tag)
-	}
-	if g.Result != "" && (!ok || tag == "" || tag == "?") {
-		g.SetTag("Result", g.Result)
-	}
-}
 
 // validResult is apply.c valid_result.
 func validResult(s string) bool {
@@ -46,40 +30,6 @@ func ensureValidResultTag(g *pgn.Game) {
 	if tag, ok := g.Tag("Result"); ok && !validResult(tag) {
 		g.SetTag("Result", "*")
 	}
-}
-
-// ConsistentFENTags is grammar.c consistent_FEN_tags, which pgn-extract
-// runs on every parsed game before replaying it, whether or not any
-// criteria are in force. A game with a valid FEN tag but no SetUp tag
-// silently gains SetUp "1" ("such a common problem that it makes more
-// sense just to silently correct it"); SetUp "1" without a FEN tag, or an
-// unparsable FEN, is inconsistent and returns a non-nil error, and
-// pgn-extract emits such a game nowhere. Evaluate calls it; so does the
-// convert command, since the C tool applies it regardless of filtering.
-func ConsistentFENTags(g *pgn.Game) error {
-	setup, hasSetup := g.Tag("SetUp")
-	fen, hasFEN := g.Tag("FEN")
-	if hasSetup && setup == "1" && !hasFEN {
-		return errSetUpWithoutFEN
-	}
-	if hasFEN {
-		if _, err := chess.FromFEN(fen); err != nil {
-			return fmt.Errorf("invalid FEN tag %q: %w", fen, err)
-		}
-		if !hasSetup {
-			g.SetTag("SetUp", "1")
-		}
-	}
-	return nil
-}
-
-var errSetUpWithoutFEN = errors.New(`SetUp "1" tag without a FEN tag`)
-
-// consistentFENTags reports whether ConsistentFENTags accepts g (adding
-// the SetUp tag as a side effect); Evaluate treats a false result as a
-// non-match.
-func consistentFENTags(g *pgn.Game) bool {
-	return ConsistentFENTags(g) == nil
 }
 
 // checkResult is the end-of-game result consistency check in apply.c
