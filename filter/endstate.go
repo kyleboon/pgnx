@@ -79,7 +79,7 @@ func firstPly(r *replay.Result) int {
 	if len(r.Positions) == 0 {
 		return 1
 	}
-	return plyNumber(r.Positions[0])
+	return r.Positions[0].PlyNumber()
 }
 
 // matchRepetition reports whether some position occurs at least n times
