@@ -566,8 +566,9 @@ those instead of re-parsing the FEN string. One parity fix fell out:
 
 `pipeline.New(Config).Process(g)` now runs pgn-extract's `deal_with_game`
 sequence (normalise, replay, broken-ness against `--keep-broken`, ECO
-classification, criteria) for `convert` and `validate`; `filter` follows
-with `pgnx-deepen.5`. No output changed. Two notes for triage:
+classification, criteria) for `convert` and `validate`; `pgnx-deepen.5`
+routed `filter` through it as well (see below). No output changed. Two
+notes for triage:
 
 - `validate` reports exactly what `convert` would fail on: a game
   Normalise rejects, a replay failure, or a game with no result token
@@ -578,3 +579,18 @@ with `pgnx-deepen.5`. No output changed. Two notes for triage:
   so the `apply.c` Result rewrite (an invalid tag becomes `*`) is applied
   before anything is written, exactly as for `filter`; `validate` writes
   nothing, so it is unobservable there.
+
+## One run struct per command (2026-11-02, beads `pgnx-deepen.5`)
+
+`convert`, `filter` and `validate` now share one per-game sequence in
+`cmd/pgnx/run.go` (observe tags, `pipeline.Process`, route, write) and
+one setup helper; `filter`'s private copies of the replay and ECO stages
+are gone, and its callback only routes the outcome through
+`filter.Selector`, `--suppress-matched` and `--unmatched`. No output
+changed: `TestFilterNoCriteriaEqualsConvertOverGoldenInputs` pins
+byte-identical output, diagnostics and exit codes for `convert` and
+`filter` with no criteria (with and without `--keep-broken`) over every
+golden input, the golden suite is unchanged, and a filter-mode
+differential (`PGNX_CMD=filter scripts/difftest.sh`, no criteria,
+`-TpCarlsen` and `--checkmate`) over 21 TWIC issues showed no
+divergence.

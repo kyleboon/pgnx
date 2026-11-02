@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/kyleboon/pgnx/output"
 	"github.com/kyleboon/pgnx/pgn"
 	"github.com/kyleboon/pgnx/pipeline"
 	"github.com/spf13/cobra"
@@ -54,11 +55,17 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	}
 
 	// "Valid" means convert would emit the game with no failure: the same
-	// pipeline, with no ECO table, no criteria and broken games not kept,
-	// so a Rejected game or a warning is a finding.
-	pipe := pipeline.New(pipeline.Config{})
+	// per-game sequence, with no ECO table, no criteria and broken games
+	// not kept, routed nowhere, so a Rejected game or a warning is a
+	// finding. The tag registry is observed and never read: validate
+	// writes no games.
+	r := &run{
+		tags:  output.NewTagRegistry(),
+		pipe:  pipeline.New(pipeline.Config{}),
+		route: routeNowhere,
+	}
 	total, succeeded, ioErr := forEachGame(cmd, args, findings, logW, func(src string, n int, g *pgn.Game) error {
-		return problems(pipe.Process(g))
+		return r.game(n, g)
 	})
 
 	if summary {

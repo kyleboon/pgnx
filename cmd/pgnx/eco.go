@@ -78,19 +78,6 @@ func (s ecoSettings) logSkipped(w io.Writer, path string) {
 	}
 }
 
-// classify replaces g's ECO tags from the table when a line matches.
-// r may be partial (a broken game kept with --keep-broken); a nil r is
-// never matched. filter's until pgnx-deepen.5 routes it through the
-// pipeline, which classifies itself.
-func (s ecoSettings) classify(g *pgn.Game, r *replay.Result) {
-	if s.table == nil || r == nil {
-		return
-	}
-	if e, ok := s.table.Classify(r); ok {
-		eco.Apply(g, e)
-	}
-}
-
 // gameWriters picks the pair of writers (the format writer and its Source
 // fallback for broken games) a game is written with.
 type gameWriters interface {
