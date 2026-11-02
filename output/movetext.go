@@ -9,22 +9,6 @@ import (
 	"github.com/kyleboon/pgnx/replay"
 )
 
-// fullmoveNumberFromFEN returns the fullmove field (the 6th, 1-based) of
-// fen, or 1 if fen is empty, malformed, or lacks that field (matching
-// chess.FromFEN's own default for a 4-field position and output.c's
-// initial move_number default when there is no FEN tag at all).
-func fullmoveNumberFromFEN(fen string) int {
-	fields := strings.Fields(fen)
-	if len(fields) < 6 {
-		return 1
-	}
-	n, err := strconv.Atoi(fields[5])
-	if err != nil || n < 1 {
-		return 1
-	}
-	return n
-}
-
 // isUCI reports whether f is the UCI format, which the C oracle renders by
 // forcibly disabling move numbers, comments, NAGs, variations, and check
 // suffixes (argsfile.c: selecting -Wuci sets keep_NAGs/keep_comments/
@@ -38,34 +22,24 @@ func isUCI(f Format) bool { return f == UCI }
 // variations) followed by the result token (unless opts.NoResults) to lw.
 func emitMovetext(lw *lineWriter, g *pgn.Game, r *replay.Result, opts Options) {
 	var moveInfos []replay.MoveInfo
-	var positions []replay.Position
 	if r != nil {
 		moveInfos = r.Moves
-		positions = r.Positions
 	}
-	// When no move in the game carries an explicit move number (the usual
-	// case), numbering falls back to counting plies from move 1 — except
-	// the C oracle actually seeds that count from the starting position's
-	// fullmove number (output.c's print_game: "move_number =
-	// initial_board->move_number", set from the FEN tag's 6th field when
-	// one is present). Without this, a game starting from a FEN with a
-	// nonzero fullmove count (e.g. an endgame study "[FEN \"... w - - 6
-	// 55\"]") would wrongly renumber its first move as "1." instead of
-	// "55.".
-	baseMoveNumber := 1
-	if len(positions) > 0 {
-		baseMoveNumber = fullmoveNumberFromFEN(positions[0].FEN)
+	// Source move numbers are ignored: the C oracle numbers every move
+	// from its own counter, seeded from the starting position's fullmove
+	// number and side to move (output.c print_game: "move_number =
+	// initial_board->move_number"; format_game: white_to_move =
+	// initial_board->to_move == WHITE). So a game starting from a FEN
+	// with a nonzero fullmove count (an endgame study "[FEN \"... w - - 6
+	// 55\"]") numbers its first move "55.", and a black-to-move start is
+	// numbered "N..." with the next move N+1. Without a replay (Source
+	// format) the standard start is assumed.
+	baseMoveNumber, startWhite := 1, true
+	if r != nil && len(r.Positions) > 0 {
+		baseMoveNumber = r.Positions[0].FullmoveNumber
+		startWhite = r.Positions[0].SideToMove == chess.White
 	}
-	// The side to move comes from the starting position's FEN (output.c's
-	// format_game: white_to_move = initial_board->to_move == WHITE); a
-	// black-to-move start is numbered "N..." and the next move is N+1.
-	startWhite := true
-	if len(positions) > 0 {
-		if f := strings.Fields(positions[0].FEN); len(f) >= 2 && f[1] == "b" {
-			startWhite = false
-		}
-	}
-	emitLine(lw, g.Moves, moveInfos, positions, startWhite, true, baseMoveNumber, opts)
+	emitLine(lw, g.Moves, moveInfos, startWhite, true, baseMoveNumber, opts)
 
 	if !opts.NoResults {
 		result := g.Result
@@ -88,11 +62,7 @@ func emitMovetext(lw *lineWriter, g *pgn.Game, r *replay.Result, opts Options) {
 // emitLine writes one line of movetext (a main line or the body of a
 // variation): moves is the pgn.Move sequence, infos is the parallel
 // replay.MoveInfo sequence (nil/empty when replay data is unavailable,
-// which is only valid for Format == Source). positions holds the position
-// before each move in moves (positions[i] is the position moves[i] is
-// played from), used only to detect en passant captures for the ELAlg/XLAlg
-// "ep" suffix; it may be shorter than moves or nil when unavailable.
-// startWhite indicates whether moves[0] (if any) is white's move — true for
+// which is only valid for Format == Source). startWhite indicates whether moves[0] (if any) is white's move — true for
 // the main line, and for a variation it matches the color of the move the
 // variation is attached to (a RAV is an alternative to a single ply, so it
 // begins on that same side to move). blackNeedsNumber tracks whether the
@@ -102,7 +72,7 @@ func emitMovetext(lw *lineWriter, g *pgn.Game, r *replay.Result, opts Options) {
 // that ply 0 of moves belongs to when no move carries an explicit number
 // (normally 1, or the starting position's FEN fullmove field for a game
 // that begins mid-sequence); see emitMovetext.
-func emitLine(lw *lineWriter, moves []*pgn.Move, infos []replay.MoveInfo, positions []replay.Position, startWhite, blackNeedsNumber bool, baseMoveNumber int, opts Options) {
+func emitLine(lw *lineWriter, moves []*pgn.Move, infos []replay.MoveInfo, startWhite, blackNeedsNumber bool, baseMoveNumber int, opts Options) {
 	uci := isUCI(opts.Format)
 	noMoveNumbers := opts.NoMoveNumbers || uci
 	noNAGs := opts.NoNAGs || uci
@@ -113,10 +83,6 @@ func emitLine(lw *lineWriter, moves []*pgn.Move, infos []replay.MoveInfo, positi
 		var info *replay.MoveInfo
 		if i < len(infos) {
 			info = &infos[i]
-		}
-		var before *replay.Position
-		if i < len(positions) {
-			before = &positions[i]
 		}
 
 		isWhite := isWhiteMove(startWhite, i)
@@ -129,7 +95,7 @@ func emitLine(lw *lineWriter, moves []*pgn.Move, infos []replay.MoveInfo, positi
 			}
 		}
 
-		lw.WriteToken(renderMove(mv, info, before, opts))
+		lw.WriteToken(renderMove(mv, info, opts))
 		blackNeedsNumber = false
 
 		if !noNAGs {
@@ -153,12 +119,10 @@ func emitLine(lw *lineWriter, moves []*pgn.Move, infos []replay.MoveInfo, positi
 			vBaseMoveNumber := moveNumberOf(moves, i, startWhite, baseMoveNumber)
 			for vi, v := range mv.Variations {
 				var vInfos []replay.MoveInfo
-				var vPositions []replay.Position
 				if info != nil && vi < len(info.Variations) && info.Variations[vi] != nil {
 					vInfos = info.Variations[vi].Moves
-					vPositions = info.Variations[vi].Positions
 				}
-				emitVariation(lw, v, vInfos, vPositions, isWhite, vBaseMoveNumber, opts)
+				emitVariation(lw, v, vInfos, isWhite, vBaseMoveNumber, opts)
 			}
 			blackNeedsNumber = true
 		}
@@ -170,7 +134,7 @@ func emitLine(lw *lineWriter, moves []*pgn.Move, infos []replay.MoveInfo, positi
 // there are no prefix comments; when the variation opens with a comment,
 // the C oracle inserts a space between "(" and the comment. The closing
 // paren is always glued to the immediately preceding token.
-func emitVariation(lw *lineWriter, v *pgn.Variation, infos []replay.MoveInfo, positions []replay.Position, startWhite bool, baseMoveNumber int, opts Options) {
+func emitVariation(lw *lineWriter, v *pgn.Variation, infos []replay.MoveInfo, startWhite bool, baseMoveNumber int, opts Options) {
 	lw.WriteToken("(")
 	if !opts.NoComments && len(v.PrefixComments) > 0 {
 		for _, c := range v.PrefixComments {
@@ -182,7 +146,7 @@ func emitVariation(lw *lineWriter, v *pgn.Variation, infos []replay.MoveInfo, po
 	// A variation always starts with an explicit move number: white moves
 	// get "N.", and black moves (the variation's first move being black's)
 	// get "N...".
-	emitLine(lw, v.Moves, infos, positions, startWhite, true, baseMoveNumber, opts)
+	emitLine(lw, v.Moves, infos, startWhite, true, baseMoveNumber, opts)
 	lw.SuppressSpace()
 	lw.WriteToken(")")
 }
@@ -202,11 +166,10 @@ func emitComment(lw *lineWriter, c string) {
 
 // renderMove returns the token to emit for mv in the format selected by
 // opts.Format. info carries the replayed detail (piece, capture, check)
-// needed by every format except Source; before is the position mv is
-// played from (used only to detect en passant captures for the ELAlg/XLAlg
-// "ep" suffix). For SAN it's replay's normalized SAN; for Source (or any
-// format when info is nil) it's the SAN exactly as written in the source.
-func renderMove(mv *pgn.Move, info *replay.MoveInfo, before *replay.Position, opts Options) string {
+// needed by every format except Source. For SAN it's replay's normalized
+// SAN; for Source (or any format when info is nil) it's the SAN exactly as
+// written in the source.
+func renderMove(mv *pgn.Move, info *replay.MoveInfo, opts Options) string {
 	switch opts.Format {
 	case SAN:
 		if info != nil {
@@ -219,7 +182,7 @@ func renderMove(mv *pgn.Move, info *replay.MoveInfo, before *replay.Position, op
 		if info == nil {
 			return mv.SAN
 		}
-		return renderAlgebraic(*info, before, opts.Format)
+		return renderAlgebraic(*info, opts.Format)
 	default:
 		return mv.SAN
 	}
@@ -258,7 +221,7 @@ var pieceLetters = map[chess.PieceType]string{
 // no piece-letter prefix (castling is not class PIECE_MOVE in the C
 // source) and, for HAlg/XLAlg, a "-" separator (castling is never a
 // capture).
-func renderAlgebraic(mi replay.MoveInfo, before *replay.Position, f Format) string {
+func renderAlgebraic(mi replay.MoveInfo, f Format) string {
 	m := mi.Move
 	var b strings.Builder
 
@@ -288,7 +251,7 @@ func renderAlgebraic(mi replay.MoveInfo, before *replay.Position, f Format) stri
 
 	if m.Promotion != chess.NoPiece {
 		b.WriteString(pieceLetters[m.Promotion])
-	} else if (f == ELAlg || f == XLAlg) && isEnPassant(mi, before) {
+	} else if (f == ELAlg || f == XLAlg) && mi.EnPassant {
 		b.WriteString("ep")
 	}
 
@@ -301,23 +264,6 @@ func renderAlgebraic(mi replay.MoveInfo, before *replay.Position, f Format) stri
 	}
 
 	return b.String()
-}
-
-// isEnPassant reports whether mi is an en passant capture: a pawn move that
-// captures a pawn not standing on the destination square. before (the
-// position mi.Move is played from) is consulted because MoveInfo alone
-// can't distinguish this from an ordinary pawn-takes-pawn capture — the
-// signal is that before's en passant target square (its FEN's 4th field)
-// equals the move's destination.
-func isEnPassant(mi replay.MoveInfo, before *replay.Position) bool {
-	if mi.Piece.Type != chess.Pawn || mi.Captured != chess.Pawn || before == nil {
-		return false
-	}
-	fields := strings.Fields(before.FEN)
-	if len(fields) < 4 {
-		return false
-	}
-	return fields[3] == mi.Move.To.String()
 }
 
 // isWhiteMove reports whether moves[i] within a line that begins with

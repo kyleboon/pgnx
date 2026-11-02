@@ -31,3 +31,35 @@ func TestBlackToMoveFEN(t *testing.T) {
 		}
 	}
 }
+
+// TestFullmoveZeroFEN pins numbering and FEN output for a FEN tag whose
+// fullmove field is 0, which the C oracle clamps to 1 (apply.c
+// new_fen_board):
+//
+//	printf '[FEN "7k/3P4/7K/8/8/8/8/8 w - - 6 0"]\n[SetUp "1"]\n[Result "*"]\n\nd8=Q *\n' | pgn-extract --quiet
+//	  -> 1. d8=Q# *
+//	... | pgn-extract --quiet -Wfen
+//	  -> 7k/3P4/7K/8/8/8/8/8 w - - 6 1
+//	     3Q3k/8/7K/8/8/8/8/8 b - - 0 1
+//	printf '[FEN "7k/3P4/7K/8/8/8/8/8 b - - 6 0"]\n[SetUp "1"]\n[Result "*"]\n\nKg8 *\n' | pgn-extract --quiet
+//	  -> 1... Kg8 *
+func TestFullmoveZeroFEN(t *testing.T) {
+	for _, tc := range []struct {
+		src  string
+		f    Format
+		want string
+	}{
+		{"[FEN \"7k/3P4/7K/8/8/8/8/8 w - - 6 0\"]\n[SetUp \"1\"]\n[Result \"*\"]\n\nd8=Q *\n", SAN, "1. d8=Q# *\n"},
+		{"[FEN \"7k/3P4/7K/8/8/8/8/8 w - - 6 0\"]\n[SetUp \"1\"]\n[Result \"*\"]\n\nd8=Q *\n", FEN, "7k/3P4/7K/8/8/8/8/8 w - - 6 1\n3Q3k/8/7K/8/8/8/8/8 b - - 0 1\n"},
+		{"[FEN \"7k/3P4/7K/8/8/8/8/8 b - - 6 0\"]\n[SetUp \"1\"]\n[Result \"*\"]\n\nKg8 *\n", SAN, "1... Kg8 *\n"},
+	} {
+		g, r := gameAndReplay(t, tc.src)
+		var buf bytes.Buffer
+		if err := NewWriter(&buf, Options{Format: tc.f}).WriteGame(g, r); err != nil {
+			t.Fatal(err)
+		}
+		if got := buf.String(); !strings.Contains(got, "\n\n"+tc.want) {
+			t.Errorf("format %v: got\n%s\nwant movetext %q", tc.f, got, tc.want)
+		}
+	}
+}
