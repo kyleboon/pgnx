@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -169,6 +170,38 @@ func TestStatusString(t *testing.T) {
 // Process touches only its game and read-only configuration, so one
 // Pipeline may process different games concurrently (ADR 0002; the
 // future --jobs). Run under -race.
+// ReplayToEmit hands the writer a replay only for an OK game: a Broken
+// game is rendered in Source format from its moves as written, and a
+// Rejected game is rendered nowhere. Faults is the reporting order:
+// Reason first, then Warnings.
+func TestOutcomeReplayToEmitAndFaults(t *testing.T) {
+	ok := New(Config{}).Process(parse(t, normal))
+	if ok.ReplayToEmit() == nil || len(ok.Faults()) != 0 {
+		t.Errorf("OK game: replay %v faults %v", ok.ReplayToEmit(), ok.Faults())
+	}
+	brk := New(Config{KeepBroken: true}).Process(parse(t, broken))
+	if brk.Status != Broken || brk.Replay == nil || brk.ReplayToEmit() != nil {
+		t.Errorf("Broken game: status %v replay %v emit %v", brk.Status, brk.Replay, brk.ReplayToEmit())
+	}
+	if f := brk.Faults(); len(f) != 1 || f[0] != brk.Reason {
+		t.Errorf("Broken game faults %v, want its reason", f)
+	}
+	rej := New(Config{}).Process(parse(t, setUpNoFEN))
+	if rej.ReplayToEmit() != nil || len(rej.Faults()) != 1 {
+		t.Errorf("Rejected game: emit %v faults %v", rej.ReplayToEmit(), rej.Faults())
+	}
+	warned := New(Config{}).Process(parse(t, noResultBroken))
+	if f := warned.Faults(); warned.Reason != nil || len(f) != 1 || f[0] != warned.Warnings[0] {
+		t.Errorf("warned game faults %v, want its warning", f)
+	}
+	reasonAndWarning := Outcome{Status: Broken, Reason: errReason, Warnings: []error{errWarning}}
+	if f := reasonAndWarning.Faults(); len(f) != 2 || f[0] != errReason || f[1] != errWarning {
+		t.Errorf("faults %v, want reason then warning", f)
+	}
+}
+
+var errReason, errWarning = errors.New("reason"), errors.New("warning")
+
 func TestProcessConcurrent(t *testing.T) {
 	cfg := Config{
 		ECO:        ecoTable(t),

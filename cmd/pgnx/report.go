@@ -6,7 +6,6 @@ import (
 	"iter"
 
 	"github.com/kyleboon/pgnx/pgn"
-	"github.com/kyleboon/pgnx/pipeline"
 )
 
 // gameVerdict is a command's verdict on one game, distinct from the
@@ -87,18 +86,6 @@ func (rep *runReport) each(seq iter.Seq[Item], fn func(n int, g *pgn.Game) gameV
 			return
 		}
 	}
-}
-
-// verdict folds a pipeline outcome into the verdict on a game that was
-// routed (so not Rejected): the reason it is Broken and any warnings
-// are its errors, and stop is the route's decision.
-func verdict(o pipeline.Outcome, stop bool) gameVerdict {
-	v := gameVerdict{Stop: stop}
-	if o.Reason != nil {
-		v.Errors = append(v.Errors, o.Reason)
-	}
-	v.Errors = append(v.Errors, o.Warnings...)
-	return v
 }
 
 // fail records a failure of the run that is not a game's: an input that

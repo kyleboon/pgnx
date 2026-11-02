@@ -205,26 +205,27 @@ func (r *run) finish(err error) error {
 
 // game is the per-game sequence: observe the game's tags (before anything
 // is written, so unrecognised tags order as the oracle's do), run the
-// pipeline, route the outcome, write. The verdict carries the reason a
-// Rejected game is emitted nowhere, else the problems of a game that was
-// emitted (or the failure of writing it), and the route's stop.
+// pipeline, route the outcome, write. The verdict carries the outcome's
+// faults (the reason a Rejected game is emitted nowhere; a Broken game's
+// replay failure and any warnings of a game that was emitted) or the
+// failure of writing it, and the route's stop.
 func (r *run) game(n int, g *pgn.Game) gameVerdict {
 	r.tags.Observe(g)
 	o := r.pipe.Process(g)
 	if o.Status == pipeline.Rejected {
-		return gameVerdict{Errors: []error{o.Reason}}
+		return gameVerdict{Errors: o.Faults()}
 	}
 	target, stop := r.route(n, o)
 	if err := r.write(target, o); err != nil {
 		return gameVerdict{Errors: []error{err}, Stop: stop}
 	}
-	return verdict(o, stop)
+	return gameVerdict{Errors: o.Faults(), Stop: stop}
 }
 
-// write sends o's game to the destination target names. A Broken game
-// is written without its (partial) replay, which the writer renders in
-// Source format: the only format a broken game is emitted in
-// (CONFORMANCE.md, --keep-broken).
+// write sends o's game to the destination target names, with the replay
+// the outcome says to emit: none for a Broken game, which the writer
+// then renders in Source format, the only format a broken game is
+// emitted in (CONFORMANCE.md, --keep-broken).
 func (r *run) write(target routeTarget, o pipeline.Outcome) error {
 	var d destination
 	switch target {
@@ -236,11 +237,7 @@ func (r *run) write(target routeTarget, o pipeline.Outcome) error {
 	if d == nil {
 		return nil
 	}
-	rep := o.Replay
-	if o.Status == pipeline.Broken {
-		rep = nil
-	}
-	return writeGameTo(d, o.Game, rep)
+	return writeGameTo(d, o.Game, o.ReplayToEmit())
 }
 
 // exec reads every game from args (or stdin) through game, closes the

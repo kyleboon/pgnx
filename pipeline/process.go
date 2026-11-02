@@ -104,6 +104,26 @@ type Outcome struct {
 	Matched bool
 }
 
+// ReplayToEmit is the replay the game is rendered with: the complete
+// replay of an OK game; nil for a Broken game, which is emitted in
+// Source format only (the one format that needs no replay), and for a
+// Rejected game, which is emitted nowhere.
+func (o Outcome) ReplayToEmit() *replay.Result {
+	if o.Status != OK {
+		return nil
+	}
+	return o.Replay
+}
+
+// Faults are what the game is reported for, in reporting order: its
+// Reason, if any, then its Warnings. Empty iff the game succeeded.
+func (o Outcome) Faults() []error {
+	if o.Reason == nil {
+		return o.Warnings
+	}
+	return append([]error{o.Reason}, o.Warnings...)
+}
+
 // Process runs the pipeline over g: Normalise; replay; decide broken-ness
 // against KeepBroken; ECO classification; the criteria. It takes
 // ownership of g and mutates it in place (tags, marks, and the dropped
