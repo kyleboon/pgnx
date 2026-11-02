@@ -29,6 +29,9 @@ PGNX_CMD=filter C_FLAGS='-TpFischer' PGNX_FLAGS='--player Fischer' scripts/difft
 # parallel (JOBS, default 8); keeps a .diff per divergent file. The local
 # TWIC corpus (twic/, gitignored, ~3.6M games) takes about 3 minutes:
 scripts/twicdiff.sh [pgn-dir] [out-dir]   # defaults twic/twic/pgn, twic/diff
+# Streaming check (ADR 0003): stream N GB of TWIC (default 2) on stdin through
+# pgnx and the C binary, report wall time, MB/s and peak RSS for both; slow:
+scripts/bigstream.sh [size-gb] [pgn-dir]   # e.g. scripts/bigstream.sh 0.05 for a smoke test
 ```
 
 ## Architecture
