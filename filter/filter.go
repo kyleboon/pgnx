@@ -89,7 +89,7 @@ type Options struct {
 // (Result "1/2" → "1/2-1/2", absent/empty/"?" Result filled from the
 // terminating token, SetUp "1" added to a FEN game, inconsistent
 // SetUp/FEN tags rejected) are pipeline.Normalise's job, run once per
-// game before replay, so tag criteria see what the oracle's see.
+// game before replay, so tag criteria see what the oracle's do.
 //
 //  1. Tag criteria other than ECO, then higher/lower-rated-winner.
 //  2. SetUp-tag filter.
@@ -134,11 +134,12 @@ type Options struct {
 //  14. Commented.
 //
 // Evaluate mutates g only in the ways listed: the Result tag/token,
-// mark comments, and the MaterialMatch and MatchLabel tags. Because marks and those tags are added before later criteria are
-// tested, a game that is marked and then rejected (by bounds, say) keeps
-// its marks and is seen that way by an unmatched-games output, exactly
-// as in C; conversely a game rejected by an earlier step (a failed
-// sequence, say) never receives a mark from a later one.
+// mark comments, and the MaterialMatch and MatchLabel tags. Because
+// marks and those tags are added before later criteria are tested, a
+// game that is marked and then rejected (by bounds, say) keeps its marks
+// and is seen that way by an unmatched-games output, exactly as in C;
+// conversely a game rejected by an earlier step (a failed sequence, say)
+// never receives a mark from a later one.
 func Evaluate(g *pgn.Game, r *replay.Result, o *Options) (bool, error) {
 	if o == nil {
 		o = &Options{}
