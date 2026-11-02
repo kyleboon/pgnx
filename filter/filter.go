@@ -91,6 +91,9 @@ func (o *Options) Validate() error {
 	if o.Checkmate && (o.Stalemate || o.Insufficient) {
 		return errors.New("checkmate cannot be combined with stalemate or insufficient material")
 	}
+	if o.HigherRatedWinner && o.LowerRatedWinner {
+		return errors.New("higher-rated winner and lower-rated winner are mutually exclusive")
+	}
 	return nil
 }
 

@@ -18,3 +18,12 @@ func TestValidateCheckmateExclusiveWithOtherEndStates(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateRatedWinnerExclusive(t *testing.T) {
+	if err := (&Options{HigherRatedWinner: true}).Validate(); err != nil {
+		t.Fatalf("higher alone: %v", err)
+	}
+	if err := (&Options{HigherRatedWinner: true, LowerRatedWinner: true}).Validate(); err == nil {
+		t.Error("both: want error")
+	}
+}
