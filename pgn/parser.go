@@ -56,9 +56,12 @@ func (p *parser) nextToken() (token, error) {
 // a phantom empty game. This matters for real files such as pgn-extract's
 // own eco.pgn, whose leading file-header comment precedes the first game's
 // tags with no tag section, moves, or result of its own.
+//
+// With ParserOptions.SkipTagsOnly a tags-only game is skipped the same
+// way; see the option for the rule.
 func (p *parser) parseGame() (*Game, error) {
 	for {
-		g, err := p.parseOneGame()
+		g, atEOF, err := p.parseOneGame()
 		if err != nil || g == nil {
 			return g, err
 		}
@@ -68,6 +71,10 @@ func (p *parser) parseGame() (*Game, error) {
 			// game; move on.
 			continue
 		}
+		if p.lex.opts.SkipTagsOnly && len(g.Moves) == 0 && g.Result == "" &&
+			(atEOF || (len(g.skipped) == 0 && len(g.PrefixComments) == 0)) {
+			continue
+		}
 		return g, nil
 	}
 }
@@ -75,15 +82,17 @@ func (p *parser) parseGame() (*Game, error) {
 // parseOneGame parses a single game's worth of tokens starting at the
 // current position, without the "was anything actually found" filtering
 // parseGame applies. See parseGame for that logic and its rationale.
-func (p *parser) parseOneGame() (*Game, error) {
-	g := &Game{}
+// atEOF reports that the game ended at end of input rather than at the
+// next game's tag section.
+func (p *parser) parseOneGame() (g *Game, atEOF bool, err error) {
+	g = &Game{}
 
 	tok, err := p.nextToken()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if tok.kind == tokEOF {
-		return nil, nil
+		return nil, true, nil
 	}
 	g.StartLine = tok.line
 
@@ -92,7 +101,7 @@ func (p *parser) parseOneGame() (*Game, error) {
 		tagName := tok.text
 		valTok, err := p.nextToken()
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if valTok.kind != tokString {
 			g.errs = append(g.errs, &ParseError{Line: valTok.line, Msg: "expected tag value string after tag name " + tagName})
@@ -104,7 +113,7 @@ func (p *parser) parseOneGame() (*Game, error) {
 		g.Tags = append(g.Tags, Tag{Name: tagName, Value: valTok.text})
 		tok, err = p.nextToken()
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 
@@ -112,7 +121,7 @@ func (p *parser) parseOneGame() (*Game, error) {
 	p.pushBack(tok)
 	moves, prefixComments, result, terminator, err := p.parseMovetext(g, 0)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	g.Moves = moves
 	g.Result = result
@@ -137,7 +146,7 @@ func (p *parser) parseOneGame() (*Game, error) {
 		p.pushBack(terminator)
 	}
 
-	return g, nil
+	return g, terminator.kind == tokEOF, nil
 }
 
 // parseMovetext parses a sequence of moves (with attached comments, NAGs,
