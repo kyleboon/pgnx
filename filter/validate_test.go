@@ -136,6 +136,20 @@ func TestValidateDelegatesToPositions(t *testing.T) {
 	}
 }
 
+// TestValidateReportsTheFirstFailingCountInFixedOrder pins that the
+// counts are checked in a fixed order, so a user with two bad counts
+// sees the same error every run.
+func TestValidateReportsTheFirstFailingCountInFixedOrder(t *testing.T) {
+	err := (&Options{Repetition: -1, PieceCount: -1, StartPly: -1}).Validate()
+	if err == nil || !strings.HasPrefix(err.Error(), "repetition count") {
+		t.Errorf("Options: %v, want the repetition count first", err)
+	}
+	err = SelectorOptions{StopAfter: -1, FirstGame: -1, GameLimit: -1}.Validate()
+	if err == nil || !strings.HasPrefix(err.Error(), "stop-after count") {
+		t.Errorf("SelectorOptions: %v, want the stop-after count first", err)
+	}
+}
+
 func TestSelectorOptionsValidate(t *testing.T) {
 	if err := (SelectorOptions{StopAfter: 2, FirstGame: 3, GameLimit: 9}).Validate(); err != nil {
 		t.Fatalf("valid: %v", err)

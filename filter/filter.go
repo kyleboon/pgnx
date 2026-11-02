@@ -45,7 +45,7 @@ type Options struct {
 
 	// Final-position predicates.
 	Checkmate, Stalemate, Insufficient bool
-	// NMoveRule is 50 (--fifty) or 75 (--seventyfive); 0 disables.
+	// NMoveRule is 50 (--fifty) or 75 (--seventy-five); 0 disables.
 	NMoveRule int
 	// Repetition is the fold count required (3 for --repetition, 5 for
 	// --repetition5); 0 disables.
@@ -132,10 +132,8 @@ func (o *Options) Validate() error {
 	if !validNMoveRule(o.NMoveRule) {
 		return fmt.Errorf("N-move rule must be 50 or 75, not %d", o.NMoveRule)
 	}
-	for name, n := range map[string]int{"repetition count": o.Repetition, "piece count": o.PieceCount, "start ply": o.StartPly} {
-		if n < 0 {
-			return fmt.Errorf("%s cannot be negative", name)
-		}
+	if err := firstNegative([]namedCount{{"repetition count", o.Repetition}, {"piece count", o.PieceCount}, {"start ply", o.StartPly}}); err != nil {
+		return err
 	}
 	for i, s := range o.Sequences {
 		if s == nil {
@@ -146,8 +144,27 @@ func (o *Options) Validate() error {
 }
 
 // validNMoveRule reports whether n is a value NMoveRule may hold: 0 (no
-// rule), 50 (--fifty) or 75 (--seventyfive).
+// rule), 50 (--fifty) or 75 (--seventy-five).
 func validNMoveRule(n int) bool { return n == 0 || n == 50 || n == 75 }
+
+// namedCount is a count a Validate method checks, with the name its
+// error calls it by.
+type namedCount struct {
+	name string
+	n    int
+}
+
+// firstNegative returns the error for the first negative count in
+// counts, in the order given, so that which rule a Validate reports is
+// deterministic; nil when none is negative.
+func firstNegative(counts []namedCount) error {
+	for _, c := range counts {
+		if c.n < 0 {
+			return fmt.Errorf("%s cannot be negative", c.name)
+		}
+	}
+	return nil
+}
 
 // SetNMoveRule sets NMoveRule to n (50 or 75). Setting it again to the
 // same value is allowed; changing it from one rule to the other is an

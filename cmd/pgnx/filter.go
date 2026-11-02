@@ -144,12 +144,14 @@ func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions,
 			return nil, sel, fmt.Errorf("--tag: %w", err)
 		}
 	}
-	for flag, tag := range map[string]string{
-		"player": "Player", "white": "White", "black": "Black",
-		"date": "Date", "result": "Result", "eco": "ECO",
+	// In this order, so the tag names the criteria mention (which seed
+	// the tag registry) are in the same order from run to run.
+	for _, p := range []struct{ flag, tag string }{
+		{"player", "Player"}, {"white", "White"}, {"black", "Black"},
+		{"date", "Date"}, {"result", "Result"}, {"eco", "ECO"},
 	} {
-		for _, v := range getList(flag) {
-			o.Tags.AddPrefix(tag, v)
+		for _, v := range getList(p.flag) {
+			o.Tags.AddPrefix(p.tag, v)
 		}
 	}
 
@@ -193,10 +195,15 @@ func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions,
 	o.Insufficient = getBool("insufficient")
 	o.Underpromotion = getBool("underpromotion")
 	o.Commented = getBool("commented")
-	for flag, rule := range map[string]int{"fifty": 50, "seventy-five": 75} {
-		if getBool(flag) {
-			if err := o.SetNMoveRule(rule); err != nil {
-				return nil, sel, fmt.Errorf("--%s: %w", flag, err)
+	// --fifty is applied first, so --fifty --seventy-five always reports
+	// the conflict against --seventy-five.
+	for _, p := range []struct {
+		flag string
+		rule int
+	}{{"fifty", 50}, {"seventy-five", 75}} {
+		if getBool(p.flag) {
+			if err := o.SetNMoveRule(p.rule); err != nil {
+				return nil, sel, fmt.Errorf("--%s: %w", p.flag, err)
 			}
 		}
 	}
