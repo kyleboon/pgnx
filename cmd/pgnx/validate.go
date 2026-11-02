@@ -1,11 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/kyleboon/pgnx/output"
-	"github.com/kyleboon/pgnx/pgn"
 	"github.com/kyleboon/pgnx/pipeline"
 	"github.com/spf13/cobra"
 )
@@ -35,7 +33,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 
 	// Per-game findings are a primary output for validate, so they go to
 	// stdout (out) rather than the shared log writer used by convert. With
-	// --summary, forEachGame's per-game lines are unwanted: every game is
+	// --summary, the report's per-game lines are unwanted: every game is
 	// still validated (for an accurate tally), but the findings themselves
 	// are discarded in favor of the single tally line printed below.
 	findings := out
@@ -64,16 +62,11 @@ func runValidate(cmd *cobra.Command, args []string) error {
 		pipe:  pipeline.New(pipeline.Config{}),
 		route: routeNowhere,
 	}
-	total, succeeded, ioErr := forEachGame(cmd, args, findings, logW, func(src string, n int, g *pgn.Game) error {
-		return r.game(n, g)
-	})
+	rep := newRunReport(findings, logW)
+	rep.each(games(args, cmd.InOrStdin(), parserOptions(cmd)), r.game)
 
 	if summary {
-		fmt.Fprintf(out, "%d of %d games valid\n", succeeded, total)
+		rep.validSummary(out)
 	}
-
-	if ioErr != nil || succeeded < total {
-		return errProblems
-	}
-	return nil
+	return rep.exit()
 }

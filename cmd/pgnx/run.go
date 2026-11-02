@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 
@@ -71,8 +72,9 @@ type run struct {
 	// means the games that succeeded (convert). filter reports the
 	// Selector's count instead.
 	matched func() int
-	// closers are the destinations, closed by close last opened first;
-	// logCloser is the --log file, closed after them.
+	// closers are the destinations, closed by closeDestinations last
+	// opened first; logCloser is the --log file, closed after them by
+	// close.
 	closers   []io.Closer
 	logCloser io.Closer
 }
@@ -143,20 +145,32 @@ func (r *run) openUnmatched(flagName string) error {
 	return nil
 }
 
-// close flushes and closes the destinations, last opened first, then
-// the log file. A destination that could not be written in full (a full
-// disk shows up at the final flush) is reported on the log writer and
-// makes close return errProblems, so the run exits 2 even though every
-// game was handed to its writer without error.
-func (r *run) close() error {
-	var err error
+// closeDestinations flushes and closes the destinations, last opened
+// first, and returns their close errors joined. A destination that
+// could not be written in full (a full disk shows up at the final
+// flush) surfaces here even though every game was handed to its writer
+// without error; exec reports it through the run report, so the run
+// exits 2. A second call is a no-op.
+func (r *run) closeDestinations() error {
+	var errs []error
 	for i := len(r.closers) - 1; i >= 0; i-- {
-		if cerr := r.closers[i].Close(); cerr != nil {
-			fmt.Fprintf(r.logW, "%v\n", cerr)
-			err = errProblems
+		if err := r.closers[i].Close(); err != nil {
+			errs = append(errs, err)
 		}
 	}
 	r.closers = nil
+	return errors.Join(errs...)
+}
+
+// close closes the destinations (if exec has not already), then the
+// log file. A destination close error is reported on the log writer
+// and makes close return errProblems.
+func (r *run) close() error {
+	var err error
+	if cerr := r.closeDestinations(); cerr != nil {
+		fmt.Fprintf(r.logW, "%v\n", cerr)
+		err = errProblems
+	}
 	if r.logCloser != nil {
 		r.logCloser.Close()
 		r.logCloser = nil
@@ -175,24 +189,20 @@ func (r *run) finish(err error) error {
 
 // game is the per-game sequence: observe the game's tags (before anything
 // is written, so unrecognised tags order as the oracle's do), run the
-// pipeline, route the outcome, write. The returned error is the game's
-// verdict in forEachGame's protocol: the reason a Rejected game is
-// emitted nowhere, else the problems of a game that was emitted, wrapped
-// with stopAfter when the route stops the run.
-func (r *run) game(n int, g *pgn.Game) error {
+// pipeline, route the outcome, write. The verdict carries the reason a
+// Rejected game is emitted nowhere, else the problems of a game that was
+// emitted (or the failure of writing it), and the route's stop.
+func (r *run) game(n int, g *pgn.Game) gameVerdict {
 	r.tags.Observe(g)
 	o := r.pipe.Process(g)
 	if o.Status == pipeline.Rejected {
-		return o.Reason
+		return gameVerdict{Errors: []error{o.Reason}}
 	}
 	dest, stop := r.route(n, o)
 	if err := r.write(dest, o); err != nil {
-		return err
+		return gameVerdict{Errors: []error{err}, Stop: stop}
 	}
-	if stop {
-		return stopAfter(problems(o))
-	}
-	return problems(o)
+	return verdict(o, stop)
 }
 
 // write sends o's game to dest. A Broken game is written without its
@@ -216,26 +226,24 @@ func (r *run) write(dest destination, o pipeline.Outcome) error {
 	return writeGameTo(w, o.Game, rep)
 }
 
-// exec reads every game from args (or stdin) through game, prints the
-// summary line and returns errProblems when any game failed or an input
-// could not be read, so the command exits 2.
+// exec reads every game from args (or stdin) through game, closes the
+// destinations, prints the summary line and returns the report's exit
+// decision: errProblems (exit 2) when any game failed, an input could
+// not be read or a destination could not be closed (a buffered
+// destination flushes at close, so a failed flush surfaces there).
 func (r *run) exec(args []string) error {
-	total, succeeded, ioErr := forEachGame(r.cmd, args, r.logW, r.logW, func(src string, n int, g *pgn.Game) error {
-		return r.game(n, g)
-	})
-
-	if !r.quiet {
-		count := succeeded
-		if r.matched != nil {
-			count = r.matched()
-		}
-		fmt.Fprintf(r.logW, "%d game%s matched out of %d.\n", count, plural(count), total)
+	rep := newRunReport(r.logW, r.logW)
+	rep.quiet = r.quiet
+	rep.each(games(args, r.cmd.InOrStdin(), parserOptions(r.cmd)), r.game)
+	if err := r.closeDestinations(); err != nil {
+		rep.fail(err)
 	}
-
-	if ioErr != nil || succeeded < total {
-		return errProblems
+	count := rep.succeeded()
+	if r.matched != nil {
+		count = r.matched()
 	}
-	return nil
+	rep.summary(r.logW, count)
+	return rep.exit()
 }
 
 // openDestination opens the destination for games: with --eco-split a
