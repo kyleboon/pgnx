@@ -197,3 +197,20 @@ func TestProcessConcurrent(t *testing.T) {
 		}
 	}
 }
+
+// Classification precedes the criteria (the C tool classifies inside
+// apply_move_list, before check_ECO_tag), so an ECO criterion sees the
+// new tag, not the one the game came with.
+func TestProcessClassifiesBeforeCriteria(t *testing.T) {
+	for _, c := range []struct {
+		want    string
+		matched bool
+	}{{"A06", true}, {"B00", false}} {
+		m := &filter.TagMatcher{}
+		m.AddPrefix("ECO", c.want)
+		o := New(Config{ECO: ecoTable(t), Criteria: &filter.Options{Tags: m}}).Process(parse(t, retiD5))
+		if o.Status != OK || o.Matched != c.matched {
+			t.Errorf("ECO %q: status %v matched %v, want OK %v", c.want, o.Status, o.Matched, c.matched)
+		}
+	}
+}
