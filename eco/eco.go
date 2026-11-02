@@ -145,7 +145,7 @@ func (t *Table) Classify(r *replay.Result) (Entry, bool) {
 	)
 	for _, p := range r.Positions[1:] {
 		cum += p.Placement
-		half := plyNumber(p)
+		half := halfMovesPlayed(p)
 		if half > t.maxHalfMoves {
 			break // the ply number only grows
 		}
@@ -178,14 +178,12 @@ func (t *Table) match(key uint64, half int, toMove chess.Color, cum uint64) *ent
 	return possible
 }
 
-// plyNumber is apply.c half_moves_played: the absolute ply number of a
-// position, from its fullmove number and side to move.
-func plyNumber(p replay.Position) int {
-	half := 2 * (p.FullmoveNumber - 1)
-	if p.SideToMove == chess.Black {
-		half++
-	}
-	return half
+// halfMovesPlayed is apply.c half_moves_played: the plies completed on
+// reaching p, one less than its ply number (the number of the move about
+// to be played). ECO entries record the same count for their final
+// position through Result.PlyCount.
+func halfMovesPlayed(p replay.Position) int {
+	return p.PlyNumber() - 1
 }
 
 // Apply replaces g's ECO classification with e: every ECO, Opening,
