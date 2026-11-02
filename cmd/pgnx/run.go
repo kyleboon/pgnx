@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 
@@ -61,13 +62,19 @@ type run struct {
 	route route
 	// output is the main destination; unmatched is the --unmatched
 	// destination, nil when the command has none.
-	output, unmatched gameWriters
+	output, unmatched gameWriter
+	// stdout is the one buffer every destination on stdout shares, so
+	// that games to --output and --unmatched, both "-", stay in input
+	// order; created on first use.
+	stdout *bufio.Writer
 	// matched counts the games the summary line reports as matched; nil
 	// means the games that succeeded (convert). filter reports the
 	// Selector's count instead.
 	matched func() int
-	// closers are closed by close, last opened first.
-	closers []io.Closer
+	// closers are the destinations, closed by close last opened first;
+	// logCloser is the --log file, closed after them.
+	closers   []io.Closer
+	logCloser io.Closer
 }
 
 // newRun does the setup shared by convert and filter from the flags
@@ -91,13 +98,9 @@ func newRun(cmd *cobra.Command, criteria *filter.Options) (*run, error) {
 	quiet, _ := flags.GetBool("quiet")
 
 	r := &run{cmd: cmd, quiet: quiet, route: routeAll}
-	var logCloser io.Closer
-	r.logW, logCloser, err = logWriter(cmd)
+	r.logW, r.logCloser, err = logWriter(cmd)
 	if err != nil {
 		return nil, err
-	}
-	if logCloser != nil {
-		r.closers = append(r.closers, logCloser)
 	}
 	if !quiet {
 		ecoPath, _ := flags.GetString("eco-file")
@@ -116,7 +119,7 @@ func newRun(cmd *cobra.Command, criteria *filter.Options) (*run, error) {
 	}
 	r.opts, r.tags = opts, opts.Tags
 
-	r.output, err = openDestination(cmd, "output", opts, ecoSet.split)
+	r.output, err = r.openDestination("output", ecoSet.split)
 	if err != nil {
 		r.close()
 		return nil, err
@@ -131,7 +134,7 @@ func newRun(cmd *cobra.Command, criteria *filter.Options) (*run, error) {
 // run's unmatched destination. Unmatched games are never divided by ECO
 // (grammar.c select_output_file routes only matched games through -E).
 func (r *run) openUnmatched(flagName string) error {
-	w, err := openDestination(r.cmd, flagName, r.opts, 0)
+	w, err := r.openDestination(flagName, 0)
 	if err != nil {
 		return err
 	}
@@ -140,12 +143,34 @@ func (r *run) openUnmatched(flagName string) error {
 	return nil
 }
 
-// close closes the destinations and the log file, last opened first.
-func (r *run) close() {
+// close flushes and closes the destinations, last opened first, then
+// the log file. A destination that could not be written in full (a full
+// disk shows up at the final flush) is reported on the log writer and
+// makes close return errProblems, so the run exits 2 even though every
+// game was handed to its writer without error.
+func (r *run) close() error {
+	var err error
 	for i := len(r.closers) - 1; i >= 0; i-- {
-		r.closers[i].Close()
+		if cerr := r.closers[i].Close(); cerr != nil {
+			fmt.Fprintf(r.logW, "%v\n", cerr)
+			err = errProblems
+		}
 	}
 	r.closers = nil
+	if r.logCloser != nil {
+		r.logCloser.Close()
+		r.logCloser = nil
+	}
+	return err
+}
+
+// finish closes the run once exec has returned err, exec's verdict, and
+// returns that verdict, or close's when exec had none.
+func (r *run) finish(err error) error {
+	if cerr := r.close(); err == nil {
+		err = cerr
+	}
+	return err
 }
 
 // game is the per-game sequence: observe the game's tags (before anything
@@ -170,9 +195,11 @@ func (r *run) game(n int, g *pgn.Game) error {
 	return problems(o)
 }
 
-// write sends o's game to dest, in Source format when the game is Broken.
+// write sends o's game to dest. A Broken game is written without its
+// (partial) replay, which the writer renders in Source format: the only
+// format a broken game is emitted in (CONFORMANCE.md, --keep-broken).
 func (r *run) write(dest destination, o pipeline.Outcome) error {
-	var w gameWriters
+	var w gameWriter
 	switch dest {
 	case toOutput:
 		w = r.output
@@ -182,7 +209,11 @@ func (r *run) write(dest destination, o pipeline.Outcome) error {
 	if w == nil {
 		return nil
 	}
-	return writeGameTo(w, o.Game, o.Replay, o.Status == pipeline.Broken)
+	rep := o.Replay
+	if o.Status == pipeline.Broken {
+		rep = nil
+	}
+	return writeGameTo(w, o.Game, rep)
 }
 
 // exec reads every game from args (or stdin) through game, prints the
@@ -207,37 +238,27 @@ func (r *run) exec(args []string) error {
 	return nil
 }
 
-// openDestination builds the writer selector for games: with --eco-split
-// a per-ECO-prefix set of files in the current directory, otherwise the
-// file named by the string flag flagName (or stdout). The returned
-// Closer closes whatever files were opened.
-func openDestination(cmd *cobra.Command, flagName string, opts output.Options, splitLevel int) (gameWriters, error) {
-	sourceOpts := output.Options{Format: output.Source, LineWidth: opts.LineWidth, Tags: opts.Tags}
+// openDestination opens the destination for games: with --eco-split a
+// per-ECO-prefix set of files in the current directory, otherwise the
+// file named by the string flag flagName, or stdout (through the run's
+// shared stdout buffer). The returned Closer flushes and closes whatever
+// was opened.
+func (r *run) openDestination(flagName string, splitLevel int) (gameWriter, error) {
 	if splitLevel > 0 {
-		return newECOSplitWriters(splitLevel, opts, sourceOpts), nil
+		return newECOSplitWriters(splitLevel, r.opts), nil
 	}
-	out, closer, err := openOutput(cmd, flagName)
+	out, closer, err := openOutput(r.cmd, flagName)
 	if err != nil {
 		return nil, err
 	}
-	return &closingWriters{
-		fixedWriters: fixedWriters{w: output.NewWriter(out, opts), sourceW: output.NewWriter(out, sourceOpts)},
-		closer:       closer,
-	}, nil
-}
-
-// closingWriters is a fixedWriters pair over a file that must be closed
-// at the end of the run (nil for stdout).
-type closingWriters struct {
-	fixedWriters
-	closer io.Closer
-}
-
-func (c *closingWriters) Close() error {
-	if c.closer == nil {
-		return nil
+	if closer == nil {
+		// stdout: one buffer for every destination on it.
+		if r.stdout == nil {
+			r.stdout = bufio.NewWriter(out)
+		}
+		return &bufferedWriter{w: output.NewWriter(r.stdout, r.opts), buf: r.stdout}, nil
 	}
-	return c.closer.Close()
+	return newBufferedWriter(out, closer, r.opts), nil
 }
 
 // plural returns "" when n == 1, else "s", matching the C oracle's

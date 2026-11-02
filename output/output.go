@@ -195,7 +195,10 @@ type Writer struct {
 }
 
 // NewWriter returns a Writer that writes rendered games to w according to
-// opts.
+// opts. The Writer buffers nothing: every tag line and every wrapped
+// movetext line is one Write to w, so w should be buffered (a
+// bufio.Writer the caller flushes when the run is done) when it is a
+// file or a pipe.
 func NewWriter(w io.Writer, opts Options) *Writer {
 	if opts.Tags == nil {
 		opts.Tags = NewTagRegistry()
@@ -203,45 +206,50 @@ func NewWriter(w io.Writer, opts Options) *Writer {
 	return &Writer{w: w, opts: opts}
 }
 
-// WriteGame renders g (with replay detail r, when available) to the
-// Writer's underlying io.Writer, followed by a blank line.
+// WriteGame renders g to the Writer's underlying io.Writer, followed by
+// a blank line. r is g's replay, the per-move detail every format but
+// Source needs.
 //
-// r may be nil only when opts.Format == Source, since Source rendering
-// uses only the pgn.Game data (the SAN exactly as written) and never
-// consults replay output; any other format returns an error when r is
-// nil, before anything is written.
+// When r is nil the game is rendered in Source format whatever
+// opts.Format says, with the Writer's other options (line width, roster,
+// stripping) unchanged. Source uses only the pgn.Game data (the SAN
+// exactly as written) and never consults replay output, so it is the one
+// format that can render a game without a replay; this is how a broken
+// game, whose moves did not fully replay, is emitted.
 func (w *Writer) WriteGame(g *pgn.Game, r *replay.Result) error {
-	if r == nil && w.opts.Format != Source {
-		return fmt.Errorf("output: replay result required for format %v", w.opts.Format)
+	opts := w.opts
+	if r == nil {
+		opts.Format = Source
 	}
-	switch w.opts.Format {
+	switch opts.Format {
 	case SAN, Source, LAlg, HAlg, ELAlg, XLAlg, UCI:
-		return w.writeMovetextGame(g, r)
+		return w.writeMovetextGame(g, r, opts)
 	case EPD, FEN:
 		return w.writePositionGame(g, r)
 	default:
-		return fmt.Errorf("output: format %v not implemented", w.opts.Format)
+		return fmt.Errorf("output: format %v not implemented", opts.Format)
 	}
 }
 
 // writeMovetextGame renders the tag section, an optional prefix-comment
 // block, and the movetext (via emitMovetext/renderMove) for every
 // movetext-shaped format: SAN, Source, and the long-algebraic family
-// (LAlg, HAlg, ELAlg, XLAlg, UCI).
-func (w *Writer) writeMovetextGame(g *pgn.Game, r *replay.Result) error {
+// (LAlg, HAlg, ELAlg, XLAlg, UCI). opts is w.opts with the format
+// WriteGame settled on.
+func (w *Writer) writeMovetextGame(g *pgn.Game, r *replay.Result, opts Options) error {
 	if err := w.writeTags(g); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w.w, "\n"); err != nil {
 		return err
 	}
-	if len(g.PrefixComments) > 0 && !w.opts.NoComments && !isUCI(w.opts.Format) {
+	if len(g.PrefixComments) > 0 && !opts.NoComments && !isUCI(opts.Format) {
 		// Prefix comments go through the same word-splitting token
 		// emission as move comments (emitComment), so their internal
 		// whitespace is normalized to single spaces and they word-wrap at
 		// the configured line width, matching the C oracle. Multiple
 		// prefix comments share one token stream.
-		plw := newLineWriter(w.w, w.opts.LineWidth)
+		plw := newLineWriter(w.w, opts.LineWidth)
 		for _, c := range g.PrefixComments {
 			emitComment(plw, c)
 		}
@@ -253,8 +261,8 @@ func (w *Writer) writeMovetextGame(g *pgn.Game, r *replay.Result) error {
 		}
 	}
 
-	lw := newLineWriter(w.w, w.opts.LineWidth)
-	emitMovetext(lw, g, r, w.opts)
+	lw := newLineWriter(w.w, opts.LineWidth)
+	emitMovetext(lw, g, r, opts)
 	if err := lw.Close(); err != nil {
 		return err
 	}
