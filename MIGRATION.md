@@ -27,7 +27,8 @@ so far to their pgnx equivalents, and lists what is not yet ported.
 | `--noresults` | `pgnx convert --no-results` |
 | `--keepbroken` | `pgnx convert --keep-broken` |
 | `--allownullmoves` | `pgnx convert --allow-null-moves` (also on `filter`, `split`, `validate`; null moves in variations never need it) |
-| `-f file_list` (list of input files) | pass the files as positional arguments instead |
+| `-f file_list` (list of input files) | pass the files as positional arguments instead (or list them in an argument file, below) |
+| `-A FILE` (argument file) | `pgnx <command> @FILE`, in pgnx's own grammar (see [Argument files](#argument-files)) |
 
 Notes:
 
@@ -193,6 +194,60 @@ Notes:
 - `--no-tags` with `--seven-tag-roster` or `--roster`, and a negative
   `--ply-limit`, are usage errors (exit 1), as the C tool exits 1 for them.
 
+## Argument files
+
+pgn-extract's `-A FILE` reads a file in its own grammar (`argsfile.c`): a
+`:-X` line per flag, with `:-t`, `:-v`, `:-x`, `:-z`, `:-y` and `:-R` lines
+switching the following bare lines into criteria or roster lines, and
+`:file.pgn` naming an input. pgnx does not read that grammar; it has its own
+argument files, written `@FILE` anywhere on the command line (before or after
+the subcommand), which cobra then parses exactly as if the file's arguments
+had been typed there:
+
+- one argument per line, except that a line starting with `-` is a flag
+  followed by its value, split at the first run of white space
+  (`--tag White "Fischer"` is `--tag` and `White "Fischer"`; `-o out.pgn` is
+  `-o` and `out.pgn`; `--line-width=60` is one argument);
+- a line not starting with `-` is one positional argument, white space and
+  all: the subcommand, an input file, or a nested `@FILE`;
+- blank lines and comment lines, whose first non-blank character is `%`,
+  are ignored (the `--tag-file`, `--position-file` and `--sequence-file`
+  files take `%` as a comment only in the first column, as pgn-extract does);
+- paths in a file, nested `@FILE` lines included, are relative to the
+  working directory, as pgn-extract's are;
+- `--` ends expansion: everything after it is passed through verbatim.
+
+To translate a pgn-extract argsfile: drop the `:` prefix and map each flag
+with the tables above; turn a `:-t` section into one `--tag` line per
+criterion (or point `--tag-file` at a file holding just those lines), and a
+`:-x`/`:-v`/`:-z`/`:-y` section into `--position`/`--sequence`/`--material`
+lines or their `-file` flags; `:file.pgn` lines become bare `file.pgn`
+lines. The C test `test-FENPattern.txt`
+
+```
+:-t
+% Find a supported Knight on e4.
+FENPattern "*/*/*/*/???pN???/???P????/*/*"
+% Find a supported Knight for White on d4
+% or Black on d5.
+FENPatternI "*/*/*/*/???Np???/????P???/*/*" Nd4th
+```
+
+becomes
+
+```
+% Find a supported Knight on e4.
+--tag FENPattern "*/*/*/*/???pN???/???P????/*/*"
+% Find a supported Knight for White on d4
+% or Black on d5.
+--tag FENPatternI "*/*/*/*/???Np???/????P???/*/*" Nd4th
+```
+
+and `pgn-extract -Atest-FENPattern.txt --addlabeltag --markmatches HERE
+petrosian.pgn` becomes `pgnx filter @test-FENPattern.txt --add-label-tag
+--mark-matches HERE petrosian.pgn` (`cmd/pgnx/testdata/argfiles/`, golden
+row `test-FENPattern-argfile`).
+
 ## Not yet ported (Phase 4+)
 
 The following pgn-extract flags have no pgnx equivalent yet:
@@ -206,7 +261,6 @@ The following pgn-extract flags have no pgnx equivalent yet:
 Also not yet supported, regardless of flag:
 
 - JSON output (`--json`)
-- Argument files (`-A`/`argsfile`)
 - `-e` without a file name (the `eco.pgn`/`$ECO_FILE` default)
 - `pgnx dedupe` — planned as a new subcommand in a later phase, not a
   flag on `convert`

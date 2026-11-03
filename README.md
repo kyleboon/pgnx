@@ -49,9 +49,12 @@ go install github.com/kyleboon/pgnx/cmd/pgnx@latest
 
 ## CLI
 
-pgnx has four subcommands. Every one reads PGN from files given as
+pgnx has five subcommands. Every one reads PGN from files given as
 arguments, or from stdin when none are given, and writes to stdout unless
-redirected.
+redirected. An argument `@FILE` is replaced by the arguments in FILE, one
+per line (a flag and its value share a line; `%` starts a comment), so a
+long or recurring command line can live in a file: `pgnx filter @opening.args
+games.pgn`.
 
 ### `pgnx convert`
 

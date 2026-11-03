@@ -219,13 +219,21 @@ var goldenCases = []struct {
 	{"test-tFEN", []string{"filter", "--tag-file", filepath.Join("testdata", "golden", "infiles", "test-tFEN.txt")}, "fischer.pgn", "test-tFEN-out.pgn", false},
 	// test-FENPattern: pgn-extract -otest-FENPattern-out.pgn -ltest-FENPattern-log.txt --quiet
 	//   -Atest-FENPattern.txt --addlabeltag --markmatches HERE petrosian.pgn
-	// -A reads an argsfile (not ported); test-FENPattern.txt is a ":-t"
+	// -A reads a C argsfile, whose ":-" grammar pgnx does not read (it has
+	// its own @FILE form, next row); test-FENPattern.txt is a ":-t"
 	// section holding exactly two criteria lines, which are passed here
 	// verbatim as --tag flags. The C Makefile's CMP of the log file is
 	// commented out, so only the PGN output is an oracle.
 	{"test-FENPattern", []string{"filter",
 		"--tag", `FENPattern "*/*/*/*/???pN???/???P????/*/*"`,
 		"--tag", `FENPatternI "*/*/*/*/???Np???/????P???/*/*" Nd4th`,
+		"--add-label-tag", "--mark-matches", "HERE"}, "petrosian.pgn", "test-FENPattern-out.pgn", false},
+	// test-FENPattern (argument-file form): pgn-extract -otest-FENPattern-out.pgn -ltest-FENPattern-log.txt --quiet
+	//   -Atest-FENPattern.txt --addlabeltag --markmatches HERE petrosian.pgn
+	// The -A argsfile is testdata/argfiles/test-FENPattern.txt rewritten in
+	// pgnx's @FILE grammar (two --tag lines in place of the ":-t" section).
+	{"test-FENPattern-argfile", []string{"filter",
+		"@" + filepath.Join("testdata", "argfiles", "test-FENPattern.txt"),
 		"--add-label-tag", "--mark-matches", "HERE"}, "petrosian.pgn", "test-FENPattern-out.pgn", false},
 	// test-FENPattern (2nd command): pgn-extract -otest-FENPattern-cli-out.pgn -ltest-FENPattern-log.txt --quiet
 	//   --fenpattern "*/*/*/*/???pN???/???P????/*/*" --fenpatterni "*/*/*/*/???Np???/????P???/*/*" --markmatches HERE petrosian.pgn
@@ -313,8 +321,7 @@ func TestGoldenConformance(t *testing.T) {
 			root := NewRootCmd()
 			var errb bytes.Buffer
 			root.SetErr(&errb)
-			root.SetArgs(args)
-			err := root.Execute()
+			err := runRoot(root, args)
 			if c.wantProblems && errors.Is(err, errProblems) {
 				err = nil
 			}

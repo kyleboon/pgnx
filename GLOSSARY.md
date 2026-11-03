@@ -93,3 +93,7 @@ _Avoid_: writer (the thing that renders), sink
 
 **Tag roster**:
 The seven standard tags every emitted game carries in fixed order, with defaults supplied when the game lacks them.
+
+**Argument file**:
+A file of command-line arguments, one per line, that `@FILE` on the command line stands for. Expanded before the command line is parsed, so it may hold the subcommand, flags, input files or further argument files; it is pgnx's form of pgn-extract's `-A` argsfile and does not share its grammar.
+_Avoid_: argsfile (the C file format), config file, options file

@@ -48,8 +48,19 @@ held to parity; see below.
   `TestConvertPieceLettersUsageErrors` (cmd/pgnx).
 - **CM (ChessMaster) format is unsupported.** pgn-extract's `-Wcm` output
   format has no pgnx equivalent.
-- **JSON output and argument files are unsupported.** `--json` and
-  `-A`/argsfile support are deferred to a later phase (see MIGRATION.md).
+- **JSON output is unsupported.** `--json` is deferred to a later phase
+  (see MIGRATION.md).
+- **Argument files have pgnx's own grammar, not the C `:-` grammar.**
+  pgn-extract's `-A FILE` reads `argsfile.c`'s format (`:-X` flag lines,
+  `:-t`/`:-v`/`:-x` sections of bare criteria lines, `:file` inputs); pgnx
+  reads `@FILE` arguments in its own one-argument-per-line grammar
+  (MIGRATION.md, "Argument files"; ADR 0004). A C argsfile is not accepted
+  as is, because its flags are C flags. The expanded arguments then behave
+  exactly as typed, so output parity is unaffected: the `test-FENPattern`
+  golden target runs both as direct `--tag` flags and through its argument
+  file (`test-FENPattern-argfile`). `test-AA` stays excluded until
+  duplicate detection lands (beads `pgnx-phase4`); its argument-file part
+  is covered by `TestArgumentFileMatchesDirectFlags`.
 - **`--keep-broken` always emits in Source format.** pgn-extract's
   `--keepbroken` re-emits a broken game in whatever `-W` format was
   requested. pgnx's `convert --keep-broken` (and `filter --keep-broken`)

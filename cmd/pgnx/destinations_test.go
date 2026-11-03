@@ -51,8 +51,7 @@ func TestConvertExitsTwoWhenOutputCannotBeWritten(t *testing.T) {
 	root.SetOut(failingWriter{})
 	root.SetErr(&errb)
 	root.SetIn(strings.NewReader(fools))
-	root.SetArgs([]string{"convert", "--quiet"})
-	if code := execute(root); code != 2 {
+	if code := execute(root, []string{"convert", "--quiet"}); code != 2 {
 		t.Errorf("exit %d, want 2; stderr %q", code, errb.String())
 	}
 	if !strings.Contains(errb.String(), errDiskFull.Error()) {

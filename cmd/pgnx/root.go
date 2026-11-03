@@ -32,14 +32,27 @@ func exitCode(err error) int {
 	return 1
 }
 
-// execute runs root and maps its error to a process exit status. Because
-// the command tree sets SilenceErrors, cobra never prints errors itself;
-// execute prints any non-sentinel error to the command's error stream with
-// a "pgnx: " prefix. The errProblems sentinel stays silent: the per-game
-// error lines and the summary have already been written to the log writer,
-// so printing the sentinel too would only duplicate that report.
-func execute(root *cobra.Command) int {
-	err := root.Execute()
+// runRoot expands the @FILE argument files in args (see expandArgs) and
+// runs root on the result. It is the one entry point for a command line,
+// used by main and by tests that drive the CLI end to end; calling
+// root.Execute directly skips the expansion.
+func runRoot(root *cobra.Command, args []string) error {
+	expanded, err := expandArgs(args)
+	if err != nil {
+		return err
+	}
+	root.SetArgs(expanded)
+	return root.Execute()
+}
+
+// execute runs root on args and maps its error to a process exit status.
+// Because the command tree sets SilenceErrors, cobra never prints errors
+// itself; execute prints any non-sentinel error to the command's error
+// stream with a "pgnx: " prefix. The errProblems sentinel stays silent: the
+// per-game error lines and the summary have already been written to the
+// log writer, so printing the sentinel too would only duplicate that report.
+func execute(root *cobra.Command, args []string) int {
+	err := runRoot(root, args)
 	if err != nil && !errors.Is(err, errProblems) {
 		fmt.Fprintf(root.ErrOrStderr(), "pgnx: %v\n", err)
 	}
@@ -51,8 +64,14 @@ func execute(root *cobra.Command) int {
 // an isolated command tree with its own in/out/err streams and flag state.
 func NewRootCmd() *cobra.Command {
 	root := &cobra.Command{
-		Use:           "pgnx",
-		Short:         "pgnx manipulates collections of chess games in PGN format",
+		Use:   "pgnx",
+		Short: "pgnx manipulates collections of chess games in PGN format",
+		Long: `pgnx manipulates collections of chess games in PGN format.
+
+An argument of the form @FILE is replaced by the arguments read from FILE:
+one per line, with a flag and its value on one line ("--tag White \"Fischer\""),
+blank and %-comment lines ignored, and nested @FILE lines allowed.
+A -- ends expansion, so file names after it may start with @.`,
 		Version:       versionString(),
 		SilenceUsage:  true,
 		SilenceErrors: true,

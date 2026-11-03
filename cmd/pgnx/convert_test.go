@@ -15,11 +15,10 @@ func runCLI(t *testing.T, stdin string, args ...string) (stdout, stderr string, 
 	root.SetOut(&out)
 	root.SetErr(&errb)
 	root.SetIn(strings.NewReader(stdin))
-	root.SetArgs(args)
-	// execute maps our sentinel errors to 2 and usage errors to 1 (via
-	// exitCode), and prints non-sentinel errors to the error stream —
-	// the same path main() uses.
-	code = execute(root)
+	// execute expands @FILE arguments, maps our sentinel errors to 2 and
+	// usage errors to 1 (via exitCode), and prints non-sentinel errors to
+	// the error stream — the same path main() uses.
+	code = execute(root, args)
 	return out.String(), errb.String(), code
 }
 
