@@ -153,8 +153,9 @@ func (p *parser) parseOneGame() (g *Game, atEOF bool, err error) {
 // and variations) until a terminating token is reached: tokResult,
 // tokRAVEnd (only valid when depth > 0), tokTagName, or tokEOF. It returns
 // the parsed moves, any comments seen before the first move, the result
-// text (only meaningful for the top-level call; "" otherwise), and the
-// terminating token so the caller can decide how to react.
+// text (the game's result at the top level, a result written inside the
+// variation below it; "" when there is none), and the terminating token
+// so the caller can decide how to react.
 func (p *parser) parseMovetext(g *Game, depth int) (moves []*Move, prefixComments []string, result string, terminator token, err error) {
 	var current *Move
 	sawMove := false
@@ -177,6 +178,16 @@ func (p *parser) parseMovetext(g *Game, depth int) (moves []*Move, prefixComment
 
 		case tokResult:
 			result = tok.text
+			if depth > 0 {
+				// A result inside a variation belongs to the variation
+				// (grammar.c parse_variant): keep it and read on to the
+				// closing paren, attaching whatever follows in source
+				// order. The C tool expects the paren next; a comment
+				// there it moves before the last move's NAGs, a move it
+				// mis-parses, neither of which pgnx mirrors (CONFORMANCE.md
+				// "Ordered annotations").
+				continue
+			}
 			return moves, prefixComments, result, tok, nil
 
 		case tokRAVEnd:
@@ -199,13 +210,14 @@ func (p *parser) parseMovetext(g *Game, depth int) (moves []*Move, prefixComment
 				g.errs = append(g.errs, &ParseError{Line: tok.line, Msg: "variation with no preceding move"})
 				continue
 			}
-			subMoves, subPrefix, _, _, verr := p.parseMovetext(g, depth+1)
+			subMoves, subPrefix, subResult, _, verr := p.parseMovetext(g, depth+1)
 			if verr != nil {
 				return moves, prefixComments, result, token{}, verr
 			}
-			current.Variations = append(current.Variations, &Variation{
+			current.Annotations = append(current.Annotations, &Variation{
 				PrefixComments: subPrefix,
 				Moves:          subMoves,
+				Result:         subResult,
 			})
 			continue
 
@@ -213,7 +225,7 @@ func (p *parser) parseMovetext(g *Game, depth int) (moves []*Move, prefixComment
 			if !sawMove || current == nil {
 				prefixComments = append(prefixComments, tok.text)
 			} else {
-				current.Comments = append(current.Comments, tok.text)
+				current.Annotations = append(current.Annotations, Comment(tok.text))
 			}
 			continue
 
@@ -230,7 +242,7 @@ func (p *parser) parseMovetext(g *Game, depth int) (moves []*Move, prefixComment
 				g.errs = append(g.errs, &ParseError{Line: tok.line, Msg: "unparsable NAG: $" + tok.text})
 				continue
 			}
-			current.NAGs = append(current.NAGs, n)
+			current.Annotations = append(current.Annotations, NAG(n))
 			continue
 
 		case tokMoveNumber:

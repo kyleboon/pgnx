@@ -72,8 +72,8 @@ func TestMatchNMoveRuleMarks(t *testing.T) {
 	want := []int{0, 0, 1, 1} // clocks 99, 100, 101, 102 → plies 2,3,4 qualify
 	want = []int{0, 1, 1, 1}
 	for i, m := range g.Moves {
-		if len(m.Comments) != want[i] {
-			t.Errorf("ply %d comments = %v, want %d", i+1, m.Comments, want[i])
+		if len(m.Comments()) != want[i] {
+			t.Errorf("ply %d comments = %v, want %d", i+1, m.Comments(), want[i])
 		}
 	}
 	g, r = replayed(t, src)
@@ -81,13 +81,13 @@ func TestMatchNMoveRuleMarks(t *testing.T) {
 		t.Error("seventy-five should not apply")
 	}
 	for _, m := range g.Moves {
-		if len(m.Comments) != 0 {
+		if len(m.Comments()) != 0 {
 			t.Error("no marks when unmatched")
 		}
 	}
 	g, r = replayed(t, src)
 	matchNMoveRule(g, r, 50, "", 1, len(r.Moves))
-	if len(g.Moves[1].Comments) != 0 {
+	if len(g.Moves[1].Comments()) != 0 {
 		t.Error("empty mark adds nothing")
 	}
 }
@@ -107,8 +107,8 @@ func TestMatchRepetitionMarks(t *testing.T) {
 		if i+1 >= 8 {
 			want = 1
 		}
-		if len(m.Comments) != want {
-			t.Errorf("ply %d comments = %v, want %d", i+1, m.Comments, want)
+		if len(m.Comments()) != want {
+			t.Errorf("ply %d comments = %v, want %d", i+1, m.Comments(), want)
 		}
 	}
 	g, r = replayed(t, src)
@@ -116,7 +116,7 @@ func TestMatchRepetitionMarks(t *testing.T) {
 		t.Error("not fivefold")
 	}
 	g, r = replayed(t, "1. Nf3 Nf6 2. Ng1 Ng8 3. Nf3 Nf6 4. Ng1 Ng8 5. Nf3 Nf6 6. Ng1 Ng8 7. Nf3 Nf6 8. Ng1 Ng8 *\n")
-	if !matchRepetition(g, r, 5, "X", 1, len(r.Moves)) || len(g.Moves[15].Comments) != 1 || len(g.Moves[11].Comments) != 0 {
+	if !matchRepetition(g, r, 5, "X", 1, len(r.Moves)) || len(g.Moves[15].Comments()) != 1 || len(g.Moves[11].Comments()) != 0 {
 		t.Error("fivefold marks only ply 16")
 	}
 	g, r = replayed(t, foolsMate)
@@ -129,7 +129,7 @@ func TestMatchRepetitionFENMark(t *testing.T) {
 	src := "1. Nf3 Nf6 2. Ng1 Ng8 3. Nf3 Nf6 4. Ng1 Ng8 *\n"
 	g, r := replayed(t, src)
 	matchRepetition(g, r, 3, "FEN", 1, len(r.Moves))
-	if got := g.Moves[7].Comments; len(got) != 1 || got[0] != r.Positions[8].FEN {
+	if got := g.Moves[7].Comments(); len(got) != 1 || got[0] != r.Positions[8].FEN {
 		t.Errorf("FEN mark = %v", got)
 	}
 }

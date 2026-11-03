@@ -34,7 +34,7 @@ func lineCriteria(t *testing.T, line string) *PositionCriteria {
 func commentsAt(g *pgn.Game) []int {
 	var out []int
 	for i, m := range g.Moves {
-		if len(m.Comments) > 0 {
+		if len(m.Comments()) > 0 {
 			out = append(out, i)
 		}
 	}
@@ -75,8 +75,8 @@ func TestAddLineDepthAndMatch(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("matched %v err %v", ok, err)
 	}
-	if got := commentsAt(g); len(got) != 1 || got[0] != 10 || g.Moves[10].Comments[0] != "MATCH" {
-		t.Errorf("mark at %v: %v", got, g.Moves[10].Comments)
+	if got := commentsAt(g); len(got) != 1 || got[0] != 10 || g.Moves[10].Comments()[0] != "MATCH" {
+		t.Errorf("mark at %v: %v", got, g.Moves[10].Comments())
 	}
 
 	// A line of only move numbers still raises the depth to 8 but adds
@@ -232,8 +232,8 @@ func TestWhoseMoveFallsThroughToPatterns(t *testing.T) {
 	}
 	// Start position: key hit, wrong side; pattern hit, wrong side → no.
 	// After 1. Nf3 (Black to move): pattern hit → marked and labelled.
-	if len(g.PrefixComments) != 0 || len(g.Moves[0].Comments) != 1 {
-		t.Errorf("prefix %v move0 %v", g.PrefixComments, g.Moves[0].Comments)
+	if len(g.PrefixComments) != 0 || len(g.Moves[0].Comments()) != 1 {
+		t.Errorf("prefix %v move0 %v", g.PrefixComments, g.Moves[0].Comments())
 	}
 	if v, _ := g.Tag("MatchLabel"); v != "ANY" {
 		t.Errorf("MatchLabel = %q", v)
@@ -315,9 +315,9 @@ func TestMatchInsideVariation(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("matched %v err %v", ok, err)
 	}
-	rav := g.Moves[0].Variations[0].Moves
-	if len(rav[1].Comments) != 1 || rav[1].Comments[0] != "V" {
-		t.Errorf("RAV marks: %v / %v / %v", rav[0].Comments, rav[1].Comments, rav[2].Comments)
+	rav := g.Moves[0].Variations()[0].Moves
+	if len(rav[1].Comments()) != 1 || rav[1].Comments()[0] != "V" {
+		t.Errorf("RAV marks: %v / %v / %v", rav[0].Comments(), rav[1].Comments(), rav[2].Comments())
 	}
 	if n := commentsAt(g); len(n) != 0 {
 		t.Errorf("main-line marks after a variation match: %v", n)
@@ -335,8 +335,8 @@ func TestMatchInsideVariation(t *testing.T) {
 	pc2.AddLine("e4")
 	g, r = replayed(t, src)
 	Evaluate(g, r, &Options{Positions: pc2, MarkMatches: "V"})
-	if len(g.Moves[0].Comments) != 0 || len(g.Moves[0].Variations[0].Moves[1].Comments) != 1 {
-		t.Errorf("main %v rav %v", g.Moves[0].Comments, g.Moves[0].Variations[0].Moves[1].Comments)
+	if len(g.Moves[0].Comments()) != 0 || len(g.Moves[0].Variations()[0].Moves[1].Comments()) != 1 {
+		t.Errorf("main %v rav %v", g.Moves[0].Comments(), g.Moves[0].Variations()[0].Moves[1].Comments())
 	}
 
 	// Nested variations are searched too, with the default depth: the
@@ -446,7 +446,7 @@ func TestPositionMarkPrecedesRepetitionMark(t *testing.T) {
 	if len(g.PrefixComments) != 0 {
 		t.Errorf("prefix %v", g.PrefixComments)
 	}
-	if c := g.Moves[3].Comments; len(c) != 2 {
+	if c := g.Moves[3].Comments(); len(c) != 2 {
 		t.Errorf("move 3 comments %v, want position mark then repetition mark", c)
 	}
 }
@@ -476,7 +476,7 @@ func TestMatchPositionsNilAndPartial(t *testing.T) {
 		t.Fatal("expected replay failure")
 	}
 	m, _, stop := matchPositions(g, r, pc, 1, "P", false)
-	if !m || stop != 3 || len(g.Moves[2].Comments) != 1 {
+	if !m || stop != 3 || len(g.Moves[2].Comments()) != 1 {
 		t.Errorf("partial: matched %v stop %d marks %v", m, stop, commentsAt(g))
 	}
 	if r.Positions[3].SideToMove != chess.Black {

@@ -28,7 +28,7 @@ func TestLexerPreservesRawBytes(t *testing.T) {
 	if found != 2 {
 		t.Errorf("tag values not preserved byte-for-byte: %+v", g.Tags)
 	}
-	if len(g.Moves) == 0 || len(g.Moves[0].Comments) != 1 || g.Moves[0].Comments[0] != "caf\xe9 \xb4" {
+	if len(g.Moves) == 0 || len(g.Moves[0].Comments()) != 1 || g.Moves[0].Comments()[0] != "caf\xe9 \xb4" {
 		t.Errorf("comment not preserved: %+v", g.Moves)
 	}
 }

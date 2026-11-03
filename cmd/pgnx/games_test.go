@@ -105,10 +105,10 @@ func TestGamesPassesParserOptions(t *testing.T) {
 	if len(plain) != 1 || len(nested) != 1 {
 		t.Fatalf("plain %d nested %d items", len(plain), len(nested))
 	}
-	if got := plain[0].Game.Moves[0].Comments; len(got) != 1 || got[0] != "outer {inner" {
+	if got := plain[0].Game.Moves[0].Comments(); len(got) != 1 || got[0] != "outer {inner" {
 		t.Errorf("plain comment = %q", got)
 	}
-	if got := nested[0].Game.Moves[0].Comments; len(got) != 1 || got[0] != "outer {inner} still" {
+	if got := nested[0].Game.Moves[0].Comments(); len(got) != 1 || got[0] != "outer {inner} still" {
 		t.Errorf("nested comment = %q", got)
 	}
 }

@@ -333,7 +333,7 @@ func (w *positionWalk) walk(moves []*pgn.Move, r *replay.Result, limit int, pref
 		check := ply >= w.startPly
 
 		if !w.noVariations {
-			for vi, v := range moves[i].Variations {
+			for vi, v := range moves[i].Variations() {
 				if vi >= len(r.Moves[i].Variations) || r.Moves[i].Variations[vi] == nil {
 					continue
 				}
@@ -350,7 +350,7 @@ func (w *positionWalk) walk(moves []*pgn.Move, r *replay.Result, limit int, pref
 			if l, ok := w.pc.matches(pos, b); ok {
 				matched, label = true, l
 				if w.mark != "" {
-					moves[i].Comments = append(moves[i].Comments, markComment(w.mark, pos))
+					moves[i].AddComment(markComment(w.mark, pos))
 				}
 			}
 		}

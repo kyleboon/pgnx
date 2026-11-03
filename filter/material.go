@@ -413,5 +413,5 @@ func addMatchComment(g *pgn.Game, moveIdx int, text string) {
 		g.PrefixComments = append(g.PrefixComments, text)
 		return
 	}
-	g.Moves[moveIdx].Comments = append(g.Moves[moveIdx].Comments, text)
+	g.Moves[moveIdx].AddComment(text)
 }

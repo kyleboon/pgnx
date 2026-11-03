@@ -76,7 +76,7 @@ func TestEvaluateTagFailureShortCircuits(t *testing.T) {
 		t.Fatal("should fail on tags")
 	}
 	for _, mv := range g.Moves {
-		if len(mv.Comments) != 0 {
+		if len(mv.Comments()) != 0 {
 			t.Error("no marks after a tag failure")
 		}
 	}
@@ -91,8 +91,8 @@ func TestEvaluateMarksSurviveLaterFailure(t *testing.T) {
 	if ok {
 		t.Fatal("not checkmate")
 	}
-	if len(g.Moves[3].Comments) != 1 {
-		t.Errorf("marks kept: %v", g.Moves[3].Comments)
+	if len(g.Moves[3].Comments()) != 1 {
+		t.Errorf("marks kept: %v", g.Moves[3].Comments())
 	}
 }
 
@@ -182,7 +182,7 @@ func TestEvaluatePhase3Order(t *testing.T) {
 	if err != nil || ok {
 		t.Fatalf("matched %v err %v", ok, err)
 	}
-	if got := commentsAt(g); len(got) != 1 || got[0] != 1 || g.Moves[1].Comments[0] != "POS" {
+	if got := commentsAt(g); len(got) != 1 || got[0] != 1 || g.Moves[1].Comments()[0] != "POS" {
 		t.Errorf("position mark not kept: comments at %v", got)
 	}
 
@@ -200,7 +200,7 @@ func TestEvaluatePhase3Order(t *testing.T) {
 		t.Fatalf("matched %v err %v", ok, err)
 	}
 	for _, m := range g.Moves {
-		for _, c := range m.Comments {
+		for _, c := range m.Comments() {
 			if c == "MAT" {
 				t.Fatal("material mark inserted although the sequence check failed")
 			}

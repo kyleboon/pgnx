@@ -142,56 +142,75 @@ func (e *emitter) line(moves []*pgn.Move, r *replay.Result, startWhite, blackNee
 		e.lw.WriteToken(renderMove(mv, info, opts))
 		blackNeedsNumber = false
 
-		if !noNAGs {
-			for _, n := range mv.NAGs {
-				e.lw.WriteToken("$" + strconv.Itoa(n))
-			}
-		}
-
-		if !noComments {
-			for _, c := range mv.Comments {
-				e.comment(c)
-			}
-			if len(mv.Comments) > 0 {
-				blackNeedsNumber = true
-			}
-		}
-
-		// print_items_following_move: the generated comments come after
-		// the move's own annotations, in this order, and before its
-		// variations; each counts as an interruption that makes black's
-		// next move carry its number.
-		if board != nil && info != nil {
-			board.Apply(info.Move)
-			e.comment(fmt.Sprintf("%.2f", shannonEvaluation(board)))
-			blackNeedsNumber = true
-		}
-		if r != nil && i+1 < len(r.Positions) {
-			if opts.FENComments {
-				e.comment(r.Positions[i+1].FEN)
-				blackNeedsNumber = true
-			}
-			if opts.HashComments {
-				e.comment(fmt.Sprintf("%016x", r.Positions[i+1].Zobrist))
-				blackNeedsNumber = true
-			}
-		}
-
-		if !noVariations && len(mv.Variations) > 0 {
-			// The variation is an alternative to mv, so it starts on the
-			// same side to move, and the same full-move number, as mv.
-			vBaseMoveNumber := moveNumberOf(moves, i, startWhite, baseMoveNumber)
-			for vi, v := range mv.Variations {
-				var vr *replay.Result
-				if info != nil && vi < len(info.Variations) {
-					vr = info.Variations[vi]
+		// print_items_following_move: the move's own annotations in the
+		// order they were written, with the generated comments
+		// (evaluation, FEN, hash) placed after the last NAG or comment
+		// that precedes the first variation, as the C tool emits them
+		// between its NAG list and its variations. A comment or a
+		// variation is an interruption that makes black's next move
+		// carry its number; a NAG is not.
+		generated := false
+		vi := 0
+		for _, a := range mv.Annotations {
+			switch a := a.(type) {
+			case pgn.NAG:
+				if !noNAGs {
+					e.lw.WriteToken("$" + strconv.Itoa(int(a)))
 				}
-				e.variation(v, vr, isWhite, vBaseMoveNumber)
+			case pgn.Comment:
+				if !noComments {
+					e.comment(string(a))
+					blackNeedsNumber = true
+				}
+			case *pgn.Variation:
+				if !generated {
+					generated = true
+					if e.generatedComments(board, info, r, i) {
+						blackNeedsNumber = true
+					}
+				}
+				if !noVariations {
+					// The variation is an alternative to mv, so it
+					// starts on the same side to move, and the same
+					// full-move number, as mv.
+					var vr *replay.Result
+					if info != nil && vi < len(info.Variations) {
+						vr = info.Variations[vi]
+					}
+					e.variation(a, vr, isWhite, moveNumberOf(moves, i, startWhite, baseMoveNumber))
+					blackNeedsNumber = true
+				}
+				vi++
 			}
+		}
+		if !generated && e.generatedComments(board, info, r, i) {
 			blackNeedsNumber = true
 		}
 	}
 	return false
+}
+
+// generatedComments writes the comments the run asked pgnx to generate
+// after main-line move i (--evaluation, --fen-comments, --hash-comments),
+// in that order, advancing board for the evaluation; it reports whether
+// it wrote any.
+func (e *emitter) generatedComments(board *chess.Board, info *replay.MoveInfo, r *replay.Result, i int) (wrote bool) {
+	if board != nil && info != nil {
+		board.Apply(info.Move)
+		e.comment(fmt.Sprintf("%.2f", shannonEvaluation(board)))
+		wrote = true
+	}
+	if r != nil && i+1 < len(r.Positions) {
+		if e.opts.FENComments {
+			e.comment(r.Positions[i+1].FEN)
+			wrote = true
+		}
+		if e.opts.HashComments {
+			e.comment(fmt.Sprintf("%016x", r.Positions[i+1].Zobrist))
+			wrote = true
+		}
+	}
+	return wrote
 }
 
 // variation writes "(...)" for a single variation. The opening paren
@@ -212,6 +231,11 @@ func (e *emitter) variation(v *pgn.Variation, r *replay.Result, startWhite bool,
 	// get "N.", and black moves (the variation's first move being black's)
 	// get "N...".
 	e.line(v.Moves, r, startWhite, true, baseMoveNumber)
+	if v.Result != "" && !e.opts.NoResults {
+		// A result written inside the variation follows its last move
+		// (output.c print_move_list prints a move's terminating_result).
+		e.lw.WriteToken(v.Result)
+	}
 	e.lw.SuppressSpace()
 	e.lw.WriteToken(")")
 }

@@ -272,3 +272,18 @@ func TestPlayerTags(t *testing.T) {
 		t.Error("BlackFideId added for a player not in the file")
 	}
 }
+
+// --dropbefore reads only the comments written directly after a move
+// (apply.c find_matching_comment on comment_list): a comment that follows
+// a NAG belongs to the NAG in the C tool and drops nothing. Oracle:
+//
+//	printf '[Result "*"]\n\n1. e4 e5 $1 { cmt } 2. Nf3 Nc6 *\n' | pgn-extract --dropbefore cmt --quiet
+func TestDropBeforeIgnoresCommentAfterNAG(t *testing.T) {
+	g, r := parse(t, "[Result \"*\"]\n\n1. e4 e5 $1 { cmt } 2. Nf3 Nc6 *\n")
+	if _, err := Apply(g, r, Options{DropBefore: "cmt"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(g.Moves) != 4 {
+		t.Errorf("a comment after a NAG must not match; got %d moves", len(g.Moves))
+	}
+}

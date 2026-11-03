@@ -40,12 +40,12 @@ func TestScannerTwoGames(t *testing.T) {
 	if g.Moves[0].MoveNumber != 1 || g.Moves[1].MoveNumber != 0 || g.Moves[2].MoveNumber != 2 {
 		t.Errorf("move numbers wrong")
 	}
-	v := g.Moves[1].Variations
+	v := g.Moves[1].Variations()
 	if len(v) != 1 || len(v[0].Moves) != 1 || v[0].Moves[0].SAN != "c5" ||
-		len(v[0].Moves[0].Comments) != 1 {
+		len(v[0].Moves[0].Comments()) != 1 {
 		t.Fatalf("variation wrong: %+v", v)
 	}
-	if len(g.Moves[2].NAGs) != 1 || g.Moves[2].NAGs[0] != 1 || g.Moves[2].Comments[0] != "dev" {
+	if len(g.Moves[2].NAGs()) != 1 || g.Moves[2].NAGs()[0] != 1 || g.Moves[2].Comments()[0] != "dev" {
 		t.Errorf("NAG/comment attachment wrong")
 	}
 	if games[1].Result != "*" || len(games[1].Moves) != 1 {

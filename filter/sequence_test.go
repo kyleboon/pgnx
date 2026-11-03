@@ -312,7 +312,7 @@ func TestEvaluateSequencesBetweenBoundsAndMaterial(t *testing.T) {
 		t.Fatalf("matched %v err %v", ok, err)
 	}
 	for _, m := range g.Moves {
-		for _, c := range m.Comments {
+		for _, c := range m.Comments() {
 			if strings.Contains(c, "MAT") {
 				t.Fatal("material mark inserted although the sequence check failed")
 			}

@@ -178,7 +178,7 @@ func countPlies(moves []*pgn.Move, variations bool) int {
 		return n
 	}
 	for _, m := range moves {
-		for _, v := range m.Variations {
+		for _, v := range m.Variations() {
 			n += countPlies(v.Moves, true)
 		}
 	}
@@ -198,7 +198,10 @@ func pliesToDrop(g *pgn.Game, r *replay.Result, opts Options) (drop bool, n int,
 			if i+1 >= len(r.Positions) {
 				break
 			}
-			if commentMatches(m.Comments, opts.DropBefore) {
+			// Only the comments written directly after the move count
+			// (find_matching_comment reads comment_list): one that
+			// follows a NAG or a variation does not drop anything.
+			if commentMatches(m.LeadingComments(), opts.DropBefore) {
 				// The C tool counts from the board's move number, not
 				// from the game's first move, so for a FEN start this is
 				// the absolute ply count (Position.PlyNumber), which can

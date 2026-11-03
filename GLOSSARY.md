@@ -17,6 +17,10 @@ _Avoid_: entry, event, record (that is what the report does with a verdict)
 **Source fidelity**:
 The parser's guarantee that a parsed game reflects the text it came from. Rewriting a game is never the parser's job.
 
+**Annotation**:
+One token written after a move: a NAG, a comment or a variation. A move keeps its annotations in the order they were written, and a comment after a variation's closing paren is an annotation of the move before the variation, following it. Comments pgnx generates for a move (a match mark) are inserted after its leading comments, before its first NAG or variation, where pgn-extract puts them.
+_Avoid_: suffix comment, NAG comment (both are positions in the one list, not kinds)
+
 **Normalisation**:
 The corrections pgn-extract applies to a game before judging it: short or missing Result tags filled in, a FEN game given its SetUp tag, inconsistent SetUp/FEN tags grounds for rejection. Runs once per game, before replay, for every command.
 _Avoid_: fix-up, consistency check, sanitising

@@ -55,26 +55,21 @@ held to parity; see below.
 
 ## Parser data-model differences
 
-- **NAG/comment interleaving order is not preserved.** `pgn.Move` stores
-  `NAGs` and `Comments` as two separate slices with no shared ordering
-  information, so pgnx's SAN/Source output always renders all of a move's
-  NAGs before all of its comments. pgn-extract preserves the original
-  interleaving (e.g. `$1 { c } $2` can round-trip as written). Confirmed
-  divergent on `testdata/golden/infiles/test-nagcomments.pgn`: pgn-extract
-  emits `$1 { good or bad? } $2 { some think this is good } ...`, pgnx
-  emits `$1 $2 { good or bad? } { some think this is good } ...`. This is
-  a parser data-model change (a combined ordered token list per move), not
-  a minimal output fix, so it is deliberately deferred rather than patched
-  around. The C repo's `test-nagcomments` Makefile target is excluded from
-  the golden harness on this basis.
-- **Comments attached across a variation's closing paren are not
-  preserved in position.** Similarly, a comment appearing after a
-  variation's `)` but conceptually trailing the move before the `(`
-  (`... 2. d4 (2. Nf3){ c4 } ) { c5 } 2. Nf3`) is reordered relative to
-  the C oracle's output, for the same reason as the NAG/comment case above
-  — comments are stored per-move/per-variation without a token-level
-  ordering that spans a variation boundary. Confirmed divergent on
-  `testdata/golden/infiles/test-splitvariants.pgn`.
+- **NAG/comment interleaving and comments after a variation's closing
+  paren are preserved** since 2026-11-03: `pgn.Move` keeps one ordered
+  list of the tokens that followed the move (`Annotations`: NAGs,
+  comments, variations) in source order, and output walks it, so
+  `$1 { c } $2` and `(2. Nf3) { c4 }` round-trip as the C tool writes
+  them. See "Ordered annotations" below for the details and the
+  remaining differences in that area.
+- **A NAG after a variation is kept.** pgn-extract's grammar ends a
+  move's annotations at its variations (`move = move_unit NAG_list
+  variant*`), so `1. e4 (1. d4) $2 { b } e5 *` makes it abandon the
+  movetext at `$2`: it reports "Missing result", emits the game with
+  only its tags and `*`, and reads `{ b } e5 *` as a tagless second
+  game whose first move fails. pgnx keeps the NAG on the move in place
+  and emits `1. e4 (1. d4) $2 { b } 1... e5 *`, a leniency of the same
+  kind as the stray-token recovery below.
 
 ## Filtering (Phase 2: `pgnx filter`)
 
@@ -280,12 +275,11 @@ ELALG, `--linenumbers`, `--plylimit 7` with and without `-V -C`,
   identical. Three games of TWIC 1200 (0- and 1-ply games) hit this.
   Under `--keep-broken` both tools emit the game untouched by the drop
   (`rewrite_game` keeps the board); pgnx also logs it and exits 2.
-- **`--drop-before` sees a comment that follows a NAG.** The C lexer
-  attaches a comment written after a NAG (`e5 $1 { c2 }`) to the NAG,
-  where `find_matching_comment` never looks, so `--dropbefore c2` drops
-  nothing there; pgn.Move keeps every comment on the move, so pgnx
-  drops. The same data-model difference as the NAG/comment ordering
-  entry above (beads `pgnx-ordered-annotations`).
+- **`--drop-before` reads only a move's leading comments**, as
+  `find_matching_comment` reads only the C tool's `comment_list`: a
+  comment written after a NAG (`e5 $1 { c2 }`) or after a variation
+  drops nothing in either tool (`pgn.Move.LeadingComments`, since
+  2026-11-03; before that pgnx matched every comment on the move).
 - **Kept broken games count and annotate their typed moves.** With
   `--keep-broken`, the C tool's PlyCount, TotalPlyCount, `--evaluation`
   and `--fencomments` cover only the plies that replayed (the rest
@@ -315,10 +309,10 @@ ELALG, `--linenumbers`, `--plylimit 7` with and without `-V -C`,
   until a quiet move have no pgnx surface. The C test suite's
   test-FF-text target (`-Fdiagram`) is excluded from the golden harness
   on this basis.
-- **`--splitvariants` is not ported yet.** Its golden target already
-  diverges on comment placement across a variation's closing paren
-  (parser data-model section above), so it waits on beads
-  `pgnx-ordered-annotations`.
+- **`--splitvariants` is not ported yet** (beads
+  `pgnx-transforms-splitvariants`). Its golden input converts
+  identically to the C tool without the flag since the ordered
+  annotations change.
 - **Usage errors instead of warnings.** `--no-tags` with
   `--seven-tag-roster` or `--roster`, a negative `--ply-limit`, a
   missing player file, and `split` with `--output` or `--eco-split`
@@ -773,3 +767,63 @@ flag, in every format and with every generated comment.
   king's cached square (`Rxa8#`); the C tool writes `Rxa8` and warns
   about an inconsistent result. A position with no king is outside
   what either tool defines, so this is documented rather than matched.
+
+## Ordered annotations (2026-11-03, beads `pgnx-ordered-annotations`)
+
+`pgn.Move` now holds its NAGs, comments and variations as one ordered
+list, `Annotations`, filled by the parser in source order; `NAGs()`,
+`Comments()`, `LeadingComments()` and `Variations()` are views of it and
+`AddComment` is how the rest of pgnx adds a comment. This is the data
+model pgn-extract's grammar implies (`move_unit comment* (NAG+ comment*)*
+(variant comment*)*`, with each NAG group's comments on the `Nag` and a
+comment after `)` as the variation's `suffix_comment`), flattened: in
+the C tool every one of those lists is printed in source order anyway.
+
+- **Output order is source order.** `print_items_following_move` prints
+  the move's `comment_list`, then each NAG with its comments, then the
+  generated comments (`--evaluation`, `--fen-comments`,
+  `--hash-comments`), then each variation with the comments that
+  followed its closing paren.
+  pgnx walks `Annotations` and emits the generated comments before the
+  first variation (or after the last annotation when there is none),
+  which is the same place. `--no-nags` keeps the comments that followed
+  the NAGs and `--no-variations` keeps the comments that followed the
+  variations, in position, as the C tool does. Oracle cases are pinned
+  in `output/annotations_test.go`; `test-nagcomments` joined the golden
+  harness (`TestGoldenConformanceNAGComments`, both the plain and the
+  `-N -a` run) and `test-splitvariants.pgn` converts identically
+  without the flag, so both left `scripts/golden-difftest-known.txt`.
+- **Generated match comments go before the NAGs.** `--mark-matches`
+  (positional, material, piece-count, repetition and N-move-rule marks)
+  reach the game through `append_comments_to_move`, which appends to
+  `comment_list`, so the C tool emits `1. e4 { MATCH } $1 { a } (1. d4)`
+  for `1. e4 $1 { a } (1. d4)`. `AddComment` inserts after the leading
+  comments and before the first NAG or variation to match; before this
+  change pgnx rendered the mark after the NAGs.
+- **`--commented` counts only leading comments.** `comments_in_move_list`
+  tests each move's `comment_list` and recurses into variations' moves;
+  a comment that follows a NAG or a variation, and a variation's prefix
+  comment, do not make a game commented. pgnx matched any move comment
+  before; it now matches the C tool.
+- **A result inside a variation is kept.** `parse_variant` accepts a
+  result token before the closing paren and prints it after the
+  variation's last move (`(1... c5 { x } 1-0)`), honouring
+  `--noresults`. pgnx used to end the variation at the result, attach
+  what followed to the move outside it and report an unmatched `)`.
+  `pgn.Variation.Result` carries the token now, and `output` writes it;
+  a result that ends a variation does not touch the game's own result
+  or the missing-result rules. Two edges stay different, both outside
+  the oracle corpus: a comment between that result and the `)` the C
+  tool moves before the last move's NAGs (`append_comment` on
+  `comment_list`), where pgnx keeps it in source order (`c5 $1 { x }
+  1-0 { y }` is emitted as written, the C tool as `c5 { y } $1 { x }
+  1-0`); and a move after the result the C tool reports as a missing
+  `)` and reads as the next main-line move, where pgnx keeps it in the
+  variation, before the result.
+- **A NAG after a variation** stays a leniency; see "Parser data-model
+  differences" above.
+- **Corpus result.** `scripts/golden-difftest.sh`: 53 golden inputs
+  identical, 1 known divergence (`nested-comment.pgn`), 0 unexpected.
+  TWIC (`scripts/twicdiff.sh`, 2026-11-03): 744/749 identical, the same
+  5 issues as the 2026-10-31 run, all the documented missing-result
+  class.

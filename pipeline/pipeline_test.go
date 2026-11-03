@@ -299,7 +299,7 @@ const e4e5Marked = "[Event \"m\"]\n\n1. e4 e5 2. Nf3 Nc6 *\n"
 func marks(g *pgn.Game) []string {
 	var out []string
 	for _, m := range g.Moves {
-		for _, c := range m.Comments {
+		for _, c := range m.Comments() {
 			out = append(out, c)
 		}
 	}

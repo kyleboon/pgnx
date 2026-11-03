@@ -66,7 +66,7 @@ func matchNMoveRule(g *pgn.Game, r *replay.Result, n int, mark string, startPly,
 		if pos.HalfmoveClock >= 2*n {
 			matched = true
 			if mark != "" {
-				g.Moves[i].Comments = append(g.Moves[i].Comments, markComment(mark, pos))
+				g.Moves[i].AddComment(markComment(mark, pos))
 			}
 		}
 	}
@@ -114,7 +114,7 @@ func matchRepetition(g *pgn.Game, r *replay.Result, n int, mark string, startPly
 		if counts[pos.Zobrist] >= n {
 			matched = true
 			if mark != "" {
-				g.Moves[i].Comments = append(g.Moves[i].Comments, markComment(mark, pos))
+				g.Moves[i].AddComment(markComment(mark, pos))
 			}
 		}
 	}
@@ -138,8 +138,11 @@ func matchUnderpromotion(r *replay.Result, startPly, stop int) bool {
 	return false
 }
 
-// matchCommented reports whether the game has a prefix comment or any
-// move comment at any variation depth (grammar.c check_for_comments).
+// matchCommented reports whether the game has a prefix comment or, at any
+// variation depth, a move with a leading comment (grammar.c
+// check_for_comments, whose comments_in_move_list tests only each move's
+// comment_list: a comment that follows a NAG or a variation does not
+// count, and neither does a variation's prefix comment).
 func matchCommented(g *pgn.Game) bool {
 	if len(g.PrefixComments) > 0 {
 		return true
@@ -149,10 +152,10 @@ func matchCommented(g *pgn.Game) bool {
 
 func movesCommented(moves []*pgn.Move) bool {
 	for _, m := range moves {
-		if len(m.Comments) > 0 {
+		if len(m.LeadingComments()) > 0 {
 			return true
 		}
-		for _, v := range m.Variations {
+		for _, v := range m.Variations() {
 			if movesCommented(v.Moves) {
 				return true
 			}

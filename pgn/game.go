@@ -1,5 +1,7 @@
 package pgn
 
+import "slices"
+
 // Tag is a single PGN header tag, e.g. [Event "Foo"].
 type Tag struct {
 	Name  string
@@ -76,9 +78,95 @@ func (g *Game) SkippedTokens() []error {
 type Move struct {
 	SAN        string // exactly as written ("Nf3!?")
 	MoveNumber int    // 0 if none was written before this move
-	NAGs       []int
-	Comments   []string // comments following this move
-	Variations []*Variation
+	// Annotations are the tokens that followed the move in the source,
+	// in the order they were written: each is a NAG, a Comment or a
+	// *Variation. A comment written after a variation's closing paren is
+	// an annotation of this move, following that variation, as
+	// pgn-extract reads it. NAGs, Comments and Variations are views of
+	// this list; AddComment is how the rest of pgnx adds to it.
+	Annotations []Annotation
+}
+
+// Annotation is one token following a move: a NAG, a Comment or a
+// *Variation. The three types are the only implementations.
+type Annotation interface {
+	annotation()
+}
+
+// NAG is a numeric annotation glyph, the N of "$N".
+type NAG int
+
+// Comment is the text of a brace comment, without the braces.
+type Comment string
+
+func (NAG) annotation()        {}
+func (Comment) annotation()    {}
+func (*Variation) annotation() {}
+
+// NAGs returns the move's NAGs in source order; nil when it has none.
+func (m *Move) NAGs() []int {
+	var nags []int
+	for _, a := range m.Annotations {
+		if n, ok := a.(NAG); ok {
+			nags = append(nags, int(n))
+		}
+	}
+	return nags
+}
+
+// Comments returns every comment on the move in source order, wherever it
+// sits among the NAGs and variations; nil when there are none.
+func (m *Move) Comments() []string {
+	var comments []string
+	for _, a := range m.Annotations {
+		if c, ok := a.(Comment); ok {
+			comments = append(comments, string(c))
+		}
+	}
+	return comments
+}
+
+// LeadingComments returns the comments written directly after the move,
+// before its first NAG or variation: pgn-extract's comment_list, the only
+// comments its --commented, --dropbefore and comment-matching options
+// look at. nil when there are none.
+func (m *Move) LeadingComments() []string {
+	var comments []string
+	for _, a := range m.Annotations {
+		c, ok := a.(Comment)
+		if !ok {
+			break
+		}
+		comments = append(comments, string(c))
+	}
+	return comments
+}
+
+// Variations returns the move's variations in source order; nil when it
+// has none.
+func (m *Move) Variations() []*Variation {
+	var variations []*Variation
+	for _, a := range m.Annotations {
+		if v, ok := a.(*Variation); ok {
+			variations = append(variations, v)
+		}
+	}
+	return variations
+}
+
+// AddComment adds a comment to the move after its leading comments and
+// before its first NAG or variation, where pgn-extract's
+// append_comments_to_move puts the comments it generates (a
+// --mark-matches comment on "e4 $1" is emitted as "e4 { mark } $1").
+func (m *Move) AddComment(text string) {
+	i := 0
+	for i < len(m.Annotations) {
+		if _, ok := m.Annotations[i].(Comment); !ok {
+			break
+		}
+		i++
+	}
+	m.Annotations = slices.Insert(m.Annotations, i, Annotation(Comment(text)))
 }
 
 // Variation is a recursive annotation variation (RAV): an alternative line
@@ -86,4 +174,8 @@ type Move struct {
 type Variation struct {
 	PrefixComments []string
 	Moves          []*Move
+	// Result is a result token written inside the variation, before its
+	// closing paren ("(1... c5 1-0)"), which pgn-extract keeps and emits
+	// after the variation's last move; "" when there is none.
+	Result string
 }

@@ -177,9 +177,9 @@ func replayMoves(moves []*pgn.Move, b *chess.Board, allowNull bool) (*Result, er
 		// Variations replay from the position before this move, so branch
 		// off a copy of b prior to applying m.
 		var variations []*Result
-		if len(mv.Variations) > 0 {
-			variations = make([]*Result, len(mv.Variations))
-			for vi, v := range mv.Variations {
+		if vars := mv.Variations(); len(vars) > 0 {
+			variations = make([]*Result, len(vars))
+			for vi, v := range vars {
 				vb := b.Copy()
 				vr, verr := replayMoves(v.Moves, vb, true)
 				if verr != nil {

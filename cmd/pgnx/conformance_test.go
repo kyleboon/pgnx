@@ -285,18 +285,17 @@ var goldenCases = []struct {
 	//   test-duplicates, test-noduplicates, test-nounique, test-ZZ,
 	//   test-fuzzydepth.
 	//   Output transforms not yet implemented: test-splitvariants
-	//   (--splitvariants, blocked on NAG/comment ordering, beads
-	//   pgnx-ordered-annotations), test-FF-text (-Fpattern, the
-	//   comment-replacing form of -F, not ported; see CONFORMANCE.md).
+	//   (--splitvariants, beads pgnx-transforms-splitvariants; its input
+	//   converts identically to the C tool without the flag),
+	//   test-FF-text (-Fpattern, the comment-replacing form of -F, not
+	//   ported; see CONFORMANCE.md).
 	//   Not byte-compared by the C Makefile either: test-r (report mode),
 	//   test-h (help text), test-LL (log-file-only comparison);
 	//   sub-targets not promoted to their own row: -WsanBSLTDK (custom
 	//   output piece letters within test-WW, no CLI surface for
-	//   alternative piece letters yet), test-nagcomments (exercises NAG/
-	//   comment interleaving order, e.g. "$1 { c } $2"; pgn.Move stores
-	//   NAGs and Comments as separate slices with no shared ordering, so
-	//   pgnx always renders all NAGs before all comments — a parser
-	//   data-model change, not a minimal oracle-justified output fix);
+	//   alternative piece letters yet); two-run targets with their own
+	//   test function: test-append (TestGoldenConformanceAppend),
+	//   test-nagcomments (TestGoldenConformanceNAGComments);
 	//   no-flags-1/no-flags-2 (fools-mate.pgn is vendored under infiles/,
 	//   not outfiles/, and isn't a $(CMP) target in the C Makefile itself
 	//   — it's illustrative, not an enforced oracle).
@@ -731,5 +730,41 @@ func TestStrayTokensConformance(t *testing.T) {
 	}
 	if !bytes.Equal(got, want) {
 		t.Errorf("output differs from C oracle\n--- first divergence ---\n%s", firstDiff(got, want))
+	}
+}
+
+// TestGoldenConformanceNAGComments mirrors the C Makefile's test-nagcomments
+// target, which exercises the interleaving of NAGs and comments ("$1 { c }
+// $2") and the comments that survive when the NAGs are dropped:
+// pgn-extract -otest-nagcomments-out.pgn --quiet test-nagcomments.pgn
+// pgn-extract -N -atest-nagcomments-out.pgn --quiet test-nagcomments.pgn
+// The oracle file holds both runs, so this needs two invocations against
+// the same output file, which the goldenCases table can't express.
+func TestGoldenConformanceNAGComments(t *testing.T) {
+	in := filepath.Join("testdata", "golden", "infiles", "test-nagcomments.pgn")
+	want, err := os.ReadFile(filepath.Join("testdata", "golden", "outfiles", "test-nagcomments-out.pgn"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	outFile := filepath.Join(t.TempDir(), "out.pgn")
+
+	root := NewRootCmd()
+	root.SetArgs([]string{"convert", "--quiet", "-o", outFile, in})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("first pgnx convert: %v", err)
+	}
+	root = NewRootCmd()
+	root.SetArgs([]string{"convert", "--quiet", "--no-nags", "--append", "-o", outFile, in})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("second pgnx convert: %v", err)
+	}
+
+	got, err := os.ReadFile(outFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("output differs from C oracle test-nagcomments-out.pgn\n--- first divergence ---\n%s",
+			firstDiff(got, want))
 	}
 }

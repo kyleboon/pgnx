@@ -114,8 +114,8 @@ func TestMatchMaterialRookEnding(t *testing.T) {
 		if i == 3 {
 			want = 1
 		}
-		if len(m.Comments) != want {
-			t.Errorf("ply %d comments = %v, want %d", i+1, m.Comments, want)
+		if len(m.Comments()) != want {
+			t.Errorf("ply %d comments = %v, want %d", i+1, m.Comments(), want)
 		}
 	}
 	if v, ok := g.Tag("MaterialMatch"); !ok || v != "White" {
@@ -126,7 +126,7 @@ func TestMatchMaterialRookEnding(t *testing.T) {
 func TestMatchMaterialDepthAndColours(t *testing.T) {
 	g, r := replayed(t, rookEnding)
 	p, _ := ParseMaterial("0 kr k", EitherColour)
-	if !matchMaterial(g, r, []*MaterialPattern{p}, "M", false) || len(g.Moves[1].Comments) != 1 {
+	if !matchMaterial(g, r, []*MaterialPattern{p}, "M", false) || len(g.Moves[1].Comments()) != 1 {
 		t.Error("depth 0 matches immediately after Kxd8 (ply 2)")
 	}
 	// Too deep for the game: 6 half-moves of stability are not available.
@@ -158,8 +158,8 @@ func TestMatchMaterialStartPosition(t *testing.T) {
 		t.Fatal("should match")
 	}
 	// Holds at start (depth→1), ply 1 (→2), ply 2 (match): comment on ply 2.
-	if len(g.PrefixComments) != 0 || len(g.Moves[1].Comments) != 1 {
-		t.Errorf("prefix=%v moves=%v", g.PrefixComments, g.Moves[1].Comments)
+	if len(g.PrefixComments) != 0 || len(g.Moves[1].Comments()) != 1 {
+		t.Errorf("prefix=%v moves=%v", g.PrefixComments, g.Moves[1].Comments())
 	}
 	g, r = replayed(t, "[FEN \"4k3/8/8/8/8/8/8/4K2R w K - 0 1\"]\n\n1. Rh2 *\n")
 	p, _ = ParseMaterial("0 kr k", EitherColour)
@@ -188,8 +188,8 @@ func TestMatchMaterialMinorWildcard(t *testing.T) {
 
 func TestMatchPieceCount(t *testing.T) {
 	g, r := replayed(t, rookEnding) // 5 pieces, then 4 after Qxd8, 3 after Kxd8
-	if !matchPieceCount(g, r, 3, "PC") || len(g.Moves[1].Comments) != 1 {
-		t.Errorf("3 pieces after ply 2: %v", g.Moves[1].Comments)
+	if !matchPieceCount(g, r, 3, "PC") || len(g.Moves[1].Comments()) != 1 {
+		t.Errorf("3 pieces after ply 2: %v", g.Moves[1].Comments())
 	}
 	g, r = replayed(t, rookEnding)
 	if !matchPieceCount(g, r, 5, "PC") || len(g.PrefixComments) != 1 {
