@@ -69,6 +69,8 @@ func addOutputFlags(cmd *cobra.Command) {
 	flags.String("add-elo-tags", "", "add WhiteElo/BlackElo tags from the tab-separated name/rating FILE (--addelotags FILE)")
 	flags.String("add-fide-id-tags", "", "add WhiteFideId/BlackFideId tags from the tab-separated name/ID FILE (--addfideidtags FILE)")
 	flags.String("line-numbers", "", "prepend a { MARKER:start:end } comment giving each game's source lines (--linenumbers MARKER)")
+	flags.Bool("split-variants", false, "emit each variation as a game of its own after the main line, stripped of variations (--splitvariants; conflicts with --no-variations)")
+	flags.Int("split-depth", 0, "with --split-variants, follow variations only N levels deep; 0 is unlimited (--splitvariants N)")
 }
 
 // forcedUCILineWidth is the line width pgn-extract's C oracle silently
@@ -188,6 +190,32 @@ func transformOptions(cmd *cobra.Command) (*transform.Options, error) {
 		*f.dest = info
 	}
 	return &opts, nil
+}
+
+// splitOptions reads --split-variants and --split-depth. Their conflicts
+// are usage errors (exit 1), as -V with --splitvariants is in the C tool.
+// UCI output drops variations (-Wuci turns keep_variations off in
+// argsfile.c), and the C tool splits only with them kept, so --format uci
+// does not split.
+func splitOptions(cmd *cobra.Command) (split bool, depth int, err error) {
+	flags := cmd.Flags()
+	split, _ = flags.GetBool("split-variants")
+	depth, _ = flags.GetInt("split-depth")
+	noVariations, _ := flags.GetBool("no-variations")
+	switch {
+	case split && noVariations:
+		// argsfile.c: "-V clashes with the --splitvariants flag."
+		return false, 0, errors.New("--split-variants conflicts with --no-variations")
+	case flags.Changed("split-depth") && !split:
+		return false, 0, errors.New("--split-depth requires --split-variants")
+	case depth < 0:
+		return false, 0, errors.New("--split-depth requires a number greater than or equal to zero")
+	}
+	formatName, _ := flags.GetString("format")
+	if format, err := output.ParseFormat(formatName); err == nil && format == output.UCI {
+		split = false
+	}
+	return split, depth, nil
 }
 
 // openOutput opens the destination named by the string flag flagName

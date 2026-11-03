@@ -105,6 +105,10 @@ func newRunTo(cmd *cobra.Command, criteria *filter.Options, open func(*run) (des
 	if err != nil {
 		return nil, err
 	}
+	split, splitDepth, err := splitOptions(cmd)
+	if err != nil {
+		return nil, err
+	}
 	flags := cmd.Flags()
 	keepBroken, _ := flags.GetBool("keep-broken")
 	allowNullMoves, _ := flags.GetBool("allow-null-moves")
@@ -143,7 +147,7 @@ func newRunTo(cmd *cobra.Command, criteria *filter.Options, open func(*run) (des
 	}
 	r.closers = append(r.closers, r.output)
 
-	r.pipe = pipeline.New(pipeline.Config{ECO: ecoSet.table, KeepBroken: keepBroken, AllowNullMoves: allowNullMoves, Criteria: criteria, Transform: transforms})
+	r.pipe = pipeline.New(pipeline.Config{ECO: ecoSet.table, KeepBroken: keepBroken, AllowNullMoves: allowNullMoves, Criteria: criteria, Transform: transforms, SplitVariations: split, SplitDepth: splitDepth})
 	return r, nil
 }
 
@@ -238,10 +242,11 @@ func (r *run) game(n int, g *pgn.Game) gameVerdict {
 	return gameVerdict{Errors: o.Faults(), Stop: stop}
 }
 
-// write sends o's game to the destination target names, with the replay
-// the outcome says to emit: none for a Broken game, which the writer
-// then renders in Source format, the only format a broken game is
-// emitted in (CONFORMANCE.md, --keep-broken).
+// write sends the games o is emitted as (one, or the main line and one
+// game per variation under --split-variants) to the destination target
+// names, each with the replay the outcome says to emit: none for a
+// Broken game, which the writer then renders in Source format, the only
+// format a broken game is emitted in (CONFORMANCE.md, --keep-broken).
 func (r *run) write(target routeTarget, o pipeline.Outcome) error {
 	var d destination
 	switch target {
@@ -253,7 +258,19 @@ func (r *run) write(target routeTarget, o pipeline.Outcome) error {
 	if d == nil {
 		return nil
 	}
-	return writeGameTo(d, o.Game, o.ReplayToEmit())
+	// The destination's writer is chosen once per source game (grammar.c
+	// select_output_file counts matched games, so a split game's parts
+	// stay in one -# file; they share their ECO tag anyway).
+	w, err := d.writerFor(o.Game)
+	if err != nil {
+		return err
+	}
+	for _, e := range o.Emissions() {
+		if err := w.WriteGame(e.Game, e.Replay); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // exec reads every game from args (or stdin) through game, closes the

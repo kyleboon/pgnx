@@ -150,6 +150,8 @@ They are `convert` flags, so `filter` and `split` take them too.
 | `--dropbefore TEXT` | `pgnx convert --drop-before TEXT` |
 | `--plylimit N` | `pgnx convert --ply-limit N` |
 | `--linenumbers MARKER` | `pgnx convert --line-numbers MARKER` |
+| `--splitvariants` | `pgnx convert --split-variants` |
+| `--splitvariants N` | `pgnx convert --split-variants --split-depth N` |
 | `--fencomments` | `pgnx convert --fen-comments` |
 | `--hashcomments` | `pgnx convert --hash-comments` |
 | `--evaluation` | `pgnx convert --evaluation` |
@@ -172,6 +174,14 @@ Notes:
   as the C tool's rewrite does, so criteria and `--eco-file` see the
   game as parsed. A game with fewer plies than asked is reported and
   emitted nowhere (exit 2); the C tool drops it silently.
+- `--split-variants` emits each game as its main line followed by one
+  game per variation, each stripped of variations, as `--splitvariants`
+  does; `--split-depth N` is the C flag's optional depth (0, the
+  default, is unlimited). It conflicts with `--no-variations` (a usage
+  error, as `-V` is in the C tool) and does nothing under `--format uci`,
+  which drops variations. The other transforms then run over each
+  emitted game on its own (the C tool compounds them across the split;
+  see CONFORMANCE.md).
 - `-Fpattern` (replacing a matching comment with a FEN), `--fencommentformat`
   and `--quiescent` are not ported; see CONFORMANCE.md.
 - `--no-tags` with `--seven-tag-roster` or `--roster`, and a negative
@@ -183,9 +193,6 @@ The following pgn-extract flags have no pgnx equivalent yet:
 
 - Duplicate detection (Phase 4): `-D`, `-U`, `-d`, `-c`, `-Z`,
   `--fuzzydepth`, `--deletesamesetup`
-- `--splitvariants` — one game per variation; waits on the parser
-  preserving NAG/comment order across variations (beads
-  `pgnx-ordered-annotations`), which its golden test depends on
 - `-Fpattern`, `--fencommentformat`, `--quiescent` — the comment-replacing
   form of `-F`, its format string, and the quiescence extension of
   `--plylimit`

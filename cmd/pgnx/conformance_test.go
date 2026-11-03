@@ -249,6 +249,8 @@ var goldenCases = []struct {
 
 	// test-plycount: pgn-extract --plycount --totalplycount -otest-plycount-out.pgn --quiet test-plycount.pgn
 	{"test-plycount", []string{"convert", "--ply-count", "--total-ply-count"}, "test-plycount.pgn", "test-plycount-out.pgn", false},
+	// test-splitvariants: pgn-extract --splitvariants -otest-splitvariants-out.pgn --quiet test-splitvariants.pgn
+	{"test-splitvariants", []string{"convert", "--split-variants"}, "test-splitvariants.pgn", "test-splitvariants-out.pgn", false},
 	// test-addhashcode: pgn-extract --addhashcode -otest-addhashcode-out.pgn --quiet test-addhashcode.pgn
 	{"test-addhashcode", []string{"convert", "--add-hash-code"}, "test-addhashcode.pgn", "test-addhashcode-out.pgn", false},
 	// test-plylimit: pgn-extract --plylimit 10 -otest-plylimit-out.pgn --quiet test-plylimit.pgn
@@ -284,10 +286,7 @@ var goldenCases = []struct {
 	//   Duplicate detection (Phase 4): test-AA, test-checkfile,
 	//   test-duplicates, test-noduplicates, test-nounique, test-ZZ,
 	//   test-fuzzydepth.
-	//   Output transforms not yet implemented: test-splitvariants
-	//   (--splitvariants, beads pgnx-transforms-splitvariants; its input
-	//   converts identically to the C tool without the flag),
-	//   test-FF-text (-Fpattern, the comment-replacing form of -F, not
+	//   Not ported: test-FF-text (-Fpattern, the comment-replacing form of -F, not
 	//   ported; see CONFORMANCE.md).
 	//   Not byte-compared by the C Makefile either: test-r (report mode),
 	//   test-h (help text), test-LL (log-file-only comparison);

@@ -7,7 +7,9 @@
 // for its players (--addelotags, --addfideidtags). Apply runs them in the
 // C tool's order over one game and its replay; the pipeline calls it last,
 // after classification and the criteria, so selection always sees the
-// game as parsed.
+// game as parsed. SplitVariations (--splitvariants, grammar.c
+// split_variants) turns one game into its main line and one game per
+// variation, each of which the pipeline then replays and passes to Apply.
 //
 // Options that change how the game is rendered rather than what it holds
 // (--plylimit, --fencomments, --notags, ...) are output.Options, not

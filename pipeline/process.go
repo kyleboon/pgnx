@@ -45,6 +45,14 @@ type Config struct {
 	// game is recomputed). The transforms run last, on the game as it
 	// will be emitted, so the criteria see the game as parsed.
 	Transform *transform.Options
+
+	// SplitVariations emits every game as its main line followed by one
+	// game per variation (--splitvariants; transform.SplitVariations),
+	// each replayed and transformed on its own and listed by
+	// Outcome.Emissions. SplitDepth limits how deep the variations are
+	// followed; 0 is unlimited.
+	SplitVariations bool
+	SplitDepth      int
 }
 
 // Pipeline runs pgn-extract's deal_with_game sequence over one game at a
@@ -92,7 +100,8 @@ func (s Status) String() string {
 type Outcome struct {
 	// Game is the processed game: the one passed to Process, normalised
 	// and with whatever tags and marks classification and the criteria
-	// added.
+	// added, or, under Config.SplitVariations, the main line split from
+	// it. Emissions lists every game to write.
 	Game *pgn.Game
 
 	// Replay is the game's replay: complete when Status is OK, partial
@@ -117,6 +126,33 @@ type Outcome struct {
 	// false when Rejected; a Broken game is matched against its partial
 	// replay.
 	Matched bool
+
+	// split holds the games of a split outcome, in emission order; nil
+	// when the run does not split.
+	split []Emission
+}
+
+// Emission is one game to write and the replay it is rendered with: nil
+// for a game emitted in Source format only (the Outcome is Broken, or
+// the game is a variation that did not replay, kept under KeepBroken).
+type Emission struct {
+	Game   *pgn.Game
+	Replay *replay.Result
+}
+
+// Emissions returns the games o is written as, in order: the game with
+// ReplayToEmit, or, under Config.SplitVariations, the main line followed
+// by one game per variation, depth first, less any variation that did
+// not replay or was too short for the drop (reported in Warnings). nil
+// when Rejected.
+func (o Outcome) Emissions() []Emission {
+	if o.Status == Rejected {
+		return nil
+	}
+	if o.split != nil {
+		return o.split
+	}
+	return []Emission{{Game: o.Game, Replay: o.ReplayToEmit()}}
 }
 
 // ReplayToEmit is the replay the game is rendered with: the complete
@@ -144,7 +180,8 @@ func (o Outcome) Faults() []error {
 // transforms. It takes
 // ownership of g and mutates it in place (tags, marks, and the dropped
 // moves described under Outcome.Warnings); the caller reads the game
-// back from the Outcome.
+// back from the Outcome, which under Config.SplitVariations holds the
+// games split from g rather than g itself.
 //
 // Process touches only g and the Pipeline's read-only configuration, so
 // one Pipeline may process different games from several goroutines at
@@ -205,18 +242,76 @@ func (p *Pipeline) Process(g *pgn.Game) Outcome {
 	// rewrite_game keeps the board under --keepbroken, so a game too
 	// short for the drop still goes out, reported but not cut.
 	topts.KeepShort = p.cfg.KeepBroken
+	if p.cfg.SplitVariations {
+		err = p.split(&o, r, topts)
+	} else {
+		o.Replay, err = p.apply(&o, g, r, topts)
+	}
+	if err != nil {
+		o.Status, o.Reason, o.Replay = Rejected, err, nil
+		return o
+	}
+	o.Matched = matched
+	return o
+}
+
+// apply runs the transforms over g and its replay r (complete or
+// partial), returning the replay of the transformed game. A short-game
+// error kept under KeepBroken becomes a warning on o; any other error is
+// the caller's to reject the game with.
+func (p *Pipeline) apply(o *Outcome, g *pgn.Game, r *replay.Result, topts transform.Options) (*replay.Result, error) {
 	transformed, err := transform.Apply(g, r, topts)
 	var short *transform.ShortGameError
 	if errors.As(err, &short) && topts.KeepShort {
 		o.Warnings = append(o.Warnings, err)
 		err = nil
 	}
-	if err != nil {
-		o.Status, o.Reason, o.Replay = Rejected, err, nil
-		return o
+	return transformed, err
+}
+
+// split is grammar.c output_game under --splitvariants: the game is
+// emitted as its main line and one game per variation, each replayed and
+// transformed on its own (format_game runs per emitted game), with the
+// HashCode of them all summed over the main line's replay r. The main
+// line becomes o.Game and o.Replay; a variation that does not replay, or
+// is too short for the drop, is reported as a warning and emitted only
+// under KeepBroken, in Source format. An error is the main line's, and
+// rejects the game as it would without splitting.
+func (p *Pipeline) split(o *Outcome, r *replay.Result, topts transform.Options) error {
+	games := transform.SplitVariations(o.Game, p.cfg.SplitDepth)
+	topts.HashCodeReplay = r
+	o.split = make([]Emission, 0, len(games))
+	for i, sg := range games {
+		sr := r
+		var replayErr error
+		if i > 0 {
+			// The main-line prefix has already been judged under the
+			// run's null-move policy, and a variation's own null moves
+			// are always accepted.
+			sr, replayErr = replay.Game(sg, replay.Options{AllowNullMoves: true})
+			if replayErr != nil {
+				o.Warnings = append(o.Warnings, fmt.Errorf("split game %d of %d does not replay: %w", i+1, len(games), replayErr))
+				if !p.cfg.KeepBroken {
+					continue
+				}
+			}
+		}
+		transformed, err := p.apply(o, sg, sr, topts)
+		if err != nil {
+			if i == 0 {
+				return err
+			}
+			o.Warnings = append(o.Warnings, fmt.Errorf("split game %d of %d: %w", i+1, len(games), err))
+			continue
+		}
+		if i == 0 {
+			o.Game, o.Replay = sg, transformed
+		}
+		emitted := transformed
+		if o.Status != OK || replayErr != nil {
+			emitted = nil
+		}
+		o.split = append(o.split, Emission{Game: sg, Replay: emitted})
 	}
-	r = transformed
-	o.Replay = r
-	o.Matched = matched
-	return o
+	return nil
 }

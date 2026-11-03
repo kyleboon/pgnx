@@ -40,6 +40,13 @@ type Options struct {
 	// (--addhashcode). The sum runs over the game before any dropping.
 	HashCode bool
 
+	// HashCodeReplay, when non-nil, is the replay HashCode is summed over
+	// instead of the game's own: the main line's, for the games split from
+	// it. The C tool computes cumulative_hash_value once, when the game is
+	// replayed for matching, and format_game stamps it on every game
+	// split_variants emits.
+	HashCodeReplay *replay.Result
+
 	// Ratings adds WhiteElo/BlackElo tags from the players' names
 	// (--addelotags); IDs adds WhiteFideId/BlackFideId (--addfideidtags).
 	// A player missing from the table adds nothing.
@@ -119,7 +126,11 @@ func Apply(g *pgn.Game, r *replay.Result, opts Options) (*replay.Result, error) 
 	// before any plies go.
 	var hashCode string
 	if opts.HashCode || hasHashCode {
-		hashCode = fmt.Sprintf("%08x", uint32(cumulativeHash(r)))
+		hr := r
+		if opts.HashCodeReplay != nil {
+			hr = opts.HashCodeReplay
+		}
+		hashCode = fmt.Sprintf("%08x", uint32(cumulativeHash(hr)))
 	}
 
 	if drop {

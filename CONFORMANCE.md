@@ -309,10 +309,46 @@ ELALG, `--linenumbers`, `--plylimit 7` with and without `-V -C`,
   until a quiet move have no pgnx surface. The C test suite's
   test-FF-text target (`-Fdiagram`) is excluded from the golden harness
   on this basis.
-- **`--splitvariants` is not ported yet** (beads
-  `pgnx-transforms-splitvariants`). Its golden input converts
-  identically to the C tool without the flag since the ordered
-  annotations change.
+- **`--split-variants` splits once, then transforms each game.**
+  `--splitvariants` (grammar.c `split_variants`) is ported as
+  `transform.SplitVariations`: the main line stripped of variations,
+  then one game per variation, depth first, with the comments that
+  followed a variation's closing paren moved before the preceding
+  move's NAGs, a variation's prefix comment onto the move before the
+  branch, a Result tag of `*` and the variation's own result token or
+  `*`. test-splitvariants is a golden row, and a differential of the
+  flag with `--ply-count --total-ply-count --add-hash-code`,
+  `--fen-comments`, `--hash-comments`, `--evaluation`, `--final-fen`,
+  `--ply-limit 3`, `--no-comments`, `--no-nags`, `--comment-lines`,
+  `--split-depth 1` and the lalg/elalg/epd formats over every golden
+  input with a variation was byte-identical. The C tool, though, calls
+  `format_game` (which rewrites the game) on the *same* `Game` for
+  every split game, so its other rewrites compound: `--linenumbers`
+  prepends its comment once more per game emitted (the sixth game of a
+  split carries six copies), `--dropply N` drops N further plies from
+  each game in turn (and loses the variations of the plies dropped),
+  and `--dropbefore` with `--splitvariants -o` crashes. pgnx splits the
+  game as parsed and then runs the transforms over each emitted game
+  independently, so each carries the line-number comment once, has its
+  own first N plies dropped and its own `--drop-before` comment looked
+  for. What the C tool does share is mirrored: every split game's
+  HashCode is the main line's (`cumulative_hash_value` is summed when
+  the game is replayed for matching), while PlyCount and TotalPlyCount
+  count the emitted game. UCI output does not split (`-Wuci` turns
+  `keep_variations` off, and `output_game` splits only with it on;
+  the C tool makes `-Wuci --splitvariants`, in that order, a usage
+  error, pgnx never does), and `--split-variants` with
+  `--no-variations` is a usage error, as `-V` with `--splitvariants`
+  is. `pgnx split --games N` counts source games, as `-#N` counts
+  matched games (`select_output_file`), so a game's split parts stay
+  in one file. Under `--keep-broken` every game split from
+  a broken game is emitted in Source format; a variation that does not
+  replay (which the C tool fails the whole game for, with or without
+  the flag, and pgnx tolerates) is reported, emitted nowhere, and under
+  `--keep-broken` emitted in Source format. Note that the C tool's
+  `--splitvariants` reads a following numeric argument as its depth, so
+  `--splitvariants -7` swallows `-7`; `-7 --splitvariants` is the
+  equivalent of `--split-variants --seven-tag-roster`.
 - **Usage errors instead of warnings.** `--no-tags` with
   `--seven-tag-roster` or `--roster`, a negative `--ply-limit`, a
   missing player file, and `split` with `--output` or `--eco-split`
@@ -578,9 +614,10 @@ remaining diffs are pre-existing classes already documented here.
   "Null moves" below). The
   separate gap that `consistent_FEN_tags` does not add a Chess960
   `Variant` tag is unchanged.
-- Also seen, already documented above: NAG/comment interleaving
+- Also seen, since fixed or documented above: NAG/comment interleaving
   (`test-nagcomments.pgn`), comments across a variation boundary
-  (`test-splitvariants.pgn`) and Latin-1 tag bytes (`odds.pgn`).
+  (`test-splitvariants.pgn`, now a golden row under `--split-variants`)
+  and Latin-1 tag bytes (`odds.pgn`).
 
 ## Differential-testing findings (2026-10-31 TWIC corpus run)
 
@@ -792,7 +829,9 @@ the C tool every one of those lists is printed in source order anyway.
   in `output/annotations_test.go`; `test-nagcomments` joined the golden
   harness (`TestGoldenConformanceNAGComments`, both the plain and the
   `-N -a` run) and `test-splitvariants.pgn` converts identically
-  without the flag, so both left `scripts/golden-difftest-known.txt`.
+  without the flag (and, since `--split-variants` was ported, with it:
+  `TestGoldenConformance/test-splitvariants`), so both left
+  `scripts/golden-difftest-known.txt`.
 - **Generated match comments go before the NAGs.** `--mark-matches`
   (positional, material, piece-count, repetition and N-move-rule marks)
   reach the game through `append_comments_to_move`, which appends to

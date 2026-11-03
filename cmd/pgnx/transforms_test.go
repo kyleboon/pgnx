@@ -24,6 +24,9 @@ func TestTransformFlagErrors(t *testing.T) {
 		{"split with output", []string{"split", "--games", "2", "-o", "x.pgn"}, "--output"},
 		{"split with append", []string{"split", "--games", "2", "--append"}, "--append"},
 		{"split with eco-split", []string{"split", "--games", "2", "--eco-split", "1"}, "--eco-split"},
+		{"split-variants with no-variations", []string{"convert", "--split-variants", "--no-variations"}, "--no-variations"},
+		{"split-depth without split-variants", []string{"convert", "--split-depth", "1"}, "--split-variants"},
+		{"negative split-depth", []string{"convert", "--split-variants", "--split-depth", "-1"}, "--split-depth"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -111,5 +114,61 @@ func TestSplitFileSuffix(t *testing.T) {
 		if _, err := os.Stat(name); err != nil {
 			t.Errorf("%s: %v", name, err)
 		}
+	}
+}
+
+// --split-variants emits one game per variation after the main line; the
+// run's summary still counts source games, as the C tool's does, and UCI
+// output, which drops variations, does not split (argsfile.c: -Wuci
+// turns keep_variations off, and output_game splits only with it on).
+func TestSplitVariationsCLI(t *testing.T) {
+	const src = "[Result \"*\"]\n\n1. e4 e5 (1... c5 2. Nf3 (2. c3)) 2. Nf3 *\n"
+	cases := []struct {
+		name  string
+		args  []string
+		games int
+	}{
+		{"convert", []string{"convert", "--split-variants"}, 3},
+		{"depth 1", []string{"convert", "--split-variants", "--split-depth", "1"}, 2},
+		{"filter", []string{"filter", "--split-variants", "--player", ""}, 3},
+		{"uci", []string{"convert", "--split-variants", "-f", "uci"}, 1},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out, errOut, code := runCLI(t, src, c.args...)
+			if code != 0 {
+				t.Fatalf("exit %d\n%s", code, errOut)
+			}
+			if n := strings.Count(out, "[Result "); n != c.games {
+				t.Errorf("%d games emitted, want %d:\n%s", n, c.games, out)
+			}
+			if !strings.Contains(errOut, "1 game matched out of 1.") {
+				t.Errorf("summary should count the source game:\n%s", errOut)
+			}
+		})
+	}
+}
+
+// pgnx split counts source games, not the games they split into: the C
+// tool's -#N switches file on num_games_matched (grammar.c
+// select_output_file), so one game split into several stays in one file.
+func TestSplitFilesCountSourceGames(t *testing.T) {
+	t.Chdir(t.TempDir())
+	const src = "[Result \"*\"]\n\n1. e4 e5 (1... c5) (1... e6) *\n"
+	_, errOut, code := runCLI(t, src+"\n"+src+"\n"+fools, "split", "--quiet", "--games", "2", "--split-variants")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s", code, errOut)
+	}
+	for name, games := range map[string]int{"1.pgn": 6, "2.pgn": 1} {
+		data, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if n := strings.Count(string(data), "[Result "); n != games {
+			t.Errorf("%s holds %d games, want %d", name, n, games)
+		}
+	}
+	if _, err := os.Stat("3.pgn"); err == nil {
+		t.Error("3.pgn should not exist")
 	}
 }

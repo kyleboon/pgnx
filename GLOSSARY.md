@@ -38,7 +38,7 @@ One condition a game must satisfy to be selected: a tag comparison, a length bou
 _Avoid_: filter (that is the command), rule, predicate, query
 
 **Transform**:
-A rewrite of a game on its way out, after it has been judged: plies dropped from its start, tags computed from it (PlyCount, HashCode) or looked up for its players, a line-number comment. Changes what the emitted game holds, never whether it is selected. Options that only change how a game is rendered (ply limit, FEN comments, no tags) are output options, not transforms.
+A rewrite of a game on its way out, after it has been judged: plies dropped from its start, tags computed from it (PlyCount, HashCode) or looked up for its players, a line-number comment, or the game split into its main line and one game per variation. Changes what the emitted game holds (or how many games it is emitted as), never whether it is selected. Options that only change how a game is rendered (ply limit, FEN comments, no tags) are output options, not transforms.
 _Avoid_: filter (that selects), post-processing, rewrite_game
 
 **Output option**:
