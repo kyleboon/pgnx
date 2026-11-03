@@ -1,17 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"io"
 
-	"github.com/kyleboon/pgnx/pgn"
-	"github.com/kyleboon/pgnx/replay"
 	"github.com/spf13/cobra"
 )
 
 // newValidateCmd builds the "pgnx validate" subcommand: it reads PGN games
-// from its input (files, or stdin when none are given), replays each one,
-// and reports which games fail. Unlike convert, validate's per-game
+// from its input (files, or stdin when none are given), normalises and
+// replays each one, and reports which games fail: a game is valid when
+// convert would emit it without a failure. Unlike convert, validate's per-game
 // findings are a primary output rather than incidental logging, so they go
 // to stdout; --summary suppresses them in favor of a single tally line.
 func newValidateCmd() *cobra.Command {
@@ -33,7 +31,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 
 	// Per-game findings are a primary output for validate, so they go to
 	// stdout (out) rather than the shared log writer used by convert. With
-	// --summary, forEachGame's per-game lines are unwanted: every game is
+	// --summary, the report's per-game lines are unwanted: every game is
 	// still validated (for an accurate tally), but the findings themselves
 	// are discarded in favor of the single tally line printed below.
 	findings := out
@@ -52,17 +50,15 @@ func runValidate(cmd *cobra.Command, args []string) error {
 		defer logCloser.Close()
 	}
 
-	total, succeeded, ioErr := forEachGame(cmd, args, findings, logW, func(src string, n int, g *pgn.Game) error {
-		_, err := replay.Game(g, replay.Options{})
-		return err
-	})
+	// "Valid" means convert would emit the game with no failure: the same
+	// per-game sequence, routed nowhere, so a Rejected game or a warning
+	// is a finding.
+	r := newReportOnlyRun()
+	rep := newRunReport(findings, logW)
+	rep.each(games(args, cmd.InOrStdin(), parserOptions(cmd)), r.game)
 
 	if summary {
-		fmt.Fprintf(out, "%d of %d games valid\n", succeeded, total)
+		rep.validSummary(out)
 	}
-
-	if ioErr != nil || succeeded < total {
-		return errProblems
-	}
-	return nil
+	return rep.exit()
 }

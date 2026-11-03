@@ -49,10 +49,13 @@ held to parity; see below.
   `-A`/argsfile support are deferred to a later phase (see MIGRATION.md).
 - **`--keep-broken` always emits in Source format.** pgn-extract's
   `--keepbroken` re-emits a broken game in whatever `-W` format was
-  requested. pgnx's `convert --keep-broken` always emits broken games in
-  Source format (SAN exactly as parsed) regardless of `-f`, since the
-  replay detail (`replay.Result`) required by non-Source formats is
-  unavailable for a game that failed replay.
+  requested. pgnx's `convert --keep-broken` (and `filter --keep-broken`)
+  always emits broken games in Source format (SAN exactly as parsed)
+  regardless of `-f`: the moves after the failure have no replay detail
+  (`replay.Result`), which every other format needs. The rule lives in
+  the writer: `output.Writer.WriteGame` given no replay renders Source
+  with its other options (line width, roster, stripping) unchanged, and
+  the CLI writes a broken game without its partial replay.
 - **`validate`/`convert` I/O error lines go to stderr/`--log`, not
   stdout.** Unreadable input files are reported on the log writer
   (stderr by default, or `--log FILE`); they are not folded into
@@ -136,6 +139,46 @@ differences:
   format wherever a matching/unmatched game would go, and still counted as
   broken (exit 2). The C tool with `--keepbroken` likewise evaluates what
   it managed to play, modulo the ordering notes above.
+- **A game with `SetUp "1"` and no FEN tag (or an unparsable FEN) is
+  emitted nowhere, not even to `--unmatched`.** In the C tool a
+  `consistent_FEN_tags` failure only makes the game a non-match: the main
+  output never sees it, but the non-matching branch of `deal_with_game`
+  (`grammar.c`) still replays it from the standard start and writes it,
+  `[SetUp "1"]` and all, to the `-n` file, exit 0:
+
+  ```sh
+  printf '[Event "a"]\n[SetUp "1"]\n\n1. e4 *\n' | pgn-extract -TpZZZ -n/dev/stdout -o/dev/null --quiet
+  # logs "Missing FEN Tag to accompany SetUp Tag" and prints the game
+  ```
+
+  pgnx normalises every game once, before replay, for every command
+  (`pipeline.Normalise`, ADR 0002), and a game that step rejects is
+  Rejected in the glossary's sense: logged, emitted nowhere (matched,
+  `--unmatched` and `--keep-broken` alike), exit 2. `convert` and
+  `filter` therefore agree with each other; the `-n` emission of a game
+  whose tags the C tool itself called inconsistent is a recovery artefact
+  and is not copied. `TestFilterRejectsSetUpWithoutFEN`.
+- **Verified: an invalid Result tag is rewritten to `*` on the unmatched
+  path too.** `filter.Evaluate` applies the `apply.c` `play_moves` rule
+  (an unrecognised Result tag becomes `*`) after the tag criteria have
+  seen the tag as written, whether or not they passed (`pgnx-deepen.3`,
+  commit 1b36160). Checked against the oracle on 2026-11-02: the C tool's
+  non-matching branch replays the game before writing it to `-n`
+  (`check_move_validity` repeats the rule), so `-n` carries `*` as well,
+  and the tag criteria see the raw value (`-Tr1:` matches, `-Tr*` does
+  not); with no criteria, and with a `*` movetext result, likewise:
+
+  ```sh
+  printf '[Event "x"]\n[Result "1:0"]\n\n1. e4 1-0\n' | pgn-extract -TpZZZ -n/dev/stdout -o/dev/null --quiet
+  # prints the game with [Result "*"] and the 1-0 token, logging
+  # "Inconsistent result strings * vs 1-0"
+  printf '[Event "x"]\n[Result "1:0"]\n\n1. e4 *\n' | pgn-extract -TpZZZ -n/dev/stdout -o/dev/null --quiet
+  # prints the game with [Result "*"]
+  ```
+
+  `pgnx filter --player ZZZ --unmatched -`, `pgnx convert`, `--result 1:`
+  and `--result '*'` give byte-identical output for the same inputs.
+  `TestEvaluateInvalidResultTagBecomesStar`.
 - **The summary line counts matched games.** `filter` prints
   `"N game(s) matched out of M."` where N counts every game that satisfied
   the criteria (including games held back by `--select-only`/
@@ -148,8 +191,8 @@ differences:
   outermost rook on the back rank, as `find_rook_starting_position` does.)
 - **Chess960 `Variant` tag is not added.** `consistent_FEN_tags` in the C
   tool also adds `[Variant "chess 960"]` to a FEN game whose start position
-  looks like a Chess960 setup but has no `Variant` tag. pgnx adds only the
-  `SetUp "1"` tag. Flagged as a gap (no golden case); revisit with the
+  looks like a Chess960 setup but has no `Variant` tag. `pipeline.Normalise`
+  adds only the `SetUp "1"` tag. Flagged as a gap (no golden case); revisit with the
   Chess960 work.
 
 ## Positional matching and ECO (Phase 3)
@@ -241,19 +284,28 @@ were fixed; the rest are the documented differences above.
   now applies the same rule: a parsed unit with zero tags, zero moves, and
   an empty result is skipped rather than returned. Verified: pgnx's output
   over `eco.pgn` is now byte-identical to the C oracle's.
-- **Open divergence — tags-only game (no moves, no result) is emitted by
-  pgnx, discarded by the C oracle.** A "game" consisting of a complete tag
-  section but no movetext and no result token — a stub record some
-  real-world PGN collections contain, e.g. a placeholder entry with
-  `[Event]`/`[Site]`/etc. filled in but the game itself never played out —
-  is dropped entirely by pgn-extract (`grammar.c`'s `parse_game` requires
-  at least one move or a result token, in addition to tags, before it will
-  emit a game), but pgnx's parser has no such check for the tags-only case
-  and emits a full seven-tag header plus a bare `*` result line. This is
-  the mirror image of the comment-only phantom-game case fixed above
-  (there: no tags, no moves, no result, discarded on both sides now; here:
-  tags present, no moves, no result, discarded only by the C oracle).
-  Repro:
+- **Intentional, behind a parser flag — tags-only game (no moves, no
+  result).** A "game" consisting of a complete tag section but no movetext
+  and no result token — a stub record some real-world PGN collections
+  contain, e.g. a placeholder entry with `[Event]`/`[Site]`/etc. filled in
+  but the game itself never played out — is never emitted by pgn-extract
+  (`grammar.c`'s `parse_game` returns `current_symbol != EOF_TOKEN`, so a
+  game that reaches end of input without a result token is never dealt
+  with). pgnx's parser used to yield it, and the CLI emitted a full
+  seven-tag header plus a bare `*`. Decided 2026-11-02 (ADR 0002, beads
+  `pgnx-tagsonly-game`): the parser skips it behind
+  `pgn.ParserOptions.SkipTagsOnly`, which all four commands set, so the
+  CLI's game counts and numbering match the oracle; the library default
+  keeps the record. The rule is "tags and an empty movetext" (no moves,
+  no result token, nothing the parser discarded, no comment), or any
+  game with no moves and no result token that ends at end of input; a
+  mid-file zero-move game whose movetext held a stray token or a comment
+  is still emitted, as the C tool emits it (the `+/-` forfeit in
+  `TestStrayTokensConformance`). Mid-file, a stub followed directly by
+  the next game's tags is not a game in either parser: both read tags
+  across blank lines, so the stub's tags run on into the next game's
+  (last occurrence wins) and the two outputs are identical.
+  `TestScannerSkipTagsOnly`, `TestTagsOnlyGameSkipped`. Repro:
 
   ```sh
   cat > tagsonly.pgn <<'EOF'
@@ -267,19 +319,16 @@ were fixed; the rest are the documented differences above.
 
   EOF
 
-  # C oracle: emits nothing.
+  # Both emit nothing and exit 0.
   pgn-extract -7 --quiet tagsonly.pgn
-
-  # pgnx: emits the full seven-tag header plus "*".
   pgnx convert --quiet --seven-tag-roster tagsonly.pgn
-  ```
 
-  Not fixed in this pass — `pgn.parser.parseGame`'s existing skip rule
-  (`len(g.Tags) == 0 && len(g.Moves) == 0 && g.Result == ""`) would need
-  to be loosened to also skip when tags are non-empty but moves and result
-  are both empty, which risks silently dropping legitimate tag-only
-  records other callers may rely on parsing; flagged here for a
-  deliberate decision rather than folded into this fix wave.
+  # Mid-file the stub's tags merge into the next game in both tools:
+  # one game, Event "u", White "Ghost", Result "1-0".
+  printf '[Event "t"]\n[White "Ghost"]\n[Result "1-0"]\n\n[Event "u"]\n\n1. d4 *\n' > stub.pgn
+  pgn-extract --quiet stub.pgn
+  pgnx convert --quiet stub.pgn
+  ```
 - **Fixed — invalid-UTF-8 bytes were corrupted to U+FFFD.** Several
   `odds.pgn` tag values (and many TWIC team/player/site tags) contain raw
   Latin-1 bytes (e.g. `0xE7`, `0xE9`). pgn-extract is byte-oriented and
@@ -290,9 +339,10 @@ were fixed; the rest are the documented differences above.
   strings/comments are skipped as unknown characters, as before. The
   scanner still streams one game at a time. Output wrapping counts bytes
   (`len`), as the C tool does. Covered by `pgn/bytes_test.go`. Tag output
-  must not re-escape these bytes (the `%q` quoting in `output/output.go`
-  is tracked separately); with raw quoting `difftest.sh` over `odds.pgn`
-  and several Latin-1 TWIC issues is clean.
+  must not re-escape these bytes (every tag line now goes through
+  `Writer.writeTag`/`quoteTagValue` in `output/output.go`, which escapes
+  only a bare `"`; no Go `%q` remains); with raw quoting `difftest.sh`
+  over `odds.pgn` and several Latin-1 TWIC issues is clean.
 - **Script scope note, not a bug:** `difftest.sh` runs both binaries with
   no flags beyond `--quiet`/`-f`/`-o` (per its usage: `<input.pgn>
   [format]`). `testdata/golden/infiles/nested-comment.pgn` is designed to
@@ -328,9 +378,18 @@ oracle as justification and one is documented.
   invalid Result tags (e.g. `"1:0"`) unchanged. The C parser's
   `check_result` (`grammar.c`) rewrites `"1/2"` to `"1/2-1/2"` and fills an
   absent, empty or `"?"` tag from the terminating token, and `play_moves`
-  (`apply.c`) replaces any remaining non-PGN value with `"*"`. The output
-  writer now applies the same normalisation to the Result roster tag;
-  `filter` applies it before tag matching as well.
+  (`apply.c`) replaces any remaining non-PGN value with `"*"`. The first
+  two rules are `pipeline.Normalise`, which every command runs once per
+  game before replay (ADR 0002); the third is the first step of the
+  criteria stage (`filter.Evaluate`, which `convert` runs with no
+  criteria), after tag criteria have seen the tag as written, as in C.
+  The output writer trusts the tags it is given and only supplies the
+  roster default `"*"` for an absent tag, so every format now prints the
+  same Result: until 2026-11-02 the writer normalised the SAN roster tag
+  at render time while the EPD `c1` comment printed the raw tag
+  (`[Result "?"]` with a `*` token gave `c1 ?;`, the oracle gives
+  `c1 *;`). `TestConvertEPDResultNormalised`,
+  `TestConvertRosterResultNormalised`.
 - **Open divergence — a game with moves but no result token.** When a
   game's movetext is not terminated by a result token, pgn-extract reports
   "Missing result" and, if the game is the last in the file, emits nothing
@@ -374,8 +433,8 @@ to treat each as a move, fail the replay and emit nothing for the game
   unrecognised movetext token "N"`; wording is not held to parity) and the
   game is emitted, but it counts as a problem, so the run exits 2 (the C
   tool exits 0). `Game.SkippedTokens` exposes them to library users.
-- **Fixed:** a game with no moves is printed with its (normalised) Result
-  tag as the movetext, not the result token and not a default `*`
+- **Fixed:** a game with no moves is printed with its Result tag (as
+  normalised by the pipeline) as the movetext, not the result token and not a default `*`
   (`output.c`, "Take account of a possible zero move game"). So `+/-`
   movetext with `[Result "+/-"]` gives the tag section with `[Result "*"]`
   and a bare `*`; `26. N 1/2-1/2` with `[Result "1-0"]` gives a bare `1-0`.
@@ -402,10 +461,15 @@ to treat each as a move, fail the replay and emit nothing for the game
   pgn-extract --quiet dash1.pgn   # tags + "1/2-1/2", then a tagless "1. Nf3 1/2-1/2" game
   pgnx convert --quiet dash1.pgn  # "1. e4 e5 2. Nf3 1/2-1/2"
   ```
-- **Open divergence (unchanged):** when a file's last game is only stray
-  tokens (movetext `-`, nothing after), the C tool stops at EOF and emits
-  nothing; pgnx emits the tag section and `*`. This is the tags-only
-  divergence above; mid-file the two agree.
+- **Fixed (2026-11-02):** when a file's last game is only stray tokens
+  (movetext `-`, nothing after), the C tool stops at EOF and emits
+  nothing; pgnx used to emit the tag section and `*`. The tags-only skip
+  (`SkipTagsOnly`, see the tags-only entry above) now covers any game
+  with no moves and no result token that ends at end of input, so pgnx
+  emits nothing either, and logs no warning for the discarded token
+  (the C tool logs "Single '-' not allowed" but exits 0). Mid-file the
+  two agree as before: such a game is emitted as a zero-move game.
+  `TestTagsOnlyGameSkipped`.
 - **Known minor difference:** the C lexer gathers a move word from its own
   narrower character set, so `Nf3Z` is `Nf3` plus junk there; pgnx gathers
   the whole word and discards it.
@@ -467,12 +531,16 @@ warnings (663 s wall, 8 workers).
   silently correct it"). pgnx did this only inside `filter.Evaluate`, so
   `pgnx filter` matched the oracle and `pgnx convert` did not (TWIC 1267,
   1393, 1426: a Chess960 event, two games tagged with the standard start
-  FEN, one adjourned-game fragment). `filter.ConsistentFENTags` is now
-  exported and `convert` calls it before replaying; following the C tool
-  it also drops a game with `SetUp "1"` and no FEN tag, or an unparsable
-  FEN, which pgn-extract emits nowhere (pgnx logs it and exits 2; the C
-  tool logs "Missing FEN Tag to accompany SetUp Tag" and exits 0).
-  `TestConvertAddsSetUpToFENGame`/`TestConvertDropsSetUpWithoutFEN`.
+  FEN, one adjourned-game fragment). The rule now lives in
+  `pipeline.Normalise`, which `convert`, `filter` and `validate` all run
+  on every game before replaying it (ADR 0002; at first it was a
+  `filter.ConsistentFENTags` call that only `convert` made). Following
+  the C tool's main output it also rejects a game with `SetUp "1"` and no
+  FEN tag, or an unparsable FEN: pgnx logs it and exits 2, emitting it
+  nowhere; the C tool logs "Missing FEN Tag to accompany SetUp Tag",
+  exits 0, and would still write the game to a `-n` file (see the
+  Filtering section). `TestConvertAddsSetUpToFENGame`/
+  `TestConvertDropsSetUpWithoutFEN`/`TestFilterRejectsSetUpWithoutFEN`.
   The separate gap that `consistent_FEN_tags` also adds
   `[Variant "chess 960"]` to an untagged Chess960 start is unchanged.
 - **Fixed — a pawn move to the last rank with no promotion piece.**
@@ -501,3 +569,63 @@ warnings (663 s wall, 8 workers).
   null moves on the main line, illegal castling and impossible piece
   moves, plus the stray-token games whose skipped word shifts the move
   colours.
+
+## Replay exposes typed facts (2026-11-02, beads `pgnx-deepen.2`)
+
+`replay.Position` now carries the ply number (`PlyNumber`, pgn-extract's
+`play_moves` count: the one-based number of the move about to be played)
+and `replay.MoveInfo` records en passant; output, filter and eco read
+those instead of re-parsing the FEN string. One parity fix fell out:
+
+- **Fixed — a FEN tag with a fullmove field of 0.** apply.c
+  `new_fen_board` clamps a move number below 1 to 1, so the oracle
+  numbers such a game from `1.` and its `-Wfen` output prints `... 6 1`
+  for the start position. pgnx numbered the movetext from 1 already
+  (output clamped on its own) but emitted the FEN with `0` and counted
+  plies from -1. The clamp now lives where the C tool has it, on the
+  replay's starting board, so every consumer agrees.
+  `TestFullmoveClampedInFEN`, `TestFullmoveZeroFEN`.
+
+## One pipeline per run (2026-11-02, beads `pgnx-deepen.4`)
+
+`pipeline.New(Config).Process(g)` now runs pgn-extract's `deal_with_game`
+sequence (normalise, replay, broken-ness against `--keep-broken`, ECO
+classification, criteria) for `convert` and `validate`; `pgnx-deepen.5`
+routed `filter` through it as well (see below). No output changed. Two
+notes for triage:
+
+- `validate` reports exactly what `convert` would fail on: a game
+  Normalise rejects, a replay failure, or a game with no result token
+  whose moves were dropped (a warning in `convert`, exit 2 there too).
+  Before, `validate` replayed the original moves and reported the illegal
+  move itself; now it reports the dropped moves. Both are findings.
+- The criteria stage runs in `validate` and `convert` with no criteria,
+  so the `apply.c` Result rewrite (an invalid tag becomes `*`) is applied
+  before anything is written, exactly as for `filter`; `validate` writes
+  nothing, so it is unobservable there.
+
+## One run struct per command (2026-11-02, beads `pgnx-deepen.5`)
+
+`convert`, `filter` and `validate` now share one per-game sequence in
+`cmd/pgnx/run.go` (observe tags, `pipeline.Process`, route, write) and
+one setup helper; `filter`'s private copies of the replay and ECO stages
+are gone, and its route only sends the outcome through
+`filter.Selector`, `--suppress-matched` and `--unmatched`. No output
+changed: `TestFilterNoCriteriaEqualsConvertOverGoldenInputs` pins
+byte-identical output, diagnostics and exit codes for `convert` and
+`filter` with no criteria (with and without `--keep-broken`) over every
+golden input, the golden suite is unchanged, and a filter-mode
+differential (`PGNX_CMD=filter scripts/difftest.sh`, no criteria,
+`-TpCarlsen` and `--checkmate`) over 21 TWIC issues showed no
+divergence.
+
+## Epic corpus result (2026-11-02, beads `pgnx-deepen`)
+
+On the epic's integration tip, the full TWIC convert differential
+(`scripts/twicdiff.sh`, SAN, 749 issues) reproduced the 2026-10-31
+baseline exactly: 744/749 identical, the same five divergent issues
+(twic1071, twic1182, twic1196, twic1260, twic1469: the documented
+"missing result" class), 226 rejected games and 70 warnings with
+identical per-file counts; and filter mode (`-TpCarlsen`,
+`--checkmate`, and `-n` against `--unmatched`) was byte-identical over
+twic1000, twic1250 and twic1500.

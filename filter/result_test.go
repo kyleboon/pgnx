@@ -7,61 +7,6 @@ import (
 	"github.com/kyleboon/pgnx/pgn"
 )
 
-func TestNormaliseResult(t *testing.T) {
-	cases := []struct {
-		tags  []string
-		token string
-		want  string
-		has   bool
-	}{
-		{[]string{"Result", "1/2"}, "1/2-1/2", "1/2-1/2", true},
-		{[]string{"Result", "1/2"}, "", "1/2-1/2", true},
-		{[]string{"Result", "?"}, "1-0", "1-0", true},
-		{[]string{"Result", ""}, "0-1", "0-1", true},
-		{nil, "1-0", "1-0", true},
-		{nil, "", "", false},
-		{[]string{"Result", "?"}, "", "?", true},
-		{[]string{"Result", "1-0"}, "0-1", "1-0", true}, // consistency is checked later, not here
-	}
-	for _, c := range cases {
-		g := game(c.tags...)
-		g.Result = c.token
-		normaliseResult(g)
-		got, has := g.Tag("Result")
-		if got != c.want || has != c.has {
-			t.Errorf("%v token %q: Result = %q,%v want %q,%v", c.tags, c.token, got, has, c.want, c.has)
-		}
-	}
-}
-
-func TestConsistentFENTags(t *testing.T) {
-	const fen = "4k3/8/8/8/8/8/8/4K2R w K - 0 1"
-	g := game("FEN", fen)
-	if !consistentFENTags(g) {
-		t.Error("valid FEN is consistent")
-	}
-	if v, ok := g.Tag("SetUp"); !ok || v != "1" {
-		t.Errorf("SetUp added: %q %v", v, ok)
-	}
-	g = game("SetUp", "1", "FEN", fen)
-	consistentFENTags(g)
-	if n := len(g.Tags); n != 2 {
-		t.Errorf("no duplicate SetUp: %v", g.Tags)
-	}
-	if consistentFENTags(game("SetUp", "1")) {
-		t.Error("SetUp without FEN is inconsistent")
-	}
-	if !consistentFENTags(game("SetUp", "0")) {
-		t.Error("SetUp 0 without FEN is fine")
-	}
-	if consistentFENTags(game("FEN", "garbage")) {
-		t.Error("bad FEN is inconsistent")
-	}
-	if !consistentFENTags(game("White", "x")) {
-		t.Error("no FEN tags")
-	}
-}
-
 func TestCheckResultFix(t *testing.T) {
 	cases := []struct {
 		name      string

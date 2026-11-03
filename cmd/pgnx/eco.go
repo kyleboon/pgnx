@@ -9,7 +9,6 @@ import (
 	"github.com/kyleboon/pgnx/eco"
 	"github.com/kyleboon/pgnx/output"
 	"github.com/kyleboon/pgnx/pgn"
-	"github.com/kyleboon/pgnx/replay"
 	"github.com/spf13/cobra"
 )
 
@@ -78,99 +77,46 @@ func (s ecoSettings) logSkipped(w io.Writer, path string) {
 	}
 }
 
-// classify replaces g's ECO tags from the table when a line matches.
-// r may be partial (a broken game kept with --keep-broken); a nil r is
-// never matched.
-func (s ecoSettings) classify(g *pgn.Game, r *replay.Result) {
-	if s.table == nil || r == nil {
-		return
-	}
-	if e, ok := s.table.Classify(r); ok {
-		eco.Apply(g, e)
-	}
+// ecoSplitDestination is the destination of an --eco-split run: each
+// game goes to the file named by eco.FilePrefix of its ECO tag, in the
+// current directory, opened in append mode on first use and kept open
+// (and buffered) for the run (eco.c open_eco_output_file; the C tool
+// reopens per game, which is observably the same). All writers share
+// the run's options and TagRegistry.
+type ecoSplitDestination struct {
+	level int
+	opts  output.Options
+	files map[string]*bufferedDestination
 }
 
-// gameWriters picks the pair of writers (the format writer and its Source
-// fallback for broken games) a game is written with.
-type gameWriters interface {
-	writersFor(g *pgn.Game) (w, sourceW *output.Writer, err error)
-	io.Closer
+func newECOSplitDestination(level int, opts output.Options) *ecoSplitDestination {
+	return &ecoSplitDestination{level: level, opts: opts, files: map[string]*bufferedDestination{}}
 }
 
-// fixedWriters writes every game to the same destination.
-type fixedWriters struct{ w, sourceW *output.Writer }
-
-func (f fixedWriters) writersFor(*pgn.Game) (*output.Writer, *output.Writer, error) {
-	return f.w, f.sourceW, nil
-}
-
-func (fixedWriters) Close() error { return nil }
-
-// ecoSplitWriters implements --eco-split: each game goes to the file named
-// by eco.FilePrefix of its ECO tag, in the current directory, opened in
-// append mode on first use and kept open for the run (eco.c
-// open_eco_output_file; the C tool reopens per game, which is observably
-// the same). All writers share the run's options and TagRegistry.
-type ecoSplitWriters struct {
-	level            int
-	opts, sourceOpts output.Options
-	files            map[string]*os.File
-	writers          map[string]fixedWriters
-}
-
-func newECOSplitWriters(level int, opts, sourceOpts output.Options) *ecoSplitWriters {
-	return &ecoSplitWriters{
-		level:      level,
-		opts:       opts,
-		sourceOpts: sourceOpts,
-		files:      map[string]*os.File{},
-		writers:    map[string]fixedWriters{},
-	}
-}
-
-func (s *ecoSplitWriters) writersFor(g *pgn.Game) (*output.Writer, *output.Writer, error) {
+func (s *ecoSplitDestination) writerFor(g *pgn.Game) (*output.Writer, error) {
 	ecoTag, _ := g.Tag("ECO")
 	name := eco.FilePrefix(ecoTag, s.level) + ".pgn"
-	if fw, ok := s.writers[name]; ok {
-		return fw.w, fw.sourceW, nil
+	if bw, ok := s.files[name]; ok {
+		return bw.w, nil
 	}
 	f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	fw := fixedWriters{w: output.NewWriter(f, s.opts), sourceW: output.NewWriter(f, s.sourceOpts)}
-	s.files[name] = f
-	s.writers[name] = fw
-	return fw.w, fw.sourceW, nil
+	bw := newBufferedDestination(f, f, s.opts)
+	s.files[name] = bw
+	return bw.w, nil
 }
 
-// Close closes every file opened so far, returning the first error.
-func (s *ecoSplitWriters) Close() error {
+// Close flushes and closes every file opened so far, returning the first
+// error.
+func (s *ecoSplitDestination) Close() error {
 	var first error
-	for name, f := range s.files {
-		if err := f.Close(); err != nil && first == nil {
+	for name, bw := range s.files {
+		if err := bw.Close(); err != nil && first == nil {
 			first = err
 		}
 		delete(s.files, name)
 	}
 	return first
-}
-
-// writeGame writes g with w, or (when its replay failed and the game is
-// being kept) with sourceW, since only Source format can render a game
-// without replay detail.
-func writeGame(g *pgn.Game, r *replay.Result, replayErr error, w, sourceW *output.Writer) error {
-	if replayErr != nil {
-		return sourceW.WriteGame(g, nil)
-	}
-	return w.WriteGame(g, r)
-}
-
-// writeGameTo resolves the destination for g and writes it.
-func writeGameTo(dest gameWriters, g *pgn.Game, r *replay.Result, replayErr error) error {
-	w, sourceW, err := dest.writersFor(g)
-	if err != nil {
-		return err
-	}
-	return writeGame(g, r, replayErr, w, sourceW)
 }

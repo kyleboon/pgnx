@@ -6,8 +6,7 @@ import (
 	"os"
 
 	"github.com/kyleboon/pgnx/filter"
-	"github.com/kyleboon/pgnx/output"
-	"github.com/kyleboon/pgnx/pgn"
+	"github.com/kyleboon/pgnx/pipeline"
 	"github.com/spf13/cobra"
 )
 
@@ -102,21 +101,24 @@ colour.`,
 	return cmd
 }
 
-// filterOptions translates the filter flags into filter.Options and
-// filter.SelectorOptions, validating combinations. Every error it returns
-// is a usage error (exit 1).
+// filterOptions maps the filter flags onto filter.Options and
+// filter.SelectorOptions. It checks only what the flags themselves can
+// get wrong (a value that cannot be mapped, two flags for one setting);
+// the criteria's own invariants are filter's, checked by Validate. Every
+// error it returns is a usage error (exit 1).
 func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions, error) {
 	flags := cmd.Flags()
-	o := &filter.Options{}
-	var sel filter.SelectorOptions
-
 	getBool := func(name string) bool { v, _ := flags.GetBool(name); return v }
 	getInt := func(name string) int { v, _ := flags.GetInt(name); return v }
 	getStr := func(name string) string { v, _ := flags.GetString(name); return v }
 	getList := func(name string) []string { v, _ := flags.GetStringArray(name); return v }
 
-	m := &filter.TagMatcher{Substring: getBool("tag-substring"), Soundex: getBool("soundex")}
-	pc := &filter.PositionCriteria{}
+	o := &filter.Options{
+		Tags:      &filter.TagMatcher{Substring: getBool("tag-substring"), Soundex: getBool("soundex")},
+		Positions: &filter.PositionCriteria{},
+	}
+	var sel filter.SelectorOptions
+
 	for _, path := range getList("tag-file") {
 		f, err := os.Open(path)
 		if err != nil {
@@ -128,7 +130,7 @@ func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions,
 			return nil, sel, fmt.Errorf("%s: %w", path, err)
 		}
 		for _, c := range cs {
-			if err := addCriterion(m, pc, c); err != nil {
+			if err := o.AddCriterion(c); err != nil {
 				return nil, sel, fmt.Errorf("%s: %w", path, err)
 			}
 		}
@@ -138,20 +140,19 @@ func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions,
 		if err != nil {
 			return nil, sel, fmt.Errorf("--tag: %w", err)
 		}
-		if err := addCriterion(m, pc, c); err != nil {
+		if err := o.AddCriterion(c); err != nil {
 			return nil, sel, fmt.Errorf("--tag: %w", err)
 		}
 	}
-	for flag, tag := range map[string]string{
-		"player": "Player", "white": "White", "black": "Black",
-		"date": "Date", "result": "Result", "eco": "ECO",
+	// In this order, so the tag names the criteria mention (which seed
+	// the tag registry) are in the same order from run to run.
+	for _, p := range []struct{ flag, tag string }{
+		{"player", "Player"}, {"white", "White"}, {"black", "Black"},
+		{"date", "Date"}, {"result", "Result"}, {"eco", "ECO"},
 	} {
-		for _, v := range getList(flag) {
-			m.AddPrefix(tag, v)
+		for _, v := range getList(p.flag) {
+			o.Tags.AddPrefix(p.tag, v)
 		}
-	}
-	if !m.Empty() {
-		o.Tags = m
 	}
 
 	o.HigherRatedWinner = getBool("higher-rated-winner")
@@ -188,39 +189,26 @@ func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions,
 	if flags.Changed("ply") {
 		o.Bounds.SetPly(getInt("ply"))
 	}
-	if o.Bounds.MaxPly != 0 && o.Bounds.MinPly > o.Bounds.MaxPly {
-		return nil, sel, errors.New("lower length bound exceeds the upper bound")
-	}
 
 	o.Checkmate = getBool("checkmate")
 	o.Stalemate = getBool("stalemate")
 	o.Insufficient = getBool("insufficient")
-	if o.Checkmate && (o.Stalemate || o.Insufficient) {
-		return nil, sel, errors.New("--checkmate cannot be combined with --stalemate or --insufficient")
-	}
 	o.Underpromotion = getBool("underpromotion")
 	o.Commented = getBool("commented")
-	switch {
-	case getBool("fifty") && getBool("seventy-five"):
-		return nil, sel, errors.New("--fifty and --seventy-five are mutually exclusive")
-	case getBool("fifty"):
-		o.NMoveRule = 50
-	case getBool("seventy-five"):
-		o.NMoveRule = 75
+	// --fifty is applied first, so --fifty --seventy-five always reports
+	// the conflict against --seventy-five.
+	for _, p := range []struct {
+		flag string
+		rule int
+	}{{"fifty", 50}, {"seventy-five", 75}} {
+		if getBool(p.flag) {
+			if err := o.SetNMoveRule(p.rule); err != nil {
+				return nil, sel, fmt.Errorf("--%s: %w", p.flag, err)
+			}
+		}
 	}
-	if n := getInt("repetition"); n < 0 {
-		return nil, sel, errors.New("--repetition must be positive")
-	} else {
-		o.Repetition = n
-	}
-	if n := getInt("piece-count"); n < 0 {
-		return nil, sel, errors.New("--piece-count must be positive")
-	} else {
-		o.PieceCount = n
-	}
-	if o.HigherRatedWinner && o.LowerRatedWinner {
-		return nil, sel, errors.New("--higher-rated-winner and --lower-rated-winner are mutually exclusive")
-	}
+	o.Repetition = getInt("repetition")
+	o.PieceCount = getInt("piece-count")
 
 	for _, spec := range []struct {
 		flag, fileFlag string
@@ -253,6 +241,7 @@ func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions,
 	o.MarkMatches = getStr("mark-matches")
 
 	// Positional criteria (-x, FEN, -H, -Tf) and their modifiers.
+	pc := o.Positions
 	for _, path := range getList("position-file") {
 		f, err := os.Open(path)
 		if err != nil {
@@ -303,19 +292,9 @@ func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions,
 		pc.WhoseMove = filter.BlackToMove
 	}
 	if flags.Changed("match-ply-limit") {
-		limit := getInt("match-ply-limit")
-		if limit < 1 {
+		if pc.MatchPlyLimit = getInt("match-ply-limit"); pc.MatchPlyLimit < 1 {
 			return nil, sel, errors.New("--match-ply-limit must be at least 1")
 		}
-		// The C tool refuses a limit below the depth its -x lines already
-		// imply (argsfile.c "conflicts with existing higher limit").
-		if depth := pc.LineDepth(); limit < depth {
-			return nil, sel, fmt.Errorf("--match-ply-limit of %d conflicts with the search depth of %d implied by the --position lines", limit, depth)
-		}
-		pc.MatchPlyLimit = limit
-	}
-	if !pc.Empty() {
-		o.Positions = pc
 	}
 	if n := getInt("start-ply"); n < 1 {
 		return nil, sel, errors.New("--start-ply must be at least 1")
@@ -365,155 +344,55 @@ func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions,
 			return nil, sel, fmt.Errorf("--skip-matching: %w", err)
 		}
 	}
-	for _, name := range []string{"stop-after", "first-game", "game-limit"} {
-		if getInt(name) < 0 {
-			return nil, sel, fmt.Errorf("--%s must be positive", name)
-		}
-	}
 	sel.StopAfter = getInt("stop-after")
 	sel.FirstGame = getInt("first-game")
 	sel.GameLimit = getInt("game-limit")
-	if sel.FirstGame > 0 && sel.GameLimit > 0 && sel.FirstGame > sel.GameLimit {
-		return nil, sel, errors.New("--first-game is beyond --game-limit")
+
+	if err := o.Validate(); err != nil {
+		return nil, sel, err
+	}
+	if err := sel.Validate(); err != nil {
+		return nil, sel, err
 	}
 	return o, sel, nil
 }
 
 func runFilter(cmd *cobra.Command, args []string) error {
-	opts, err := outputOptions(cmd)
-	if err != nil {
-		return err
-	}
 	fopts, selOpts, err := filterOptions(cmd)
 	if err != nil {
 		return err
 	}
-	ecoSet, err := ecoOptions(cmd)
+	r, err := newRun(cmd, fopts)
 	if err != nil {
 		return err
 	}
+
 	flags := cmd.Flags()
-	keepBroken, _ := flags.GetBool("keep-broken")
-	quiet, _ := flags.GetBool("quiet")
 	suppressMatched, _ := flags.GetBool("suppress-matched")
-	unmatchedPath, _ := flags.GetString("unmatched")
-
-	logW, logCloser, err := logWriter(cmd)
-	if err != nil {
-		return err
-	}
-	if logCloser != nil {
-		defer logCloser.Close()
-	}
-	if !quiet {
-		ecoPath, _ := flags.GetString("eco-file")
-		ecoSet.logSkipped(logW, ecoPath)
-	}
-
-	// One registry shared by every writer, fed criteria tag names and
-	// every parsed game, so unrecognised tags come out in the C oracle's
-	// run-wide first-seen order (its lexer registers names from -t files
-	// and from unmatched games too).
-	opts.Tags = output.NewTagRegistry()
-	for _, name := range criteriaTagNames(cmd) {
-		opts.Tags.ObserveName(name)
-	}
-	if opts.SevenTagRoster && ecoSet.classifying() {
-		opts.RosterExtras = ecoRosterExtras
-	}
-	matched, err := openDestination(cmd, "output", opts, ecoSet.split)
-	if err != nil {
-		return err
-	}
-	defer matched.Close()
-	var unmatched gameWriters
-	if unmatchedPath != "" {
-		// Unmatched games are never divided by ECO (grammar.c
-		// select_output_file routes only matched games through -E).
-		unmatched, err = openDestination(cmd, "unmatched", opts, 0)
-		if err != nil {
+	if unmatchedPath, _ := flags.GetString("unmatched"); unmatchedPath != "" {
+		if err := r.openUnmatched("unmatched"); err != nil {
+			r.close()
 			return err
 		}
-		defer unmatched.Close()
 	}
 
+	// The Selector routes each processed game: matched games to the
+	// output unless --suppress-matched, the rest to --unmatched, and its
+	// stop-after decision ends the run.
 	sel := filter.NewSelector(selOpts)
-	total, succeeded, ioErr := forEachGame(cmd, args, logW, logW, func(src string, n int, g *pgn.Game) error {
-		opts.Tags.Observe(g)
-		r, replayErr, problem := replayGame(g, keepBroken)
-		if replayErr != nil && !keepBroken {
-			return replayErr
-		}
-		ecoSet.classify(g, r)
-		isMatch, err := filter.Evaluate(g, r, fopts)
-		if err != nil {
-			return err
-		}
-		d := sel.Decide(n, isMatch)
+	r.route = func(n int, o pipeline.Outcome) (routeTarget, bool) {
+		d := sel.Decide(n, o.Matched)
 		switch {
 		case d.Emit && !suppressMatched:
-			err = writeGameTo(matched, g, r, replayErr)
-		case d.ToUnmatched && unmatched != nil:
-			err = writeGameTo(unmatched, g, r, replayErr)
+			return toOutput, d.Stop
+		case d.ToUnmatched:
+			return toUnmatched, d.Stop
 		}
-		if err != nil {
-			return err
-		}
-		if replayErr == nil {
-			replayErr = problem
-		}
-		if d.Stop {
-			return stopAfter(replayErr)
-		}
-		return replayErr
-	})
-
-	if !quiet && !suppressMatched {
-		count := sel.Matched()
-		fmt.Fprintf(logW, "%d game%s matched out of %d.\n", count, plural(count), total)
+		return nowhere, d.Stop
 	}
-
-	if ioErr != nil || succeeded < total {
-		return errProblems
-	}
-	return nil
-}
-
-// addCriterion sends a parsed -t line to the matcher it belongs to: FEN,
-// FENPattern and FENPatternI lines are positional criteria (taglines.c
-// process_tag_line), everything else is a tag criterion.
-func addCriterion(m *filter.TagMatcher, pc *filter.PositionCriteria, c filter.Criterion) error {
-	if c.IsPositional() {
-		return pc.AddCriterion(c)
-	}
-	return m.Add(c)
-}
-
-// criteriaTagNames returns the tag names mentioned by --tag-file files and
-// --tag expressions, in order, for TagRegistry seeding; positional
-// criteria lines name no tag. Errors are ignored here: filterOptions has
-// already reported them.
-func criteriaTagNames(cmd *cobra.Command) []string {
-	var names []string
-	files, _ := cmd.Flags().GetStringArray("tag-file")
-	for _, path := range files {
-		f, err := os.Open(path)
-		if err != nil {
-			continue
-		}
-		cs, _ := filter.ReadCriteria(f)
-		f.Close()
-		for _, c := range cs {
-			if !c.IsPositional() {
-				names = append(names, c.Tag)
-			}
-		}
-	}
-	exprs, _ := cmd.Flags().GetStringArray("tag")
-	for _, e := range exprs {
-		if c, err := filter.ParseCriterion(e); err == nil && !c.IsPositional() {
-			names = append(names, c.Tag)
-		}
-	}
-	return names
+	// The summary counts the Selector's matches, and --suppress-matched
+	// suppresses it along with the matched games.
+	r.matched = sel.Matched
+	r.quiet = r.quiet || suppressMatched
+	return r.finish(r.exec(args))
 }

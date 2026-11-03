@@ -195,7 +195,10 @@ type Writer struct {
 }
 
 // NewWriter returns a Writer that writes rendered games to w according to
-// opts.
+// opts. The Writer buffers nothing: every tag line and every wrapped
+// movetext line is one Write to w, so w should be buffered (a
+// bufio.Writer the caller flushes when the run is done) when it is a
+// file or a pipe.
 func NewWriter(w io.Writer, opts Options) *Writer {
 	if opts.Tags == nil {
 		opts.Tags = NewTagRegistry()
@@ -203,45 +206,50 @@ func NewWriter(w io.Writer, opts Options) *Writer {
 	return &Writer{w: w, opts: opts}
 }
 
-// WriteGame renders g (with replay detail r, when available) to the
-// Writer's underlying io.Writer, followed by a blank line.
+// WriteGame renders g to the Writer's underlying io.Writer, followed by
+// a blank line. r is g's replay, the per-move detail every format but
+// Source needs.
 //
-// r may be nil only when opts.Format == Source, since Source rendering
-// uses only the pgn.Game data (the SAN exactly as written) and never
-// consults replay output; any other format returns an error when r is
-// nil, before anything is written.
+// When r is nil the game is rendered in Source format whatever
+// opts.Format says, with the Writer's other options (line width, roster,
+// stripping) unchanged. Source uses only the pgn.Game data (the SAN
+// exactly as written) and never consults replay output, so it is the one
+// format that can render a game without a replay; this is how a broken
+// game, whose moves did not fully replay, is emitted.
 func (w *Writer) WriteGame(g *pgn.Game, r *replay.Result) error {
-	if r == nil && w.opts.Format != Source {
-		return fmt.Errorf("output: replay result required for format %v", w.opts.Format)
+	opts := w.opts
+	if r == nil {
+		opts.Format = Source
 	}
-	switch w.opts.Format {
+	switch opts.Format {
 	case SAN, Source, LAlg, HAlg, ELAlg, XLAlg, UCI:
-		return w.writeMovetextGame(g, r)
+		return w.writeMovetextGame(g, r, opts)
 	case EPD, FEN:
 		return w.writePositionGame(g, r)
 	default:
-		return fmt.Errorf("output: format %v not implemented", w.opts.Format)
+		return fmt.Errorf("output: format %v not implemented", opts.Format)
 	}
 }
 
 // writeMovetextGame renders the tag section, an optional prefix-comment
 // block, and the movetext (via emitMovetext/renderMove) for every
 // movetext-shaped format: SAN, Source, and the long-algebraic family
-// (LAlg, HAlg, ELAlg, XLAlg, UCI).
-func (w *Writer) writeMovetextGame(g *pgn.Game, r *replay.Result) error {
+// (LAlg, HAlg, ELAlg, XLAlg, UCI). opts is w.opts with the format
+// WriteGame settled on.
+func (w *Writer) writeMovetextGame(g *pgn.Game, r *replay.Result, opts Options) error {
 	if err := w.writeTags(g); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w.w, "\n"); err != nil {
 		return err
 	}
-	if len(g.PrefixComments) > 0 && !w.opts.NoComments && !isUCI(w.opts.Format) {
+	if len(g.PrefixComments) > 0 && !opts.NoComments && !isUCI(opts.Format) {
 		// Prefix comments go through the same word-splitting token
 		// emission as move comments (emitComment), so their internal
 		// whitespace is normalized to single spaces and they word-wrap at
 		// the configured line width, matching the C oracle. Multiple
 		// prefix comments share one token stream.
-		plw := newLineWriter(w.w, w.opts.LineWidth)
+		plw := newLineWriter(w.w, opts.LineWidth)
 		for _, c := range g.PrefixComments {
 			emitComment(plw, c)
 		}
@@ -253,8 +261,8 @@ func (w *Writer) writeMovetextGame(g *pgn.Game, r *replay.Result) error {
 		}
 	}
 
-	lw := newLineWriter(w.w, w.opts.LineWidth)
-	emitMovetext(lw, g, r, w.opts)
+	lw := newLineWriter(w.w, opts.LineWidth)
+	emitMovetext(lw, g, r, opts)
 	if err := lw.Close(); err != nil {
 		return err
 	}
@@ -262,25 +270,11 @@ func (w *Writer) writeMovetextGame(g *pgn.Game, r *replay.Result) error {
 	return err
 }
 
-// normalisedResult returns the Result tag value the C oracle would emit
-// for a tag (value, present) and terminating token. Its parser's
-// check_result (grammar.c) rewrites the short form "1/2" to "1/2-1/2"
-// and fills an absent, empty or "?" tag from the token; its replay
-// (apply.c play_moves) then replaces any tag that is still not one of
-// the four PGN results with "*". With neither tag nor token the roster
-// default "*" applies.
-func normalisedResult(value string, present bool, token string) string {
-	if present && value == "1/2" {
-		value = "1/2-1/2"
-	}
-	if token != "" && (!present || value == "" || value == "?") {
-		value, present = token, true
-	}
-	switch value {
-	case "1-0", "0-1", "1/2-1/2", "*":
-		return value
-	}
-	return "*"
+// writeTag prints one tag line. It is the only place a tag reaches the
+// output, so pgn-extract's quoting (see quoteTagValue) applies everywhere.
+func (w *Writer) writeTag(name, value string) error {
+	_, err := fmt.Fprintf(w.w, "[%s %s]\n", name, quoteTagValue(value))
+	return err
 }
 
 // writeTags renders the tag section: the seven roster tags (using the
@@ -298,7 +292,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 	if len(w.opts.Roster) > 0 {
 		for _, name := range w.opts.Roster {
 			value, _ := g.Tag(name)
-			if _, err := fmt.Fprintf(w.w, "[%s %s]\n", name, quoteTagValue(value)); err != nil {
+			if err := w.writeTag(name, value); err != nil {
 				return err
 			}
 		}
@@ -309,15 +303,14 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 	for _, rt := range sevenTagRoster {
 		rosterSet[rt.name] = true
 		value, ok := g.Tag(rt.name)
-		switch {
-		case rt.name == "Result":
-			value = normalisedResult(value, ok, g.Result)
-		case !ok:
+		if !ok {
 			// A present-but-empty roster tag is preserved as ""; only a
-			// genuinely missing tag gets the standard default.
+			// genuinely missing tag gets the standard default. The Result
+			// value is written as given: its normalisation is the
+			// pipeline's job, before the game reaches the writer.
 			value = rt.deflt
 		}
-		if _, err := fmt.Fprintf(w.w, "[%s %s]\n", rt.name, quoteTagValue(value)); err != nil {
+		if err := w.writeTag(rt.name, value); err != nil {
 			return err
 		}
 	}
@@ -330,7 +323,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 			if !ok {
 				continue
 			}
-			if _, err := fmt.Fprintf(w.w, "[%s %s]\n", name, quoteTagValue(value)); err != nil {
+			if err := w.writeTag(name, value); err != nil {
 				return err
 			}
 		}
@@ -343,7 +336,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 				if !ok {
 					continue
 				}
-				if _, err := fmt.Fprintf(w.w, "[%s %q]\n", name, value); err != nil {
+				if err := w.writeTag(name, value); err != nil {
 					return err
 				}
 			}
@@ -360,7 +353,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 			continue
 		}
 		rosterSet[name] = true
-		if _, err := fmt.Fprintf(w.w, "[%s %s]\n", name, quoteTagValue(value)); err != nil {
+		if err := w.writeTag(name, value); err != nil {
 			return err
 		}
 	}
@@ -373,7 +366,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 			continue
 		}
 		rosterSet[name] = true
-		if _, err := fmt.Fprintf(w.w, "[%s %s]\n", name, quoteTagValue(value)); err != nil {
+		if err := w.writeTag(name, value); err != nil {
 			return err
 		}
 	}
@@ -394,7 +387,7 @@ func (w *Writer) writeTags(g *pgn.Game) error {
 		return w.opts.Tags.index[rest[i].Name] < w.opts.Tags.index[rest[j].Name]
 	})
 	for _, t := range rest {
-		if _, err := fmt.Fprintf(w.w, "[%s %s]\n", t.Name, quoteTagValue(t.Value)); err != nil {
+		if err := w.writeTag(t.Name, t.Value); err != nil {
 			return err
 		}
 	}

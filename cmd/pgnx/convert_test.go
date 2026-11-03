@@ -18,7 +18,7 @@ func runCLI(t *testing.T, stdin string, args ...string) (stdout, stderr string, 
 	root.SetArgs(args)
 	// execute maps our sentinel errors to 2 and usage errors to 1 (via
 	// exitCode), and prints non-sentinel errors to the error stream —
-	// the same path main()'s run() uses.
+	// the same path main() uses.
 	code = execute(root)
 	return out.String(), errb.String(), code
 }

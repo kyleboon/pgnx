@@ -1,6 +1,9 @@
 package filter
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/kyleboon/pgnx/pgn"
 	"github.com/kyleboon/pgnx/replay"
 )
@@ -42,7 +45,7 @@ type Options struct {
 
 	// Final-position predicates.
 	Checkmate, Stalemate, Insufficient bool
-	// NMoveRule is 50 (--fifty) or 75 (--seventyfive); 0 disables.
+	// NMoveRule is 50 (--fifty) or 75 (--seventy-five); 0 disables.
 	NMoveRule int
 	// Repetition is the fold count required (3 for --repetition, 5 for
 	// --repetition5); 0 disables.
@@ -81,25 +84,128 @@ type Options struct {
 	MarkMatches string
 }
 
+// AddCriterion adds a parsed -t line to the matcher it belongs to: a
+// positional criterion (FEN, FENPattern, FENPatternI; see
+// Criterion.IsPositional) to Positions, everything else to Tags
+// (taglines.c process_tag_line). Either matcher is created when nil, so
+// a Tags configured beforehand (Substring, Soundex) is kept.
+func (o *Options) AddCriterion(c Criterion) error {
+	if c.IsPositional() {
+		if o.Positions == nil {
+			o.Positions = &PositionCriteria{}
+		}
+		return o.Positions.AddCriterion(c)
+	}
+	if o.Tags == nil {
+		o.Tags = &TagMatcher{}
+	}
+	return o.Tags.Add(c)
+}
+
+// TagNames returns the tag names o's tag criteria mention, in
+// first-insertion order (see TagMatcher.TagNames); nil when o is nil or
+// has no tag criteria.
+func (o *Options) TagNames() []string {
+	if o == nil {
+		return nil
+	}
+	return o.Tags.TagNames()
+}
+
+// Validate reports the first way in which o is not a usable set of
+// criteria (the rules pgn-extract's argument handling enforces before
+// any game is read). The command layer maps a non-nil error to a usage
+// error; a zero Options is valid.
+func (o *Options) Validate() error {
+	if o.Checkmate && (o.Stalemate || o.Insufficient) {
+		return errors.New("checkmate cannot be combined with stalemate or insufficient material")
+	}
+	if o.HigherRatedWinner && o.LowerRatedWinner {
+		return errors.New("higher-rated winner and lower-rated winner are mutually exclusive")
+	}
+	if o.Bounds.MinPly < 0 || o.Bounds.MaxPly < 0 {
+		return errors.New("length bounds cannot be negative")
+	}
+	if o.Bounds.MaxPly != 0 && o.Bounds.MinPly > o.Bounds.MaxPly {
+		return fmt.Errorf("lower length bound of %d plies exceeds the upper bound of %d", o.Bounds.MinPly, o.Bounds.MaxPly)
+	}
+	if !validNMoveRule(o.NMoveRule) {
+		return fmt.Errorf("N-move rule must be 50 or 75, not %d", o.NMoveRule)
+	}
+	if err := firstNegative([]namedCount{{"repetition count", o.Repetition}, {"piece count", o.PieceCount}, {"start ply", o.StartPly}}); err != nil {
+		return err
+	}
+	for i, s := range o.Sequences {
+		if s == nil {
+			return fmt.Errorf("sequence %d is empty", i+1)
+		}
+	}
+	return o.Positions.Validate()
+}
+
+// validNMoveRule reports whether n is a value NMoveRule may hold: 0 (no
+// rule), 50 (--fifty) or 75 (--seventy-five).
+func validNMoveRule(n int) bool { return n == 0 || n == 50 || n == 75 }
+
+// namedCount is a count a Validate method checks, with the name its
+// error calls it by.
+type namedCount struct {
+	name string
+	n    int
+}
+
+// firstNegative returns the error for the first negative count in
+// counts, in the order given, so that which rule a Validate reports is
+// deterministic; nil when none is negative.
+func firstNegative(counts []namedCount) error {
+	for _, c := range counts {
+		if c.n < 0 {
+			return fmt.Errorf("%s cannot be negative", c.name)
+		}
+	}
+	return nil
+}
+
+// SetNMoveRule sets NMoveRule to n (50 or 75). Setting it again to the
+// same value is allowed; changing it from one rule to the other is an
+// error, as the C tool's --fifty and --seventyfive conflict with a
+// previous setting of each other (argsfile.c).
+func (o *Options) SetNMoveRule(n int) error {
+	if n == 0 || !validNMoveRule(n) {
+		return fmt.Errorf("N-move rule must be 50 or 75, not %d", n)
+	}
+	if o.NMoveRule != 0 && o.NMoveRule != n {
+		return fmt.Errorf("%d-move rule conflicts with the %d-move rule already set", n, o.NMoveRule)
+	}
+	o.NMoveRule = n
+	return nil
+}
+
 // Evaluate reports whether g (with its replay r, which may be partial
 // for a broken game kept with --keep-broken) satisfies o, running the
 // checks in the same order as pgn-extract's deal_with_game chain
-// (grammar.c:1214, apply.c:955-1330) and stopping at the first failure:
+// (grammar.c:1214, apply.c:955-1330) and stopping at the first failure.
+// Evaluate trusts the tags it is given: the C parser's corrections
+// (Result "1/2" → "1/2-1/2", absent/empty/"?" Result filled from the
+// terminating token, SetUp "1" added to a FEN game, inconsistent
+// SetUp/FEN tags rejected) are pipeline.Normalise's job, run once per
+// game before replay, so tag criteria see what the oracle's do.
 //
-//  1. Result-tag normalisation ("1/2" → "1/2-1/2"; absent/empty/"?"
-//     filled from the terminating token), as the C parser does.
-//  2. FEN/SetUp consistency (may add SetUp "1"; rejects SetUp without FEN).
-//  3. Tag criteria other than ECO, then higher/lower-rated-winner.
-//  4. SetUp-tag filter.
-//  5. ECO classification is not Evaluate's job: the CLI classifies a
+//  1. Tag criteria other than ECO, then higher/lower-rated-winner.
+//  2. SetUp-tag filter.
+//  3. ECO classification is not Evaluate's job: the CLI classifies a
 //     replayed game (replacing its ECO/Opening/Variation/SubVariation
 //     tags) before calling Evaluate, which is observably the same as the
 //     C tool classifying inside apply_move_list.
-//  6. The replay-time walk (apply.c play_moves) over the main line and,
+//  4. An invalid Result tag becomes "*" (the first line of apply.c
+//     play_moves and check_move_validity), after the tag checks have
+//     seen it as written but even when they failed, since the C tool's
+//     non-matching branch replays such a game before writing it to -n.
+//     Then the replay-time walk (play_moves) over the main line and,
 //     unless NoVariations, its variations, each main-line ply having the
 //     absolute ply number p (1 for a standard start; from a FEN,
-//     2*(Fullmove-1)+(Black?1:0)+1 for the first move). An invalid Result
-//     tag becomes "*". When positions are sought: the start position is
+//     2*(Fullmove-1)+(Black?1:0)+1 for the first move). When positions
+//     are sought: the start position is
 //     tested before any move when p >= StartPly, a match going to the
 //     front of the prefix comments; variations on a move are walked
 //     first, each with a fresh matched state, a match inside marking the
@@ -110,30 +216,30 @@ type Options struct {
 //     (main line only); the walk stops once p exceeds the search depth
 //     (MatchPlyLimit, or the longest -x line) without a match, leaving
 //     the game unmatched with no later marks.
-//  7. Repetition and N-move-rule marks, and the underpromotion check,
+//  5. Repetition and N-move-rule marks, and the underpromotion check,
 //     only from StartPly and only as far as the walk went.
-//  8. A MatchLabel tag when AddLabelTag and the label is non-empty.
-//  9. The end-of-game result check, if the walk reached the last move
+//  6. A MatchLabel tag when AddLabelTag and the label is non-empty.
+//  7. The end-of-game result check, if the walk reached the last move
 //     (FixResultTags may rewrite the Result tag and g.Result; NoBadResults
 //     may return ErrBadResult).
-//  10. Positions sought but unmatched, the N-move rule, underpromotion,
+//  8. Positions sought but unmatched, the N-move rule, underpromotion,
 //     stalemate and insufficient material reject the game.
-//  11. Ply-count bounds.
-//  12. Move sequences (check_textual_variations): any one of Sequences,
+//  9. Ply-count bounds.
+//  10. Move sequences (check_textual_variations): any one of Sequences,
 //     straight or permuted, from the first move or, with
 //     SequenceAnywhere, from any move.
-//  13. Material patterns, then piece count (each may insert a mark).
-//  14. Checkmate, then repetition.
-//  15. ECO tag criteria (last, after classification has had its say).
-//  16. Commented.
+//  11. Material patterns, then piece count (each may insert a mark).
+//  12. Checkmate, then repetition.
+//  13. ECO tag criteria (last, after classification has had its say).
+//  14. Commented.
 //
-// Evaluate mutates g only in the ways listed: the Result tag/token, a
-// SetUp "1" tag, mark comments, and the MaterialMatch and MatchLabel
-// tags. Because marks and those tags are added before later criteria are
-// tested, a game that is marked and then rejected (by bounds, say) keeps
-// its marks and is seen that way by an unmatched-games output, exactly
-// as in C; conversely a game rejected by an earlier step (a failed
-// sequence, say) never receives a mark from a later one.
+// Evaluate mutates g only in the ways listed: the Result tag/token,
+// mark comments, and the MaterialMatch and MatchLabel tags. Because
+// marks and those tags are added before later criteria are tested, a
+// game that is marked and then rejected (by bounds, say) keeps its marks
+// and is seen that way by an unmatched-games output, exactly as in C;
+// conversely a game rejected by an earlier step (a failed sequence, say)
+// never receives a mark from a later one.
 func Evaluate(g *pgn.Game, r *replay.Result, o *Options) (bool, error) {
 	if o == nil {
 		o = &Options{}
@@ -142,22 +248,23 @@ func Evaluate(g *pgn.Game, r *replay.Result, o *Options) (bool, error) {
 		r = &replay.Result{}
 	}
 
-	normaliseResult(g)
-	if !consistentFENTags(g) {
-		return false, nil
+	tagsMatch := o.Tags == nil || o.Tags.Match(g)
+	if tagsMatch && (o.HigherRatedWinner || o.LowerRatedWinner) && !RatedWinner(g, o.HigherRatedWinner, o.LowerRatedWinner) {
+		tagsMatch = false
 	}
-	if o.Tags != nil && !o.Tags.Match(g) {
-		return false, nil
-	}
-	if (o.HigherRatedWinner || o.LowerRatedWinner) && !RatedWinner(g, o.HigherRatedWinner, o.LowerRatedWinner) {
-		return false, nil
-	}
-	if _, hasSetup := g.Tag("SetUp"); (o.Setup == OnlySetup && !hasSetup) || (o.Setup == NoSetup && hasSetup) {
-		return false, nil
+	if _, hasSetup := g.Tag("SetUp"); tagsMatch && ((o.Setup == OnlySetup && !hasSetup) || (o.Setup == NoSetup && hasSetup)) {
+		tagsMatch = false
 	}
 
-	// apply_move_list / play_moves.
+	// apply_move_list / play_moves. The Result rewrite happens whether
+	// or not the tag checks passed: C's non-matching branch forces
+	// apply_move_list (check_move_validity, which repeats the rule) on a
+	// game that failed them before writing it to the -n file, so every
+	// game that reaches an output has a valid Result tag.
 	ensureValidResultTag(g)
+	if !tagsMatch {
+		return false, nil
+	}
 	startPly := o.StartPly
 	if startPly < 1 {
 		startPly = 1
@@ -175,7 +282,7 @@ func Evaluate(g *pgn.Game, r *replay.Result, o *Options) (bool, error) {
 		nMoveRule = matchNMoveRule(g, r, o.NMoveRule, o.MarkMatches, startPly, stop)
 	}
 	if o.AddLabelTag && label != "" {
-		setTag(g, "MatchLabel", label)
+		g.SetTag("MatchLabel", label)
 	}
 	if stop >= len(r.Moves) {
 		// The result check lives at the last move of the walk; a walk cut

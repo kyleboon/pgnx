@@ -64,4 +64,17 @@ type ParserOptions struct {
 	// matching pgn-extract's traditional behaviour) the first "}" closes the
 	// comment regardless of any "{" seen inside it.
 	NestedComments bool
+
+	// SkipTagsOnly, when true, drops a game that has a tag section but no
+	// movetext: no moves, no result token and nothing the parser
+	// discarded. pgn-extract never emits such a record (grammar.c
+	// parse_game), so the CLI sets this to keep game counts and numbering
+	// in step with the oracle; the default keeps the record for library
+	// callers. A game that ends at end of input with no moves and no
+	// result token is dropped too, whatever junk came between, since the
+	// C tool stops there before dealing with it. A game whose movetext
+	// held only stray tokens is still yielded mid-file (with
+	// Game.SkippedTokens), as the oracle emits it as a zero-move game.
+	// See CONFORMANCE.md.
+	SkipTagsOnly bool
 }

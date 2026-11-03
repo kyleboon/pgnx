@@ -48,6 +48,18 @@ func (m *TagMatcher) AddPrefix(tag, value string) {
 	m.Add(Criterion{Tag: tag, Op: OpPrefix, Value: value})
 }
 
+// TagNames returns the names of the tags the criteria mention, in
+// first-insertion order, for the output tag registry: the C lexer
+// registers the names it reads from -t files before any game is parsed,
+// so unrecognised tags take their output order from the criteria first.
+// A nil or empty matcher returns nil.
+func (m *TagMatcher) TagNames() []string {
+	if m.Empty() {
+		return nil
+	}
+	return append([]string(nil), m.order...)
+}
+
 // Empty reports whether no criteria have been added.
 func (m *TagMatcher) Empty() bool {
 	return m == nil || len(m.groups) == 0

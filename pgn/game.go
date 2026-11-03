@@ -31,6 +31,32 @@ func (g *Game) Tag(name string) (string, bool) {
 	return value, found
 }
 
+// SetTag sets the tag named name to value. If the tag is present its last
+// occurrence (the one Tag reads) is replaced in place, so the game's tag
+// order is preserved; otherwise the tag is appended. SetTag and DeleteTag
+// are the only ways the rest of pgnx mutates a parsed game's tags.
+func (g *Game) SetTag(name, value string) {
+	for i := len(g.Tags) - 1; i >= 0; i-- {
+		if g.Tags[i].Name == name {
+			g.Tags[i].Value = value
+			return
+		}
+	}
+	g.Tags = append(g.Tags, Tag{Name: name, Value: value})
+}
+
+// DeleteTag removes every tag named name, keeping the order of the rest.
+// A name the game lacks is a no-op.
+func (g *Game) DeleteTag(name string) {
+	kept := g.Tags[:0]
+	for _, t := range g.Tags {
+		if t.Name != name {
+			kept = append(kept, t)
+		}
+	}
+	g.Tags = kept
+}
+
 // ParseErrors returns the recoverable errors collected while parsing this
 // game. Parsing a game never fails hard; problems such as a missing result
 // or an unparsable NAG are recorded here instead.

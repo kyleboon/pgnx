@@ -111,3 +111,70 @@ func TestScannerLeadingFileCommentIsNotAGame(t *testing.T) {
 		t.Errorf("leading file comment should not be attached as a prefix comment: %v", games[0].PrefixComments)
 	}
 }
+
+// A tags-only game (a tag section with no movetext: no moves, no result
+// token, nothing discarded) is a record pgn-extract never emits; the CLI
+// asks the parser to skip it with SkipTagsOnly so game counts and
+// numbering match the oracle (ADR 0002, CONFORMANCE.md). The library
+// default keeps the record. Mid-file the question rarely arises: both
+// parsers read tags across blank lines, so a stub's tags merge into the
+// next game's. A game whose movetext held only stray tokens or a comment
+// is not tags-only mid-file (the oracle emits it as a zero-move game),
+// but at end of input the oracle stops before dealing with any game that
+// has no moves and no result, junk or not.
+func TestScannerSkipTagsOnly(t *testing.T) {
+	const stub = "[Event \"stub\"]\n[White \"Ghost\"]\n[Result \"1-0\"]\n\n"
+	const real = "[Event \"real\"]\n\n1. d4 *\n\n"
+	const strayOnly = "[Event \"stray\"]\n\n-\n\n"
+	cases := []struct {
+		name string
+		src  string
+		skip bool
+		want []string // Event tags of the games yielded
+	}{
+		{"default keeps a trailing stub", real + stub, false, []string{"real", "stub"}},
+		{"default keeps a trailing stub with junk", real + strayOnly, false, []string{"real", "stray"}},
+		{"trailing stub skipped", real + stub, true, []string{"real"}},
+		{"stub alone yields nothing", stub, true, nil},
+		{"two stubs in a row merge and are skipped", stub + stub, true, nil},
+		{"trailing stray-only game skipped", real + strayOnly, true, []string{"real"}},
+		{"trailing stub with a comment skipped", real + stub + "{c}\n", true, []string{"real"}},
+		{"mid-file stray-only game kept", strayOnly + real, true, []string{"stray", "real"}},
+		{"mid-file stub with a comment kept", stub + "{c}\n\n" + real, true, []string{"stub", "real"}},
+		{"trailing moves without a result kept", real + "[Event \"open\"]\n\n1. e4 e5\n", true, []string{"real", "open"}},
+		{"zero-move game with a result kept", stub + "*\n\n" + real, true, []string{"stub", "real"}},
+	}
+	for _, c := range cases {
+		s := NewScanner(strings.NewReader(c.src), ParserOptions{SkipTagsOnly: c.skip})
+		var got []string
+		for s.Next() {
+			ev, _ := s.Game().Tag("Event")
+			got = append(got, ev)
+		}
+		if err := s.Err(); err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if strings.Join(got, ",") != strings.Join(c.want, ",") {
+			t.Errorf("%s: games = %v, want %v", c.name, got, c.want)
+		}
+	}
+
+	// A mid-file stub is never seen as a game of its own: its tags run on
+	// into the next game's tag section (last occurrence wins), with or
+	// without SkipTagsOnly, exactly as in grammar.c.
+	for _, skip := range []bool{false, true} {
+		s := NewScanner(strings.NewReader(stub+real), ParserOptions{SkipTagsOnly: skip})
+		if !s.Next() {
+			t.Fatalf("skip=%v: no game", skip)
+		}
+		g := s.Game()
+		ev, _ := g.Tag("Event")
+		white, _ := g.Tag("White")
+		if ev != "real" || white != "Ghost" || len(g.Moves) != 1 {
+			t.Errorf("skip=%v: merged game = Event %q White %q moves %d", skip, ev, white, len(g.Moves))
+		}
+		if s.Next() {
+			t.Errorf("skip=%v: a second game", skip)
+		}
+	}
+}

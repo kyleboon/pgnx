@@ -1,14 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"strings"
 
-	"github.com/kyleboon/pgnx/filter"
 	"github.com/kyleboon/pgnx/output"
-	"github.com/kyleboon/pgnx/pgn"
 	"github.com/spf13/cobra"
 )
 
@@ -127,111 +124,12 @@ func openOutput(cmd *cobra.Command, flagName string) (io.Writer, io.Closer, erro
 }
 
 func runConvert(cmd *cobra.Command, args []string) error {
-	opts, err := outputOptions(cmd)
+	// convert is filter with no criteria: the pipeline decides everything
+	// about a game and every game that is not Rejected goes to the output
+	// (newRun's route, routeAll).
+	r, err := newRun(cmd, nil)
 	if err != nil {
 		return err
 	}
-	ecoSet, err := ecoOptions(cmd)
-	if err != nil {
-		return err
-	}
-	keepBroken, _ := cmd.Flags().GetBool("keep-broken")
-	quiet, _ := cmd.Flags().GetBool("quiet")
-
-	logW, logCloser, err := logWriter(cmd)
-	if err != nil {
-		return err
-	}
-	if logCloser != nil {
-		defer logCloser.Close()
-	}
-	if !quiet {
-		ecoPath, _ := cmd.Flags().GetString("eco-file")
-		ecoSet.logSkipped(logW, ecoPath)
-	}
-
-	// One registry shared by every writer, fed every parsed game so that
-	// unrecognised tags are ordered as the C oracle orders them (run-wide
-	// first-seen), even when a game is skipped.
-	opts.Tags = output.NewTagRegistry()
-	if opts.SevenTagRoster && ecoSet.classifying() {
-		opts.RosterExtras = ecoRosterExtras
-	}
-	dest, err := openDestination(cmd, "output", opts, ecoSet.split)
-	if err != nil {
-		return err
-	}
-	defer dest.Close()
-
-	total, succeeded, ioErr := forEachGame(cmd, args, logW, logW, func(src string, n int, g *pgn.Game) error {
-		opts.Tags.Observe(g)
-		// grammar.c consistent_FEN_tags: add a missing SetUp "1" to a FEN
-		// game; drop a game whose SetUp/FEN tags are inconsistent.
-		if err := filter.ConsistentFENTags(g); err != nil {
-			return err
-		}
-		r, replayErr, problem := replayGame(g, keepBroken)
-		if replayErr != nil && !keepBroken {
-			return replayErr
-		}
-		ecoSet.classify(g, r)
-		if err := writeGameTo(dest, g, r, replayErr); err != nil {
-			return err
-		}
-		if replayErr == nil {
-			return problem
-		}
-		return replayErr
-	})
-
-	if !quiet {
-		fmt.Fprintf(logW, "%d game%s matched out of %d.\n", succeeded, plural(succeeded), total)
-	}
-
-	if ioErr != nil || succeeded < total {
-		return errProblems
-	}
-	return nil
-}
-
-// openDestination builds the writer selector for games: with --eco-split
-// a per-ECO-prefix set of files in the current directory, otherwise the
-// file named by the string flag flagName (or stdout). The returned
-// Closer closes whatever files were opened.
-func openDestination(cmd *cobra.Command, flagName string, opts output.Options, splitLevel int) (gameWriters, error) {
-	sourceOpts := output.Options{Format: output.Source, LineWidth: opts.LineWidth, Tags: opts.Tags}
-	if splitLevel > 0 {
-		return newECOSplitWriters(splitLevel, opts, sourceOpts), nil
-	}
-	out, closer, err := openOutput(cmd, flagName)
-	if err != nil {
-		return nil, err
-	}
-	return &closingWriters{
-		fixedWriters: fixedWriters{w: output.NewWriter(out, opts), sourceW: output.NewWriter(out, sourceOpts)},
-		closer:       closer,
-	}, nil
-}
-
-// closingWriters is a fixedWriters pair over a file that must be closed
-// at the end of the run (nil for stdout).
-type closingWriters struct {
-	fixedWriters
-	closer io.Closer
-}
-
-func (c *closingWriters) Close() error {
-	if c.closer == nil {
-		return nil
-	}
-	return c.closer.Close()
-}
-
-// plural returns "" when n == 1, else "s", matching the C oracle's
-// "%lu game%s matched out of %lu.\n" wording (main.c).
-func plural(n int) string {
-	if n == 1 {
-		return ""
-	}
-	return "s"
+	return r.finish(r.exec(args))
 }

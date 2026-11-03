@@ -13,9 +13,15 @@ type Options struct{}
 
 // Result is the outcome of replaying a sequence of moves (a main line or a
 // variation) against a starting position.
+//
+// Applying Moves[i].Move to the board of Positions[i] yields Positions[i+1],
+// so a caller that needs a board at every ply walks the typed moves from
+// StartBoard; Result itself keeps only the first and last boards.
 type Result struct {
 	Moves     []MoveInfo // parallel to the source []*pgn.Move
 	Positions []Position // len = len(Moves)+1; [0] is the starting position
+
+	start, final *chess.Board // boards of Positions[0] and the last Position
 }
 
 // MoveInfo describes one replayed ply.
@@ -24,6 +30,7 @@ type MoveInfo struct {
 	Move       chess.Move
 	Piece      chess.Piece
 	Captured   chess.PieceType // NoPiece if quiet
+	EnPassant  bool            // a pawn capturing en passant (Captured is Pawn)
 	IsCheck    bool
 	IsMate     bool
 	Variations []*Result // parallel to the pgn.Move's Variations
@@ -84,9 +91,30 @@ func startingBoard(g *pgn.Game) (*chess.Board, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid FEN tag %q: %w", fen, err)
 		}
+		// A fullmove field below 1 counts as move 1 (apply.c
+		// new_fen_board), so ply numbers and emitted FENs agree with
+		// the C tool.
+		if b.FullmoveNumber < 1 {
+			b.FullmoveNumber = 1
+		}
 		return b, nil
 	}
 	return chess.NewBoard(), nil
+}
+
+// PlyNumber is the ply number of p: the absolute, one-based number of the
+// move about to be played from it, as pgn-extract's play_moves counts
+// (apply.c: plies = move_number*2 - (to_move == WHITE ? 1 : 0)). It is 1
+// at the standard starting position; for a game that starts from a FEN
+// tag it is derived from the FEN's fullmove number and side to move, so
+// "... b - - 0 40" is ply 80. The number of plies completed on reaching p
+// (apply.c half_moves_played) is PlyNumber()-1.
+func (p Position) PlyNumber() int {
+	n := 2*(p.FullmoveNumber-1) + 1
+	if p.SideToMove == chess.Black {
+		n++
+	}
+	return n
 }
 
 // replayMoves replays moves in sequence against b (which is mutated in
@@ -100,6 +128,8 @@ func startingBoard(g *pgn.Game) (*chess.Board, error) {
 func replayMoves(moves []*pgn.Move, b *chess.Board) (*Result, error) {
 	r := &Result{
 		Positions: make([]Position, 0, len(moves)+1),
+		start:     b.Copy(),
+		final:     b, // mutated below; the last position when replay stops
 	}
 	r.Positions = append(r.Positions, positionOf(b))
 
@@ -115,7 +145,7 @@ func replayMoves(moves []*pgn.Move, b *chess.Board) (*Result, error) {
 
 		san := sanFor(m, b)
 		piece := b.PieceAt(m.From)
-		captured := capturedPieceType(m, b)
+		captured, enPassant := capturedPieceType(m, b)
 
 		// Variations replay from the position before this move, so branch
 		// off a copy of b prior to applying m.
@@ -149,6 +179,7 @@ func replayMoves(moves []*pgn.Move, b *chess.Board) (*Result, error) {
 			Move:       m,
 			Piece:      piece,
 			Captured:   captured,
+			EnPassant:  enPassant,
 			IsCheck:    isCheck,
 			IsMate:     isMate,
 			Variations: variations,
@@ -160,14 +191,15 @@ func replayMoves(moves []*pgn.Move, b *chess.Board) (*Result, error) {
 }
 
 // capturedPieceType returns the type of piece m captures on b, before m is
-// applied, or chess.NoPiece if m is not a capture. En passant captures the
-// pawn beside m.To rather than the piece (if any) on m.To.
-func capturedPieceType(m chess.Move, b *chess.Board) chess.PieceType {
+// applied, or chess.NoPiece if m is not a capture, and whether the capture
+// is en passant: a pawn moving to b's en passant square takes the pawn
+// beside m.To rather than the (empty) square itself.
+func capturedPieceType(m chess.Move, b *chess.Board) (chess.PieceType, bool) {
 	mover := b.PieceAt(m.From)
 	if mover.Type == chess.Pawn && b.HasEP && m.To == b.EPSquare {
-		return chess.Pawn
+		return chess.Pawn, true
 	}
-	return b.PieceAt(m.To).Type
+	return b.PieceAt(m.To).Type, false
 }
 
 // positionOf snapshots b's current FEN, Zobrist hash and placement key.
@@ -183,28 +215,35 @@ func positionOf(b *chess.Board) Position {
 }
 
 // PlyCount returns the game's length in plies as pgn-extract defines it
-// (apply.c apply_move_list): derived from the final position's fullmove
-// number and side to move, not from a count of moves played. For a game
-// that starts from a FEN tag this is therefore the absolute half-move
-// number reached, which is what the C tool's -b/-p bounds compare
-// against. It is 0 for an empty Result.
+// (apply.c apply_move_list): the plies completed on reaching the final
+// position, one less than its PlyNumber, not a count of moves played. For
+// a game that starts from a FEN tag this is therefore the absolute
+// half-move number reached, which is what the C tool's -b/-p bounds
+// compare against. It is 0 for an empty Result.
 func (r *Result) PlyCount() int {
 	if r == nil || len(r.Positions) == 0 {
 		return 0
 	}
-	last := r.Positions[len(r.Positions)-1]
-	if last.SideToMove == chess.Black {
-		return 2*(last.FullmoveNumber-1) + 1
-	}
-	return 2 * (last.FullmoveNumber - 1)
+	return r.Positions[len(r.Positions)-1].PlyNumber() - 1
 }
 
-// FinalBoard reconstructs the last position reached from its FEN. It is a
-// convenience for predicates that need the board itself (stalemate,
-// insufficient material); Result does not retain a Board per ply.
-func (r *Result) FinalBoard() (*chess.Board, error) {
-	if r == nil || len(r.Positions) == 0 {
-		return nil, fmt.Errorf("replay: empty result has no final position")
+// StartBoard returns a copy of the board of Positions[0], the caller's to
+// mutate: applying the typed Moves to it in order walks the line's
+// positions. It is nil for an empty Result.
+func (r *Result) StartBoard() *chess.Board {
+	if r == nil || r.start == nil {
+		return nil
 	}
-	return chess.FromFEN(r.Positions[len(r.Positions)-1].FEN)
+	return r.start.Copy()
+}
+
+// FinalBoard returns a copy of the board of the last Position reached (for
+// a partial Result, the position the failing move was attempted from), for
+// predicates that need the board itself (stalemate, insufficient
+// material). It is nil for an empty Result.
+func (r *Result) FinalBoard() *chess.Board {
+	if r == nil || r.final == nil {
+		return nil
+	}
+	return r.final.Copy()
 }

@@ -229,13 +229,13 @@ func TestNoResultsKeepsTag(t *testing.T) {
 // TestEmptyVsMissingRosterTags pins that a roster tag that is present but
 // empty in the source is preserved as empty, while a genuinely missing tag
 // gets the standard default — the oracle does NOT conflate the two. The
-// Result tag is the exception: absent or empty, it is filled from the
-// game's actual result (movetext terminator). Oracle:
+// writer treats Result like the other six: the oracle fills an empty
+// Result from the movetext terminator in its parser, which in pgnx is
+// pipeline.Normalise's job before the game reaches the writer. Oracle:
 //
 //	printf '[Round ""]\n[Result "*"]\n\n1. e4 *\n' | pgn-extract --quiet
 //	printf '[Result "*"]\n\n1. e4 *\n' | pgn-extract --quiet
-//	printf '[Event ""]\n[Site ""]\n[Date ""]\n[Round ""]\n[White ""]\n[Black ""]\n[Result ""]\n\n1. e4 *\n' | pgn-extract --quiet
-//	printf '[Result ""]\n\n1. e4 e5 1-0\n' | pgn-extract --quiet
+//	printf '[Event ""]\n[Site ""]\n[Date ""]\n[Round ""]\n[White ""]\n[Black ""]\n[Result "*"]\n\n1. e4 *\n' | pgn-extract --quiet
 func TestEmptyVsMissingRosterTags(t *testing.T) {
 	cases := []struct {
 		name string
@@ -253,14 +253,9 @@ func TestEmptyVsMissingRosterTags(t *testing.T) {
 			want: "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n1. e4 *\n\n",
 		},
 		{
-			name: "all empty preserved except Result",
-			src:  "[Event \"\"]\n[Site \"\"]\n[Date \"\"]\n[Round \"\"]\n[White \"\"]\n[Black \"\"]\n[Result \"\"]\n\n1. e4 *\n",
+			name: "all empty preserved",
+			src:  "[Event \"\"]\n[Site \"\"]\n[Date \"\"]\n[Round \"\"]\n[White \"\"]\n[Black \"\"]\n[Result \"*\"]\n\n1. e4 *\n",
 			want: "[Event \"\"]\n[Site \"\"]\n[Date \"\"]\n[Round \"\"]\n[White \"\"]\n[Black \"\"]\n[Result \"*\"]\n\n1. e4 *\n\n",
-		},
-		{
-			name: "empty Result takes game result",
-			src:  "[Result \"\"]\n\n1. e4 e5 1-0\n",
-			want: "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"1-0\"]\n\n1. e4 e5 1-0\n\n",
 		},
 	}
 	for _, tc := range cases {
@@ -440,18 +435,81 @@ func TestSourceFormatNilReplay(t *testing.T) {
 	}
 }
 
-// TestNilReplayRequiresSource pins that WriteGame refuses a nil
-// replay.Result for any format other than Source, erroring before
-// anything is written.
-func TestNilReplayRequiresSource(t *testing.T) {
-	g, _ := gameAndReplay(t, fools)
-	var buf bytes.Buffer
-	w := NewWriter(&buf, Options{Format: SAN})
-	if err := w.WriteGame(g, nil); err == nil {
-		t.Error("expected error for nil replay with Format SAN, got nil")
+// brokenSrc is a game whose fourth ply is illegal (the black knight cannot
+// reach f3), so replay stops after three plies with a partial Result.
+const brokenSrc = "[Event \"Casual\"]\n[White \"A\"]\n[Black \"B\"]\n[Result \"*\"]\n\n1. e4 e5 2. Nf3 Nf3 $1 {oops} *\n"
+
+// brokenWant is brokenSrc rendered in Source format: the roster defaults
+// and the moves exactly as written, whatever format was asked for.
+const brokenWant = "[Event \"Casual\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"A\"]\n[Black \"B\"]\n[Result \"*\"]\n\n" +
+	"1. e4 e5 2. Nf3 Nf3 $1 { oops } *\n\n"
+
+// brokenGame parses brokenSrc and replays it, returning the partial
+// replay (three plies) the failure leaves behind.
+func brokenGame(t *testing.T) (*pgn.Game, *replay.Result) {
+	t.Helper()
+	g := parseGame(t, brokenSrc)
+	r, err := replay.Game(g, replay.Options{})
+	if err == nil {
+		t.Fatal("brokenSrc replayed without error")
 	}
-	if buf.Len() != 0 {
-		t.Errorf("expected no output on error, got:\n%q", buf.String())
+	if r == nil || len(r.Moves) != 3 {
+		t.Fatalf("partial replay: %+v", r)
+	}
+	return g, r
+}
+
+// TestNilReplayRendersSource pins that a game written without a replay
+// is rendered in Source format whatever Options.Format says: Source is the
+// only format that needs no replay, so it is how a broken game (one whose
+// moves did not fully replay) reaches the output. UCI is the format that
+// strips the most (move numbers, NAGs, comments) and so would differ most
+// if its options leaked into the fallback; EPD would have no tags at all.
+func TestNilReplayRendersSource(t *testing.T) {
+	g, _ := brokenGame(t)
+	for _, f := range []Format{SAN, Source, LAlg, HAlg, ELAlg, XLAlg, UCI, EPD, FEN} {
+		var buf bytes.Buffer
+		w := NewWriter(&buf, Options{Format: f})
+		if err := w.WriteGame(g, nil); err != nil {
+			t.Errorf("%v: %v", f, err)
+			continue
+		}
+		if buf.String() != brokenWant {
+			t.Errorf("%v: got:\n%q\nwant:\n%q", f, buf.String(), brokenWant)
+		}
+	}
+}
+
+// TestPartialReplayRendersSource pins the other half of the broken-game
+// contract: a Source writer given the partial replay a failed replay
+// leaves behind renders every move as written, not only the plies that
+// replayed, and the same bytes as the nil-replay fallback.
+func TestPartialReplayRendersSource(t *testing.T) {
+	g, partial := brokenGame(t)
+	var buf bytes.Buffer
+	w := NewWriter(&buf, Options{Format: Source})
+	if err := w.WriteGame(g, partial); err != nil {
+		t.Fatal(err)
+	}
+	if buf.String() != brokenWant {
+		t.Errorf("got:\n%q\nwant:\n%q", buf.String(), brokenWant)
+	}
+}
+
+// TestNilReplayFallbackKeepsOtherOptions pins that the Source fallback is
+// only a change of format: the line width, roster and comment stripping
+// the writer was built with still apply to a broken game.
+func TestNilReplayFallbackKeepsOtherOptions(t *testing.T) {
+	g, _ := brokenGame(t)
+	var buf bytes.Buffer
+	w := NewWriter(&buf, Options{Format: LAlg, LineWidth: 12, SevenTagRoster: true, NoComments: true, NoNAGs: true})
+	if err := w.WriteGame(g, nil); err != nil {
+		t.Fatal(err)
+	}
+	want := "[Event \"Casual\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"A\"]\n[Black \"B\"]\n[Result \"*\"]\n\n" +
+		"1. e4 e5 2.\nNf3 Nf3 *\n\n"
+	if buf.String() != want {
+		t.Errorf("got:\n%q\nwant:\n%q", buf.String(), want)
 	}
 }
 
@@ -586,18 +644,19 @@ func parseGame(t *testing.T, src string) *pgn.Game {
 	return s.Game()
 }
 
-func TestResultTagNormalisation(t *testing.T) {
+// The writer trusts the Result tag it is given (normalising it is the
+// pipeline's job): a present tag is written verbatim, and only an absent
+// one gets the roster default "*".
+func TestResultTagTrusted(t *testing.T) {
 	cases := []struct {
 		src  string
 		want string
 	}{
-		{"[Result \"1/2\"]\n\n1. e4 1/2-1/2\n", "1/2-1/2"},
-		{"[Result \"1/2\"]\n\n1. e4 *\n", "1/2-1/2"},
-		{"[Result \"?\"]\n\n1. e4 1-0\n", "1-0"},
-		{"[Result \"\"]\n\n1. e4 0-1\n", "0-1"},
-		{"1. e4 0-1\n", "0-1"},
-		{"[Result \"1:0\"]\n\n1. e4 1-0\n", "*"},
-		{"[Result \"1-0\"]\n\n1. e4 0-1\n", "1-0"}, // disagreement is filter's business
+		{"[Result \"1/2\"]\n\n1. e4 1/2-1/2\n", "1/2"},
+		{"[Result \"?\"]\n\n1. e4 1-0\n", "?"},
+		{"[Result \"1:0\"]\n\n1. e4 1-0\n", "1:0"},
+		{"[Result \"1-0\"]\n\n1. e4 0-1\n", "1-0"},
+		{"1. e4 0-1\n", "*"},
 		{"[Event \"x\"]\n\n*\n", "*"},
 	}
 	for _, c := range cases {
@@ -651,5 +710,74 @@ func TestRosterFENTags(t *testing.T) {
 	}
 	if want := head + "\n1. e4 *\n\n"; buf.String() != want {
 		t.Errorf("got:\n%q\nwant:\n%q", buf.String(), want)
+	}
+}
+
+// TestTagValuesQuotedTheOracleWay feeds a value holding `"` and `\` through
+// every tag-emitting path and pins pgn-extract's quoting rule. The oracle
+// (lex.c gather_string, output.c output_tag) stores a tag value with its
+// source escape pairs intact and prints it verbatim inside double quotes,
+// so `\"`, `\\` and a lone `\d` pass through unchanged. A bare `"` can only
+// arrive programmatically (SetTag); escaping it is the one liberty taken,
+// since the oracle could never hold one. Go's %q escaping (`\\`, `\"` for
+// every backslash and quote) must appear on no path. The EPD c0 comment
+// copies values raw (output.c format_epd_game_comment), with no quoting.
+func TestTagValuesQuotedTheOracleWay(t *testing.T) {
+	const (
+		raw     = `a\"b\\c\d` // as parsed from [X "a\"b\\c\d"]
+		bare    = `x"y`       // set programmatically
+		bareOut = `x\"y`
+		fen     = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+	)
+	src := "[Event \"" + raw + "\"]\n" +
+		"[Annotator \"" + raw + "\"]\n" + // well-known, fixed order
+		"[HashCode \"" + raw + "\"]\n" + // predefined trailing
+		"[Foo \"" + raw + "\"]\n" + // unrecognised
+		"[Opening \"" + raw + "\"]\n" + // RosterExtras under SevenTagRoster
+		"[FEN \"" + fen + "\"]\n[SetUp \"1\"]\n" +
+		"[Variant \"" + raw + "\"]\n" + // Variant/SetUp/FEN trailer under SevenTagRoster
+		"[Result \"*\"]\n\n1. e4 *\n"
+	newGame := func() (*pgn.Game, *replay.Result) {
+		g, r := gameAndReplay(t, src)
+		g.SetTag("Site", bare) // roster tag
+		g.SetTag("Bar", bare)  // unrecognised, appended
+		return g, r
+	}
+	render := func(opts Options) string {
+		g, r := newGame()
+		var buf bytes.Buffer
+		if err := NewWriter(&buf, opts).WriteGame(g, r); err != nil {
+			t.Fatal(err)
+		}
+		return buf.String()
+	}
+
+	seven := "[Event \"" + raw + "\"]\n[Site \"" + bareOut + "\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n"
+	allTags := seven +
+		"[Opening \"" + raw + "\"]\n[Annotator \"" + raw + "\"]\n" +
+		"[Variant \"" + raw + "\"]\n[SetUp \"1\"]\n[FEN \"" + fen + "\"]\n" +
+		"[HashCode \"" + raw + "\"]\n" +
+		"[Foo \"" + raw + "\"]\n[Bar \"" + bareOut + "\"]\n"
+
+	for _, tc := range []struct {
+		name string
+		opts Options
+		want string
+	}{
+		{"all tags", Options{Format: SAN}, allTags + "\n1. e4 *\n\n"},
+		{"fen format shares the tag section", Options{Format: FEN}, allTags + "\n" + fen + "\nrnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1\n\n"},
+		{"seven-tag roster with extras and FEN trailer",
+			Options{Format: SAN, SevenTagRoster: true, RosterExtras: []string{"ECO", "Opening"}},
+			seven + "[Opening \"" + raw + "\"]\n[Variant \"" + raw + "\"]\n[SetUp \"1\"]\n[FEN \"" + fen + "\"]\n\n1. e4 *\n\n"},
+		{"explicit roster",
+			Options{Format: SAN, Roster: []string{"Event", "Site", "Foo", "Bar", "Missing"}},
+			"[Event \"" + raw + "\"]\n[Site \"" + bareOut + "\"]\n[Foo \"" + raw + "\"]\n[Bar \"" + bareOut + "\"]\n[Missing \"\"]\n\n1. e4 *\n\n"},
+		{"epd comment copies values raw", Options{Format: EPD},
+			"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - c0 - " + raw + " " + bare + "; c1 *;\n" +
+				"rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 c0 - " + raw + " " + bare + "; c1 *;\n\n"},
+	} {
+		if got := render(tc.opts); got != tc.want {
+			t.Errorf("%s: got:\n%s\nwant:\n%s", tc.name, got, tc.want)
+		}
 	}
 }

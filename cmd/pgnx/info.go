@@ -45,7 +45,11 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	var win, loss, draw, unknown int
 	tagCounts := make(map[string]int, len(rosterTagNames))
 
-	total, _, ioErr := forEachGame(cmd, args, logW, logW, func(src string, n int, g *pgn.Game) error {
+	// A game with problems still contributes to the statistics: only an
+	// unreadable input fails the run.
+	rep := newRunReport(logW, logW)
+	rep.ioOnly = true
+	rep.each(games(args, cmd.InOrStdin(), parserOptions(cmd)), func(n int, g *pgn.Game) gameVerdict {
 		plies += len(g.Moves)
 		switch g.Result {
 		case "1-0":
@@ -62,9 +66,10 @@ func runInfo(cmd *cobra.Command, args []string) error {
 				tagCounts[name]++
 			}
 		}
-		return nil
+		return gameVerdict{}
 	})
 
+	total := rep.total
 	avg := 0.0
 	if total > 0 {
 		avg = float64(plies) / float64(total)
@@ -82,8 +87,5 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Fprintln(out)
 
-	if ioErr != nil {
-		return errProblems
-	}
-	return nil
+	return rep.exit()
 }

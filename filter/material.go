@@ -317,11 +317,8 @@ func matchMaterial(g *pgn.Game, r *replay.Result, patterns []*MaterialPattern, m
 	if len(patterns) == 0 {
 		return true
 	}
-	if len(r.Positions) == 0 {
-		return false
-	}
-	board, err := chess.FromFEN(r.Positions[0].FEN)
-	if err != nil {
+	board := r.StartBoard()
+	if board == nil {
 		return false
 	}
 	n := countPieces(board)
@@ -353,7 +350,7 @@ func matchMaterial(g *pgn.Game, r *replay.Result, patterns []*MaterialPattern, m
 				if whiteMatches {
 					colour = "White"
 				}
-				setTag(g, "MaterialMatch", colour)
+				g.SetTag("MaterialMatch", colour)
 			}
 			return true
 		}
@@ -377,11 +374,8 @@ func matchMaterial(g *pgn.Game, r *replay.Result, patterns []*MaterialPattern, m
 // position (the start, or after a capture) with exactly target pieces,
 // kings included. A match is marked like a material match.
 func matchPieceCount(g *pgn.Game, r *replay.Result, target int, mark string) bool {
-	if len(r.Positions) == 0 {
-		return false
-	}
-	board, err := chess.FromFEN(r.Positions[0].FEN)
-	if err != nil {
+	board := r.StartBoard()
+	if board == nil {
 		return false
 	}
 	count := 0
@@ -420,15 +414,4 @@ func addMatchComment(g *pgn.Game, moveIdx int, text string) {
 		return
 	}
 	g.Moves[moveIdx].Comments = append(g.Moves[moveIdx].Comments, text)
-}
-
-// setTag sets the last occurrence of name to value, or appends the tag.
-func setTag(g *pgn.Game, name, value string) {
-	for i := len(g.Tags) - 1; i >= 0; i-- {
-		if g.Tags[i].Name == name {
-			g.Tags[i].Value = value
-			return
-		}
-	}
-	g.Tags = append(g.Tags, pgn.Tag{Name: name, Value: value})
 }
