@@ -29,9 +29,17 @@ _Avoid_: validation (that is the `validate` command's name, not the act)
 The fixed sequence a game goes through between parsing and writing: normalisation, replay, broken-ness, ECO classification, criteria, transforms. The same sequence for every command; commands differ only in what they do with the outcome.
 _Avoid_: per-game loop, callback, deal_with_game
 
+**Criterion**:
+One condition a game must satisfy to be selected: a tag comparison, a length bound, an end state, a material balance, a position reached or a move sequence played. A run's criteria together decide whether a game is matched.
+_Avoid_: filter (that is the command), rule, predicate, query
+
 **Transform**:
 A rewrite of a game on its way out, after it has been judged: plies dropped from its start, tags computed from it (PlyCount, HashCode) or looked up for its players, a line-number comment. Changes what the emitted game holds, never whether it is selected. Options that only change how a game is rendered (ply limit, FEN comments, no tags) are output options, not transforms.
 _Avoid_: filter (that selects), post-processing, rewrite_game
+
+**Output option**:
+A setting that changes only how an emitted game is rendered: its notation, line width, ply limit, per-move comments, or which tags and annotations are shown. Never changes what the game holds or whether it is selected.
+_Avoid_: transform (that rewrites the game), format flag, display flag
 
 **Outcome**:
 What the pipeline concludes about one game: its disposition, its reason if any, whether it matched the criteria, and the game and replay to emit.
