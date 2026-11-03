@@ -245,6 +245,31 @@ var goldenCases = []struct {
 	// test-n and test-suppressmatched need two outputs; see
 	// TestGoldenConformanceUnmatched and TestGoldenConformanceSuppressMatched.
 
+	// ---- Phase 2b: output transforms and options (convert flags, so also filter's) ----
+
+	// test-plycount: pgn-extract --plycount --totalplycount -otest-plycount-out.pgn --quiet test-plycount.pgn
+	{"test-plycount", []string{"convert", "--ply-count", "--total-ply-count"}, "test-plycount.pgn", "test-plycount-out.pgn", false},
+	// test-addhashcode: pgn-extract --addhashcode -otest-addhashcode-out.pgn --quiet test-addhashcode.pgn
+	{"test-addhashcode", []string{"convert", "--add-hash-code"}, "test-addhashcode.pgn", "test-addhashcode-out.pgn", false},
+	// test-plylimit: pgn-extract --plylimit 10 -otest-plylimit-out.pgn --quiet test-plylimit.pgn
+	{"test-plylimit", []string{"convert", "--ply-limit", "10"}, "test-plylimit.pgn", "test-plylimit-out.pgn", false},
+	// test-FF: pgn-extract -F -otest-FF-out.pgn --quiet test-F.pgn
+	{"test-FF", []string{"convert", "--final-fen"}, "test-F.pgn", "test-FF-out.pgn", false},
+	// test-fencomments: pgn-extract --fencomments -otest-fencomments-out.pgn --quiet test-fencomments.pgn
+	{"test-fencomments", []string{"convert", "--fen-comments"}, "test-fencomments.pgn", "test-fencomments-out.pgn", false},
+	// test-evaluation: pgn-extract --evaluation -otest-evaluation-out.pgn --quiet test-evaluation.pgn
+	{"test-evaluation", []string{"convert", "--evaluation"}, "test-evaluation.pgn", "test-evaluation-out.pgn", false},
+	// test-nochecks: pgn-extract --nochecks -otest-nochecks-out.pgn --quiet test-nochecks.pgn
+	{"test-nochecks", []string{"convert", "--no-checks"}, "test-nochecks.pgn", "test-nochecks-out.pgn", false},
+	// test-notags: pgn-extract -otest-notags-out.pgn --notags --quiet test-notags.pgn
+	{"test-notags", []string{"convert", "--no-tags"}, "test-notags.pgn", "test-notags-out.pgn", false},
+	// test-linenumbers: pgn-extract --quiet --linenumbers marker infiles/petrosian.pgn -o test-linenumbers-out.pgn
+	{"test-linenumbers", []string{"convert", "--line-numbers", "marker"}, "petrosian.pgn", "test-linenumbers-out.pgn", false},
+
+	// test-dropply (four -a runs into one file) is in
+	// TestGoldenConformanceAppendRuns; test-hash (-#, file splitting) is
+	// in TestGoldenConformanceSplit.
+
 	// Phase 4+ (deliberately excluded from this harness):
 	//   test-Te (pgn-extract -e eco.pgn -TeB14 fischer.pgn) has no CMP
 	//   line and no oracle file in the C repo; its behaviour is pinned by
@@ -254,14 +279,10 @@ var goldenCases = []struct {
 	//   test-fuzzydepth.
 	//   Null moves: test-allownullmoves, test-odds (null-move decoding, not
 	//   implemented).
-	//   Output transforms not yet implemented ("Phase 2b"): test-hash (-#
-	//   game-splitting), test-evaluation, test-FF/test-fencomments
-	//   (FEN-comment output), test-nochecks (NoChecks output option),
-	//   test-notags (NO_TAGS tag_output_format), test-plylimit,
-	//   test-plycount, test-addhashcode (PlyCount/TotalPlyCount/HashCode
-	//   tag-adding options), test-splitvariants (structural game-splitting
-	//   transform), test-dropply (ply-trimming transform), test-linenumbers
-	//   (line-number marker tag).
+	//   Output transforms not yet implemented: test-splitvariants
+	//   (--splitvariants, blocked on NAG/comment ordering, beads
+	//   pgnx-ordered-annotations), test-FF-text (-Fpattern, the
+	//   comment-replacing form of -F, not ported; see CONFORMANCE.md).
 	//   Not byte-compared by the C Makefile either: test-r (report mode),
 	//   test-h (help text), test-LL (log-file-only comparison);
 	//   sub-targets not promoted to their own row: -WsanBSLTDK (custom
@@ -491,6 +512,10 @@ func TestGoldenConformanceMultiFile(t *testing.T) {
 // test-startply (after rm test-startply-out.pgn), for N in 8 9 10 11 100 200:
 //
 //	pgn-extract --startply N -Tf"*/*/4p3/3pP3/2pP4/2P5/*/*" --markmatches match -atest-startply-out.pgn --quiet test-startply.pgn
+//
+// test-dropply (the first run is -o, the rest -a), for N in 10 11 -1 -2:
+//
+//	pgn-extract --dropply N -atest-dropply-out.pgn --quiet najdorf.pgn
 func TestGoldenConformanceAppendRuns(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -506,6 +531,8 @@ func TestGoldenConformanceAppendRuns(t *testing.T) {
 		{"test-startply", "--start-ply", []string{"8", "9", "10", "11", "100", "200"},
 			[]string{"--fen-pattern", "*/*/4p3/3pP3/2pP4/2P5/*/*", "--mark-matches", "match"},
 			"test-startply.pgn", "test-startply-out.pgn"},
+		{"test-dropply", "--drop-ply", []string{"10", "11", "-1", "-2"}, nil,
+			"najdorf.pgn", "test-dropply-out.pgn"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -589,6 +616,70 @@ func TestGoldenConformanceECOSplit(t *testing.T) {
 	}
 	if len(files) != 3 {
 		t.Errorf("want exactly A.pgn, B.pgn and E.pgn in the cwd, got %v", files)
+	}
+}
+
+// TestGoldenConformanceSplit mirrors the C Makefile's test-hash target:
+// pgn-extract -#20 --quiet test-hash.pgn, then CMP of 1.pgn and 2.pgn;
+// pgn-extract -#20,10 --quiet test-hash.pgn, then CMP of 10.pgn and 11.pgn.
+// -# writes numbered files into the current directory, so each run
+// happens in an empty temp cwd with the input passed as an absolute path.
+func TestGoldenConformanceSplit(t *testing.T) {
+	in, err := filepath.Abs(filepath.Join("testdata", "golden", "infiles", "test-hash.pgn"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	oracles, err := filepath.Abs(filepath.Join("testdata", "golden", "outfiles"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name  string
+		args  []string
+		files []string
+	}{
+		{"-#20", []string{"--games", "20"}, []string{"1.pgn", "2.pgn"}},
+		{"-#20,10", []string{"--games", "20", "--start", "10"}, []string{"10.pgn", "11.pgn"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			args := append([]string{"split", "--quiet"}, c.args...)
+			args = append(args, in)
+			root := NewRootCmd()
+			var out, errb bytes.Buffer
+			root.SetOut(&out)
+			root.SetErr(&errb)
+			root.SetArgs(args)
+			if err := root.Execute(); err != nil {
+				t.Fatalf("pgnx %v: %v\n%s", args, err, errb.String())
+			}
+			if out.Len() != 0 {
+				t.Errorf("stdout should be empty, got %d bytes", out.Len())
+			}
+			for _, name := range c.files {
+				got, err := os.ReadFile(name)
+				if err != nil {
+					t.Errorf("%s: %v", name, err)
+					continue
+				}
+				want, err := os.ReadFile(filepath.Join(oracles, name))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Equal(got, want) {
+					t.Errorf("output differs from C oracle %s\n--- first divergence ---\n%s",
+						name, firstDiff(got, want))
+				}
+			}
+			files, err := filepath.Glob("*.pgn")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(files) != len(c.files) {
+				t.Errorf("want exactly %v in the cwd, got %v", c.files, files)
+			}
+		})
 	}
 }
 

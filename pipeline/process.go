@@ -1,12 +1,14 @@
 package pipeline
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/kyleboon/pgnx/eco"
 	"github.com/kyleboon/pgnx/filter"
 	"github.com/kyleboon/pgnx/pgn"
 	"github.com/kyleboon/pgnx/replay"
+	"github.com/kyleboon/pgnx/transform"
 )
 
 // Config is a run's per-game configuration, fixed before the first game
@@ -30,6 +32,13 @@ type Config struct {
 	// play_moves: an invalid Result tag becomes "*") happen there in the
 	// C tool.
 	Criteria *filter.Options
+
+	// Transform is the run's output-side rewrites (transform.Options):
+	// ply dropping and the added tags and comments. nil runs only the
+	// rewrite the C tool always does (a HashCode tag present on the
+	// game is recomputed). The transforms run last, on the game as it
+	// will be emitted, so the criteria see the game as parsed.
+	Transform *transform.Options
 }
 
 // Pipeline runs pgn-extract's deal_with_game sequence over one game at a
@@ -125,7 +134,8 @@ func (o Outcome) Faults() []error {
 }
 
 // Process runs the pipeline over g: Normalise; replay; decide broken-ness
-// against KeepBroken; ECO classification; the criteria. It takes
+// against KeepBroken; ECO classification; the criteria; the output
+// transforms. It takes
 // ownership of g and mutates it in place (tags, marks, and the dropped
 // moves described under Outcome.Warnings); the caller reads the game
 // back from the Outcome.
@@ -177,6 +187,29 @@ func (p *Pipeline) Process(g *pgn.Game) Outcome {
 		o.Status, o.Reason, o.Replay = Rejected, err, nil
 		return o
 	}
+	// Output-side rewrites come last (output.c format_game is called on
+	// the way out), after everything that judges the game; a game too
+	// short for the plies asked to be dropped is emitted nowhere, as the
+	// C tool emits nothing for it.
+	var topts transform.Options
+	if p.cfg.Transform != nil {
+		topts = *p.cfg.Transform
+	}
+	// rewrite_game keeps the board under --keepbroken, so a game too
+	// short for the drop still goes out, reported but not cut.
+	topts.KeepShort = p.cfg.KeepBroken
+	transformed, err := transform.Apply(g, r, topts)
+	var short *transform.ShortGameError
+	if errors.As(err, &short) && topts.KeepShort {
+		o.Warnings = append(o.Warnings, err)
+		err = nil
+	}
+	if err != nil {
+		o.Status, o.Reason, o.Replay = Rejected, err, nil
+		return o
+	}
+	r = transformed
+	o.Replay = r
 	o.Matched = matched
 	return o
 }

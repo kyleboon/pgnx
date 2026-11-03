@@ -1,6 +1,6 @@
 # 0002: A pipeline package owns pgn-extract's game semantics; the parser preserves the source
 
-Status: accepted (2026-11-02)
+Status: accepted (2026-11-02); amended 2026-11-02 (transform stage, see the end)
 
 pgn-extract corrects a game inside its parser (`grammar.c`: Result and SetUp
 fix-ups, FEN consistency) and judges it in `deal_with_game`. pgnx's `convert`
@@ -37,3 +37,15 @@ side.
 - A tags-only game (tags, no moves, no result) is skipped by the parser
   behind `ParserOptions.SkipTagsOnly`, which the CLI sets, so counts and
   numbering match the oracle while library callers keep the record.
+
+## Amendment (2026-11-02, beads `pgnx-transforms`)
+
+The sequence gains a sixth, last stage: the output transforms
+(`transform.Apply`, an eighth library package beside `eco` and `filter`),
+which rewrite the game the way `format_game`/`rewrite_game` do on the way
+out: plies dropped from the start, the PlyCount/TotalPlyCount/HashCode and
+player tags, the line-number comment. They run after the criteria so
+selection and classification see the game as parsed, and a game too short
+for `--drop-ply` is Rejected there. Options that change only how a game is
+rendered (`--ply-limit`, the generated comments, `--no-tags`) stay in
+`output.Options`, outside the pipeline, as before.

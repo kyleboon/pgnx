@@ -26,8 +26,12 @@ Playing a parsed game's moves out on a board to resolve each SAN move against th
 _Avoid_: validation (that is the `validate` command's name, not the act)
 
 **Pipeline**:
-The fixed sequence a game goes through between parsing and writing: normalisation, replay, broken-ness, ECO classification, criteria. The same sequence for every command; commands differ only in what they do with the outcome.
+The fixed sequence a game goes through between parsing and writing: normalisation, replay, broken-ness, ECO classification, criteria, transforms. The same sequence for every command; commands differ only in what they do with the outcome.
 _Avoid_: per-game loop, callback, deal_with_game
+
+**Transform**:
+A rewrite of a game on its way out, after it has been judged: plies dropped from its start, tags computed from it (PlyCount, HashCode) or looked up for its players, a line-number comment. Changes what the emitted game holds, never whether it is selected. Options that only change how a game is rendered (ply limit, FEN comments, no tags) are output options, not transforms.
+_Avoid_: filter (that selects), post-processing, rewrite_game
 
 **Outcome**:
 What the pipeline concludes about one game: its disposition, its reason if any, whether it matched the criteria, and the game and replay to emit.

@@ -1,11 +1,14 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
 
 	"github.com/kyleboon/pgnx/output"
+	"github.com/kyleboon/pgnx/transform"
 	"github.com/spf13/cobra"
 )
 
@@ -44,6 +47,27 @@ func addOutputFlags(cmd *cobra.Command) {
 	flags.Bool("no-results", false, "omit the trailing result token")
 	flags.Bool("keep-broken", false, "emit games that fail replay, in Source format, instead of skipping them")
 	flags.Bool("nested-comments", false, "allow { to nest inside a comment")
+
+	// Output options (pgn-extract's output.c): how the game is rendered.
+	flags.Bool("no-tags", false, "omit the tag section (--notags; conflicts with --seven-tag-roster and --roster)")
+	flags.Bool("no-checks", false, "omit + and # from emitted moves (--nochecks)")
+	flags.Bool("comment-lines", false, "put each comment on a line of its own (--commentlines)")
+	flags.Bool("fen-comments", false, "follow every move with a { FEN } comment of the position reached (--fencomments)")
+	flags.Bool("hash-comments", false, "follow every move with a { hash } comment of the position reached, in hex (--hashcomments)")
+	flags.Bool("evaluation", false, "follow every move with a { value } comment holding a Shannon evaluation of the position (--evaluation)")
+	flags.Bool("final-fen", false, "follow the last move with a { \"FEN\" } comment of the final position (-F)")
+	flags.Int("ply-limit", 0, "emit at most N plies of each game; a cut game ends with * (--plylimit N)")
+
+	// Transforms (pgn-extract's apply.c/format_game rewrites): what the
+	// emitted game holds.
+	flags.Int("drop-ply", 0, "drop the first N plies and start the game from the position reached; negative N keeps the last -N plies (--dropply N)")
+	flags.String("drop-before", "", "drop every ply up to and including the move whose comment is exactly TEXT (--dropbefore TEXT)")
+	flags.Bool("ply-count", false, "add a PlyCount tag (--plycount)")
+	flags.Bool("total-ply-count", false, "add a TotalPlyCount tag counting variations too (--totalplycount)")
+	flags.Bool("add-hash-code", false, "add a HashCode tag (--addhashcode)")
+	flags.String("add-elo-tags", "", "add WhiteElo/BlackElo tags from the tab-separated name/rating FILE (--addelotags FILE)")
+	flags.String("add-fide-id-tags", "", "add WhiteFideId/BlackFideId tags from the tab-separated name/ID FILE (--addfideidtags FILE)")
+	flags.String("line-numbers", "", "prepend a { MARKER:start:end } comment giving each game's source lines (--linenumbers MARKER)")
 }
 
 // forcedUCILineWidth is the line width pgn-extract's C oracle silently
@@ -79,6 +103,22 @@ func outputOptions(cmd *cobra.Command) (output.Options, error) {
 	noVariations, _ := flags.GetBool("no-variations")
 	noMoveNumbers, _ := flags.GetBool("no-move-numbers")
 	noResults, _ := flags.GetBool("no-results")
+	noTags, _ := flags.GetBool("no-tags")
+	if noTags && (sevenTagRoster || rosterCSV != "") {
+		// argsfile.c: "--notags clashes with another roster-related argument."
+		return output.Options{}, errors.New("--no-tags conflicts with --seven-tag-roster and --roster")
+	}
+	noChecks, _ := flags.GetBool("no-checks")
+	commentLines, _ := flags.GetBool("comment-lines")
+	fenComments, _ := flags.GetBool("fen-comments")
+	hashComments, _ := flags.GetBool("hash-comments")
+	evaluation, _ := flags.GetBool("evaluation")
+	finalFEN, _ := flags.GetBool("final-fen")
+	hasPlyLimit := flags.Changed("ply-limit")
+	plyLimit, _ := flags.GetInt("ply-limit")
+	if hasPlyLimit && plyLimit < 0 {
+		return output.Options{}, errors.New("--ply-limit requires a number greater than or equal to zero")
+	}
 
 	var roster []string
 	if rosterCSV != "" {
@@ -97,7 +137,56 @@ func outputOptions(cmd *cobra.Command) (output.Options, error) {
 		NoVariations:   noVariations,
 		NoMoveNumbers:  noMoveNumbers,
 		NoResults:      noResults,
+		NoTags:         noTags,
+		NoChecks:       noChecks,
+		CommentLines:   commentLines,
+		FENComments:    fenComments,
+		HashComments:   hashComments,
+		Evaluation:     evaluation,
+		FinalFEN:       finalFEN,
+		PlyLimit:       plyLimit,
+		HasPlyLimit:    hasPlyLimit,
 	}, nil
+}
+
+// transformOptions builds the transform.Options for a command's pipeline
+// from the flags registered by addOutputFlags, loading the player files.
+// Every error is a usage error (exit 1).
+func transformOptions(cmd *cobra.Command) (*transform.Options, error) {
+	flags := cmd.Flags()
+	var opts transform.Options
+	opts.DropPlies, _ = flags.GetInt("drop-ply")
+	opts.DropBefore, _ = flags.GetString("drop-before")
+	opts.PlyCount, _ = flags.GetBool("ply-count")
+	opts.TotalPlyCount, _ = flags.GetBool("total-ply-count")
+	opts.HashCode, _ = flags.GetBool("add-hash-code")
+	opts.LineNumbers, _ = flags.GetString("line-numbers")
+	// -Wuci forces variations off in the C tool (argsfile.c), and
+	// TotalPlyCount follows keep_variations.
+	noVariations, _ := flags.GetBool("no-variations")
+	formatName, _ := flags.GetString("format")
+	opts.CountVariations = !noVariations && formatName != "uci"
+
+	for _, f := range []struct {
+		flag string
+		dest *transform.PlayerInfo
+	}{{"add-elo-tags", &opts.Ratings}, {"add-fide-id-tags", &opts.IDs}} {
+		path, _ := flags.GetString(f.flag)
+		if path == "" {
+			continue
+		}
+		file, err := os.Open(path)
+		if err != nil {
+			return nil, fmt.Errorf("--%s: %w", f.flag, err)
+		}
+		info, err := transform.LoadPlayerInfo(file)
+		file.Close()
+		if err != nil {
+			return nil, fmt.Errorf("--%s %s: %w", f.flag, path, err)
+		}
+		*f.dest = info
+	}
+	return &opts, nil
 }
 
 // openOutput opens the destination named by the string flag flagName

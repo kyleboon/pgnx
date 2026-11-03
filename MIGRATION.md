@@ -1,8 +1,8 @@
 # Migrating from pgn-extract
 
 pgnx does not accept pgn-extract's C flags directly — the CLI is redesigned
-around subcommands (`convert`, `filter`, `validate`, `info`) rather than one
-flat flag namespace. This document maps the pgn-extract flags implemented
+around subcommands (`convert`, `filter`, `split`, `validate`, `info`) rather
+than one flat flag namespace. This document maps the pgn-extract flags implemented
 so far to their pgnx equivalents, and lists what is not yet ported.
 
 ## Output flags (Phase 1 scope; also accepted by `filter`)
@@ -132,6 +132,49 @@ Notes:
   (exit 1) rather than logged and skipped; see
   [CONFORMANCE.md](CONFORMANCE.md#positional-matching-and-eco-phase-3).
 
+## Output transforms (Phase 2b scope; `convert` flags, so also `filter`'s)
+
+Options that rewrite or annotate a game on output rather than select it.
+They are `convert` flags, so `filter` and `split` take them too.
+
+| pgn-extract | pgnx |
+|---|---|
+| `--plycount` | `pgnx convert --ply-count` |
+| `--totalplycount` | `pgnx convert --total-ply-count` |
+| `--addhashcode` | `pgnx convert --add-hash-code` |
+| `--addelotags FILE` | `pgnx convert --add-elo-tags FILE` (same tab-separated name/rating file) |
+| `--addfideidtags FILE` | `pgnx convert --add-fide-id-tags FILE` |
+| `--dropply N` | `pgnx convert --drop-ply N` (negative N keeps the last -N plies, as in C) |
+| `--dropbefore TEXT` | `pgnx convert --drop-before TEXT` |
+| `--plylimit N` | `pgnx convert --ply-limit N` |
+| `--linenumbers MARKER` | `pgnx convert --line-numbers MARKER` |
+| `--fencomments` | `pgnx convert --fen-comments` |
+| `--hashcomments` | `pgnx convert --hash-comments` |
+| `--evaluation` | `pgnx convert --evaluation` |
+| `-F` | `pgnx convert --final-fen` |
+| `--commentlines` | `pgnx convert --comment-lines` |
+| `--notags` | `pgnx convert --no-tags` |
+| `--nochecks` | `pgnx convert --no-checks` |
+| `-#N` | `pgnx split --games N` |
+| `-#N,M` | `pgnx split --games N --start M` |
+
+Notes:
+
+- `pgnx split` is `convert` writing numbered files (`1.pgn`, `2.pgn`, ...;
+  `.epd`/`.fen` by format) of `--games` games each into the current
+  directory, exactly as `-#` does. It takes every `convert` flag except
+  `--output`/`--append` and `--eco-split`, which are usage errors (the C
+  tool warns and ignores `-o`). To split a selection, pipe `pgnx filter`
+  into `pgnx split`.
+- `--drop-ply` and `--drop-before` run after selection and classification,
+  as the C tool's rewrite does, so criteria and `--eco-file` see the
+  game as parsed. A game with fewer plies than asked is reported and
+  emitted nowhere (exit 2); the C tool drops it silently.
+- `-Fpattern` (replacing a matching comment with a FEN), `--fencommentformat`
+  and `--quiescent` are not ported; see CONFORMANCE.md.
+- `--no-tags` with `--seven-tag-roster` or `--roster`, and a negative
+  `--ply-limit`, are usage errors (exit 1), as the C tool exits 1 for them.
+
 ## Not yet ported (Phase 4+)
 
 The following pgn-extract flags have no pgnx equivalent yet:
@@ -140,20 +183,20 @@ The following pgn-extract flags have no pgnx equivalent yet:
   `--fuzzydepth`, `--deletesamesetup`
 - `--odds` — needs null-move support (`--allownullmoves`), which `replay`
   does not have
-- Output-side transforms (a planned "convert transforms" mini-phase):
-  `--plycount`, `--totalplycount`, `--addhashcode`, `--dropply`,
-  `--plylimit`, `--linenumbers`, `--splitvariants`, `--fencomments`,
-  `--evaluation`, `--hashcomments`, `-F`, `--commentlines`, `--notags`,
-  `--nochecks`, `--addelotags`, `--addfideidtags`, `--dropbefore`
+- `--splitvariants` — one game per variation; waits on the parser
+  preserving NAG/comment order across variations (beads
+  `pgnx-ordered-annotations`), which its golden test depends on
+- `-Fpattern`, `--fencommentformat`, `--quiescent` — the comment-replacing
+  form of `-F`, its format string, and the quiescence extension of
+  `--plylimit`
 
 Also not yet supported, regardless of flag:
 
 - JSON output (`--json`)
 - Argument files (`-A`/`argsfile`)
-- `-#` file splitting
 - `-e` without a file name (the `eco.pgn`/`$ECO_FILE` default)
-- `pgnx dedupe`, `pgnx split` — planned as new subcommands in later
-  phases, not flags on `convert`
+- `pgnx dedupe` — planned as a new subcommand in a later phase, not a
+  flag on `convert`
 
 See [CONFORMANCE.md](CONFORMANCE.md) for behavioral differences in flags
 that *are* implemented.

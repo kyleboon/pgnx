@@ -10,6 +10,7 @@ import (
 	"github.com/kyleboon/pgnx/eco"
 	"github.com/kyleboon/pgnx/filter"
 	"github.com/kyleboon/pgnx/pgn"
+	"github.com/kyleboon/pgnx/transform"
 )
 
 // parse returns the single game in src, parsed as the CLI parses it.
@@ -319,5 +320,57 @@ func TestProcessClassifiesBeforeCriteria(t *testing.T) {
 		if o.Status != OK || o.Matched != c.matched {
 			t.Errorf("ECO %q: status %v matched %v, want OK %v", c.want, o.Status, o.Matched, c.matched)
 		}
+	}
+}
+
+// The transforms run last, after classification and the criteria, so a
+// criterion sees the game as parsed while the emitted game carries the
+// rewrite; a game too short for --dropply is Rejected, emitted nowhere.
+func TestProcessTransforms(t *testing.T) {
+	crit := &filter.Options{}
+	crit.Bounds.SetMinPly(4)
+	p := New(Config{Criteria: crit, Transform: &transform.Options{DropPlies: 3, PlyCount: true}})
+	o := p.Process(parse(t, normal))
+	if o.Status != OK || !o.Matched {
+		t.Fatalf("status %v matched %v: %v", o.Status, o.Matched, o.Reason)
+	}
+	if fen, _ := o.Game.Tag("FEN"); fen != "rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq g3 0 2" {
+		t.Errorf("FEN after dropping three plies = %q", fen)
+	}
+	if n, _ := o.Game.Tag("PlyCount"); n != "1" {
+		t.Errorf("PlyCount = %q, want 1", n)
+	}
+	if len(o.ReplayToEmit().Moves) != 1 {
+		t.Errorf("emitted replay has %d moves, want 1", len(o.ReplayToEmit().Moves))
+	}
+
+	o = New(Config{Transform: &transform.Options{DropPlies: 5}}).Process(parse(t, normal))
+	if o.Status != Rejected || o.Reason == nil || o.Replay != nil || o.Matched {
+		t.Errorf("dropping 5 of 4 plies: status %v matched %v reason %v", o.Status, o.Matched, o.Reason)
+	}
+
+	// A game too short for the drop goes out untouched under KeepBroken,
+	// with a warning, and the other transforms still apply.
+	o = New(Config{KeepBroken: true, Transform: &transform.Options{DropPlies: 5, PlyCount: true}}).Process(parse(t, normal))
+	if o.Status != OK || len(o.Warnings) != 1 || o.Reason != nil {
+		t.Errorf("short game kept: status %v warnings %v reason %v", o.Status, o.Warnings, o.Reason)
+	}
+	if _, ok := o.Game.Tag("FEN"); ok {
+		t.Error("short game kept must not be cut")
+	}
+	if n, _ := o.Game.Tag("PlyCount"); n != "4" {
+		t.Errorf("PlyCount = %q, want 4", n)
+	}
+
+	// A broken game kept is not cut, but still counted.
+	o = New(Config{KeepBroken: true, Transform: &transform.Options{DropPlies: 1, PlyCount: true}}).Process(parse(t, broken))
+	if o.Status != Broken {
+		t.Fatalf("status %v", o.Status)
+	}
+	if _, ok := o.Game.Tag("FEN"); ok {
+		t.Error("a broken game must not have plies dropped")
+	}
+	if n, _ := o.Game.Tag("PlyCount"); n != "2" {
+		t.Errorf("PlyCount = %q, want 2", n)
 	}
 }

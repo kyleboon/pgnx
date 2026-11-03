@@ -63,6 +63,7 @@ func NewRootCmd() *cobra.Command {
 
 	root.AddCommand(newConvertCmd())
 	root.AddCommand(newFilterCmd())
+	root.AddCommand(newSplitCmd())
 	root.AddCommand(newValidateCmd())
 	root.AddCommand(newInfoCmd())
 

@@ -99,11 +99,10 @@ func (s *ecoSplitDestination) writerFor(g *pgn.Game) (*output.Writer, error) {
 	if bw, ok := s.files[name]; ok {
 		return bw.w, nil
 	}
-	f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
+	bw, err := openFileDestination(name, os.O_APPEND, s.opts)
 	if err != nil {
 		return nil, err
 	}
-	bw := newBufferedDestination(f, f, s.opts)
 	s.files[name] = bw
 	return bw.w, nil
 }

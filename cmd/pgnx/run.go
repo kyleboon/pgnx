@@ -79,15 +79,25 @@ type run struct {
 	logCloser io.Closer
 }
 
-// newRun does the setup shared by convert and filter from the flags
-// addOutputFlags and addECOFlags register: output options, ECO options,
-// --keep-broken, --quiet, the log writer, the tag registry (seeded with
-// the tag names the criteria mention, as the C lexer registers them from
-// -t files first), the main destination and the pipeline. criteria is
-// nil for convert. Every error is a usage error (exit 1). The caller
-// must close the run.
+// newRun does the setup shared by convert, filter and split from the
+// flags addOutputFlags and addECOFlags register: output options,
+// transform options, ECO options, --keep-broken, --quiet, the log writer,
+// the tag registry (seeded with the tag names the criteria mention, as
+// the C lexer registers them from -t files first), the main destination
+// and the pipeline. criteria is nil for convert. Every error is a usage
+// error (exit 1). The caller must close the run.
 func newRun(cmd *cobra.Command, criteria *filter.Options) (*run, error) {
+	return newRunTo(cmd, criteria, nil)
+}
+
+// newRunTo is newRun with the main destination opened by open, when not
+// nil (split's numbered files), instead of by --output/--eco-split.
+func newRunTo(cmd *cobra.Command, criteria *filter.Options, open func(*run) (destination, error)) (*run, error) {
 	opts, err := outputOptions(cmd)
+	if err != nil {
+		return nil, err
+	}
+	transforms, err := transformOptions(cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -121,14 +131,18 @@ func newRun(cmd *cobra.Command, criteria *filter.Options) (*run, error) {
 	}
 	r.opts, r.tags = opts, opts.Tags
 
-	r.output, err = r.openDestination("output", ecoSet.split)
+	if open != nil {
+		r.output, err = open(r)
+	} else {
+		r.output, err = r.openDestination("output", ecoSet.split)
+	}
 	if err != nil {
 		r.close()
 		return nil, err
 	}
 	r.closers = append(r.closers, r.output)
 
-	r.pipe = pipeline.New(pipeline.Config{ECO: ecoSet.table, KeepBroken: keepBroken, Criteria: criteria})
+	r.pipe = pipeline.New(pipeline.Config{ECO: ecoSet.table, KeepBroken: keepBroken, Criteria: criteria, Transform: transforms})
 	return r, nil
 }
 

@@ -55,6 +55,13 @@ func (lw *lineWriter) SuppressSpace() {
 	lw.noSpace = true
 }
 
+// BreakLine ends the current line, if any, so the next token starts a
+// fresh one (output.c terminate_line). A no-op at the start of a line.
+func (lw *lineWriter) BreakLine() {
+	lw.flushLine()
+	lw.noSpace = false
+}
+
 // flushLine writes the accumulated line (if any) followed by a newline.
 func (lw *lineWriter) flushLine() {
 	if lw.err != nil {

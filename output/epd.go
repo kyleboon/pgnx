@@ -32,7 +32,12 @@ func (w *Writer) writePositionGame(g *pgn.Game, r *replay.Result) error {
 // NO_TAGS in practice), one "<epd> c0 <comment>;" line per position, and a
 // trailing blank line.
 func (w *Writer) writeEPDGame(g *pgn.Game, r *replay.Result) error {
-	comment := epdGameComment(g)
+	// --notags leaves the comment empty, trailing space and all
+	// (print_EPD_move_list's "%s %s" with an empty game comment).
+	comment := ""
+	if !w.opts.NoTags {
+		comment = epdGameComment(g)
+	}
 	for _, pos := range r.Positions {
 		if _, err := fmt.Fprintf(w.w, "%s %s\n", epdFields(pos.FEN), comment); err != nil {
 			return err
@@ -48,13 +53,22 @@ func (w *Writer) writeEPDGame(g *pgn.Game, r *replay.Result) error {
 // 6-field FEN string per position, and a trailing blank line. There is no
 // result token and no per-position comment (unlike EPD).
 func (w *Writer) writeFENGame(g *pgn.Game, r *replay.Result) error {
-	if err := w.writeTags(g); err != nil {
-		return err
+	if !w.opts.NoTags {
+		if err := w.writeTags(g); err != nil {
+			return err
+		}
+		if _, err := io.WriteString(w.w, "\n"); err != nil {
+			return err
+		}
 	}
-	if _, err := io.WriteString(w.w, "\n"); err != nil {
-		return err
+	positions := r.Positions
+	// print_FEN_move_list tests --plylimit once, against the starting
+	// ply: a start past the limit lists nothing, a start within it lists
+	// every position.
+	if w.opts.HasPlyLimit && len(positions) > 0 && positions[0].PlyNumber() > w.opts.PlyLimit {
+		positions = nil
 	}
-	for _, pos := range r.Positions {
+	for _, pos := range positions {
 		if _, err := fmt.Fprintf(w.w, "%s\n", pos.FEN); err != nil {
 			return err
 		}

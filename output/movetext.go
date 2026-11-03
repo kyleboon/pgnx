@@ -1,6 +1,7 @@
 package output
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -13,18 +14,22 @@ import (
 // forcibly disabling move numbers, comments, NAGs, variations, and check
 // suffixes (argsfile.c: selecting -Wuci sets keep_NAGs/keep_comments/
 // keep_move_numbers/keep_checks/keep_variations all FALSE), regardless of
-// any other Options. Since Options has no NoChecks field (and none is
-// needed for any other format), UCI's stripping is special-cased here
-// rather than exposed as new Options surface.
+// any other Options. The generated comments (--fencomments and friends)
+// are not among the things it disables.
 func isUCI(f Format) bool { return f == UCI }
 
-// emitMovetext writes g's movetext (main line, recursively including
-// variations) followed by the result token (unless opts.NoResults) to lw.
-func emitMovetext(lw *lineWriter, g *pgn.Game, r *replay.Result, opts Options) {
-	var moveInfos []replay.MoveInfo
-	if r != nil {
-		moveInfos = r.Moves
-	}
+// emitter renders one game's movetext, token by token, into a lineWriter
+// under a fixed set of Options. It is what output.c print_move_list,
+// print_move and print_items_following_move are to the C tool.
+type emitter struct {
+	lw   *lineWriter
+	opts Options
+}
+
+// movetext writes g's movetext (main line, recursively including
+// variations), the final-position comment if asked for, and the result
+// token (unless opts.NoResults).
+func (e *emitter) movetext(g *pgn.Game, r *replay.Result) {
 	// Source move numbers are ignored: the C oracle numbers every move
 	// from its own counter, seeded from the starting position's fullmove
 	// number and side to move (output.c print_game: "move_number =
@@ -39,9 +44,25 @@ func emitMovetext(lw *lineWriter, g *pgn.Game, r *replay.Result, opts Options) {
 		baseMoveNumber = r.Positions[0].FullmoveNumber
 		startWhite = r.Positions[0].SideToMove == chess.White
 	}
-	emitLine(lw, g.Moves, moveInfos, startWhite, true, baseMoveNumber, opts)
+	cut := e.line(g.Moves, r, startWhite, true, baseMoveNumber)
 
-	if !opts.NoResults {
+	if cut {
+		// print_move_list: a main line cut short by --plylimit ends
+		// with "*" when the game had a result, whatever it was.
+		if !e.opts.NoResults && g.Result != "" {
+			e.lw.WriteToken("*")
+		}
+		return
+	}
+
+	if e.opts.FinalFEN && !e.opts.FENComments && r != nil && len(g.Moves) > 0 && len(r.Positions) > len(g.Moves) {
+		// -F: the final position, quoted, after the last move's own
+		// annotations and before the result; not subject to
+		// --nocomments (output.c print_move_list).
+		e.comment(`"` + r.Positions[len(g.Moves)].FEN + `"`)
+	}
+
+	if !e.opts.NoResults {
 		result := g.Result
 		if len(g.Moves) == 0 {
 			// A zero-move game has no move to carry a terminating result,
@@ -56,31 +77,53 @@ func emitMovetext(lw *lineWriter, g *pgn.Game, r *replay.Result, opts Options) {
 		if result == "" {
 			result = "*"
 		}
-		lw.WriteToken(result)
+		e.lw.WriteToken(result)
 	}
 }
 
-// emitLine writes one line of movetext (a main line or the body of a
-// variation): moves is the pgn.Move sequence, infos is the parallel
-// replay.MoveInfo sequence (nil/empty when replay data is unavailable,
-// which is only valid for Format == Source). startWhite indicates whether moves[0] (if any) is white's move — true for
-// the main line, and for a variation it matches the color of the move the
-// variation is attached to (a RAV is an alternative to a single ply, so it
-// begins on that same side to move). blackNeedsNumber tracks whether the
-// very next move, if it is black's, must be given an explicit "N..." number
-// because of a preceding interruption (comment/variation) or because this
-// line starts with black to move. baseMoveNumber is the full-move number
-// that ply 0 of moves belongs to when no move carries an explicit number
-// (normally 1, or the starting position's FEN fullmove field for a game
-// that begins mid-sequence); see emitMovetext.
-func emitLine(lw *lineWriter, moves []*pgn.Move, infos []replay.MoveInfo, startWhite, blackNeedsNumber bool, baseMoveNumber int, opts Options) {
+// line writes one line of movetext (a main line or the body of a
+// variation): moves is the pgn.Move sequence, r its replay (nil when
+// replay data is unavailable, which is only valid for Format == Source).
+// startWhite indicates whether moves[0] (if any) is white's move — true
+// for the main line, and for a variation it matches the color of the
+// move the variation is attached to (a RAV is an alternative to a single
+// ply, so it begins on that same side to move). blackNeedsNumber tracks
+// whether the very next move, if it is black's, must be given an
+// explicit "N..." number because of a preceding interruption
+// (comment/variation) or because this line starts with black to move.
+// baseMoveNumber is the full-move number that ply 0 of moves belongs to
+// when no move carries an explicit number (normally 1, or the starting
+// position's FEN fullmove field for a game that begins mid-sequence);
+// see movetext. It reports whether --plylimit cut the line short.
+func (e *emitter) line(moves []*pgn.Move, r *replay.Result, startWhite, blackNeedsNumber bool, baseMoveNumber int) (cut bool) {
+	opts := e.opts
 	uci := isUCI(opts.Format)
 	noMoveNumbers := opts.NoMoveNumbers || uci
 	noNAGs := opts.NoNAGs || uci
 	noComments := opts.NoComments || uci
 	noVariations := opts.NoVariations || uci
 
+	var infos []replay.MoveInfo
+	if r != nil {
+		infos = r.Moves
+	}
+	// The evaluation needs the board after each move; walk it alongside
+	// the typed moves.
+	var board *chess.Board
+	if opts.Evaluation && r != nil {
+		board = r.StartBoard()
+	}
+	// The ply number of moves[0], as print_move_list computes it from
+	// the move number and side to move.
+	startPly := 2*(baseMoveNumber-1) + 1
+	if !startWhite {
+		startPly++
+	}
+
 	for i, mv := range moves {
+		if opts.HasPlyLimit && startPly+i > opts.PlyLimit {
+			return true
+		}
 		var info *replay.MoveInfo
 		if i < len(infos) {
 			info = &infos[i]
@@ -90,26 +133,46 @@ func emitLine(lw *lineWriter, moves []*pgn.Move, infos []replay.MoveInfo, startW
 
 		if !noMoveNumbers {
 			if isWhite {
-				lw.WriteToken(strconv.Itoa(moveNumberOf(moves, i, startWhite, baseMoveNumber)) + ".")
+				e.lw.WriteToken(strconv.Itoa(moveNumberOf(moves, i, startWhite, baseMoveNumber)) + ".")
 			} else if blackNeedsNumber {
-				lw.WriteToken(strconv.Itoa(moveNumberOf(moves, i, startWhite, baseMoveNumber)) + "...")
+				e.lw.WriteToken(strconv.Itoa(moveNumberOf(moves, i, startWhite, baseMoveNumber)) + "...")
 			}
 		}
 
-		lw.WriteToken(renderMove(mv, info, opts))
+		e.lw.WriteToken(renderMove(mv, info, opts))
 		blackNeedsNumber = false
 
 		if !noNAGs {
 			for _, n := range mv.NAGs {
-				lw.WriteToken("$" + strconv.Itoa(n))
+				e.lw.WriteToken("$" + strconv.Itoa(n))
 			}
 		}
 
 		if !noComments {
 			for _, c := range mv.Comments {
-				emitComment(lw, c)
+				e.comment(c)
 			}
 			if len(mv.Comments) > 0 {
+				blackNeedsNumber = true
+			}
+		}
+
+		// print_items_following_move: the generated comments come after
+		// the move's own annotations, in this order, and before its
+		// variations; each counts as an interruption that makes black's
+		// next move carry its number.
+		if board != nil && info != nil {
+			board.Apply(info.Move)
+			e.comment(fmt.Sprintf("%.2f", shannonEvaluation(board)))
+			blackNeedsNumber = true
+		}
+		if r != nil && i+1 < len(r.Positions) {
+			if opts.FENComments {
+				e.comment(r.Positions[i+1].FEN)
+				blackNeedsNumber = true
+			}
+			if opts.HashComments {
+				e.comment(fmt.Sprintf("%016x", r.Positions[i+1].Zobrist))
 				blackNeedsNumber = true
 			}
 		}
@@ -119,74 +182,96 @@ func emitLine(lw *lineWriter, moves []*pgn.Move, infos []replay.MoveInfo, startW
 			// same side to move, and the same full-move number, as mv.
 			vBaseMoveNumber := moveNumberOf(moves, i, startWhite, baseMoveNumber)
 			for vi, v := range mv.Variations {
-				var vInfos []replay.MoveInfo
-				if info != nil && vi < len(info.Variations) && info.Variations[vi] != nil {
-					vInfos = info.Variations[vi].Moves
+				var vr *replay.Result
+				if info != nil && vi < len(info.Variations) {
+					vr = info.Variations[vi]
 				}
-				emitVariation(lw, v, vInfos, isWhite, vBaseMoveNumber, opts)
+				e.variation(v, vr, isWhite, vBaseMoveNumber)
 			}
 			blackNeedsNumber = true
 		}
 	}
+	return false
 }
 
-// emitVariation writes "(...)" for a single variation. The opening paren
+// variation writes "(...)" for a single variation. The opening paren
 // is glued (no space) directly to the variation's first move token when
 // there are no prefix comments; when the variation opens with a comment,
 // the C oracle inserts a space between "(" and the comment. The closing
 // paren is always glued to the immediately preceding token.
-func emitVariation(lw *lineWriter, v *pgn.Variation, infos []replay.MoveInfo, startWhite bool, baseMoveNumber int, opts Options) {
-	lw.WriteToken("(")
-	if !opts.NoComments && len(v.PrefixComments) > 0 {
+func (e *emitter) variation(v *pgn.Variation, r *replay.Result, startWhite bool, baseMoveNumber int) {
+	e.lw.WriteToken("(")
+	if !e.opts.NoComments && len(v.PrefixComments) > 0 {
 		for _, c := range v.PrefixComments {
-			emitComment(lw, c)
+			e.comment(c)
 		}
 	} else {
-		lw.SuppressSpace()
+		e.lw.SuppressSpace()
 	}
 	// A variation always starts with an explicit move number: white moves
 	// get "N.", and black moves (the variation's first move being black's)
 	// get "N...".
-	emitLine(lw, v.Moves, infos, startWhite, true, baseMoveNumber, opts)
-	lw.SuppressSpace()
-	lw.WriteToken(")")
+	e.line(v.Moves, r, startWhite, true, baseMoveNumber)
+	e.lw.SuppressSpace()
+	e.lw.WriteToken(")")
 }
 
-// emitComment writes a comment as "{", each whitespace-separated word of
+// comment writes a comment as "{", each whitespace-separated word of
 // its text, and "}" — all as individual tokens, so long comments word-wrap
 // at the configured line width exactly like the C oracle (which splits
 // comment text into individually wrappable words). The single spaces
 // inside the braces ("{ text }") fall out of normal token separation.
-func emitComment(lw *lineWriter, c string) {
-	lw.WriteToken("{")
-	for _, word := range strings.Fields(c) {
-		lw.WriteToken(word)
+// With CommentLines the comment is a line of its own (output.c
+// start_comment/end_comment).
+func (e *emitter) comment(c string) {
+	if e.opts.CommentLines {
+		e.lw.BreakLine()
 	}
-	lw.WriteToken("}")
+	e.lw.WriteToken("{")
+	for _, word := range strings.Fields(c) {
+		e.lw.WriteToken(word)
+	}
+	e.lw.WriteToken("}")
+	if e.opts.CommentLines {
+		e.lw.BreakLine()
+	}
 }
 
 // renderMove returns the token to emit for mv in the format selected by
 // opts.Format. info carries the replayed detail (piece, capture, check)
 // needed by every format except Source. For SAN it's replay's normalized
 // SAN; for Source (or any format when info is nil) it's the SAN exactly as
-// written in the source.
+// written in the source. opts.NoChecks (and UCI) drop the check suffix.
 func renderMove(mv *pgn.Move, info *replay.MoveInfo, opts Options) string {
+	noChecks := opts.NoChecks || isUCI(opts.Format)
 	switch opts.Format {
+	case LAlg, HAlg, ELAlg, XLAlg, UCI:
+		if info != nil {
+			return renderAlgebraic(*info, opts.Format, noChecks)
+		}
 	case SAN:
 		if info != nil {
-			return info.SAN
+			return stripChecks(info.SAN, noChecks)
 		}
-		return mv.SAN
-	case Source:
-		return mv.SAN
-	case LAlg, HAlg, ELAlg, XLAlg, UCI:
-		if info == nil {
-			return mv.SAN
-		}
-		return renderAlgebraic(*info, opts.Format)
-	default:
-		return mv.SAN
 	}
+	return stripChecks(mv.SAN, noChecks)
+}
+
+// stripChecks cuts san at its first "+" (or, failing that, "#") when
+// noChecks, as output.c print_move does for SAN and Source: whatever
+// follows the glyph goes with it.
+func stripChecks(san string, noChecks bool) string {
+	if !noChecks {
+		return san
+	}
+	i := strings.IndexByte(san, '+')
+	if i < 0 {
+		i = strings.IndexByte(san, '#')
+	}
+	if i < 0 {
+		return san
+	}
+	return san[:i]
 }
 
 // pieceLetters is the C oracle's default (English) output_piece_characters,
@@ -214,15 +299,14 @@ var pieceLetters = map[chess.PieceType]string{
 //     to depending on whether the move captures; en passant gets "ep".
 //   - UCI:   identical token shape to LAlg (no separator, no piece prefix,
 //     no "ep" suffix — see UCI's UNKNOWN_MOVE/ENPASSANT_PAWN_MOVE handling
-//     in output.c, which only appends "ep" for ELALG/XLALG/XOLALG); check
-//     suffixes are never appended (argsfile.c forces keep_checks off), and
+//     in output.c, which only appends "ep" for ELALG/XLALG/XOLALG), and
 //     promotions are still the uppercase piece_str() letter.
 //
 // Castling is rendered as the king's own from-to move (never "O-O"), with
 // no piece-letter prefix (castling is not class PIECE_MOVE in the C
 // source) and, for HAlg/XLAlg, a "-" separator (castling is never a
-// capture).
-func renderAlgebraic(mi replay.MoveInfo, f Format) string {
+// capture). The check suffix is appended unless noChecks.
+func renderAlgebraic(mi replay.MoveInfo, f Format, noChecks bool) string {
 	m := mi.Move
 	var b strings.Builder
 
@@ -256,7 +340,7 @@ func renderAlgebraic(mi replay.MoveInfo, f Format) string {
 		b.WriteString("ep")
 	}
 
-	if f != UCI {
+	if !noChecks {
 		if mi.IsMate {
 			b.WriteByte('#')
 		} else if mi.IsCheck {

@@ -4,7 +4,9 @@
 // the source; this package corrects and judges it. See ADR 0002.
 //
 // The stages are normalisation (Normalise), replay, disposition against
-// keep-broken, ECO classification and criteria evaluation; New builds a
+// keep-broken, ECO classification, criteria evaluation and the output
+// transforms (transform.Apply, last, so the criteria see the game as
+// parsed); New builds a
 // Pipeline for a run's Config and Process runs the stages over one game,
 // returning its Outcome. Every command is a caller; commands differ only
 // in what they do with the outcome. Each stage touches only its game and

@@ -186,6 +186,41 @@ type Options struct {
 	NoVariations  bool
 	NoMoveNumbers bool
 	NoResults     bool
+
+	// NoTags omits the tag section and the blank line after it
+	// (--notags); EPD lines then carry no game comment.
+	NoTags bool
+
+	// NoChecks omits the + and # suffixes from emitted moves
+	// (--nochecks).
+	NoChecks bool
+
+	// CommentLines puts every comment on a line of its own
+	// (--commentlines).
+	CommentLines bool
+
+	// FENComments follows every move, in variations too, with a comment
+	// holding the FEN of the position it reaches (--fencomments). It
+	// implies FinalFEN off, as the C tool does.
+	FENComments bool
+
+	// HashComments follows every move with a comment holding the
+	// Polyglot hash of the position it reaches, in hex (--hashcomments).
+	HashComments bool
+
+	// Evaluation follows every move with a comment holding a Shannon
+	// evaluation of the position it reaches (--evaluation).
+	Evaluation bool
+
+	// FinalFEN follows the last main-line move with a comment holding
+	// the quoted FEN of the final position (-F).
+	FinalFEN bool
+
+	// PlyLimit, when HasPlyLimit, is the highest ply number emitted
+	// (--plylimit): moves past it are left out, in variations too, and a
+	// cut main line ends with "*" rather than the game's result.
+	PlyLimit    int
+	HasPlyLimit bool
 }
 
 // Writer renders games to an underlying io.Writer according to Options.
@@ -237,11 +272,13 @@ func (w *Writer) WriteGame(g *pgn.Game, r *replay.Result) error {
 // (LAlg, HAlg, ELAlg, XLAlg, UCI). opts is w.opts with the format
 // WriteGame settled on.
 func (w *Writer) writeMovetextGame(g *pgn.Game, r *replay.Result, opts Options) error {
-	if err := w.writeTags(g); err != nil {
-		return err
-	}
-	if _, err := io.WriteString(w.w, "\n"); err != nil {
-		return err
+	if !opts.NoTags {
+		if err := w.writeTags(g); err != nil {
+			return err
+		}
+		if _, err := io.WriteString(w.w, "\n"); err != nil {
+			return err
+		}
 	}
 	if len(g.PrefixComments) > 0 && !opts.NoComments && !isUCI(opts.Format) {
 		// Prefix comments go through the same word-splitting token
@@ -249,11 +286,11 @@ func (w *Writer) writeMovetextGame(g *pgn.Game, r *replay.Result, opts Options) 
 		// whitespace is normalized to single spaces and they word-wrap at
 		// the configured line width, matching the C oracle. Multiple
 		// prefix comments share one token stream.
-		plw := newLineWriter(w.w, opts.LineWidth)
+		pe := &emitter{lw: newLineWriter(w.w, opts.LineWidth), opts: opts}
 		for _, c := range g.PrefixComments {
-			emitComment(plw, c)
+			pe.comment(c)
 		}
-		if err := plw.Close(); err != nil {
+		if err := pe.lw.Close(); err != nil {
 			return err
 		}
 		if _, err := io.WriteString(w.w, "\n"); err != nil {
@@ -262,7 +299,8 @@ func (w *Writer) writeMovetextGame(g *pgn.Game, r *replay.Result, opts Options) 
 	}
 
 	lw := newLineWriter(w.w, opts.LineWidth)
-	emitMovetext(lw, g, r, opts)
+	e := &emitter{lw: lw, opts: opts}
+	e.movetext(g, r)
 	if err := lw.Close(); err != nil {
 		return err
 	}

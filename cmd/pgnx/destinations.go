@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"io"
+	"os"
 
 	"github.com/kyleboon/pgnx/output"
 	"github.com/kyleboon/pgnx/pgn"
@@ -39,6 +40,18 @@ func newBufferedDestination(dst io.Writer, file io.Closer, opts output.Options) 
 }
 
 func (b *bufferedDestination) writerFor(*pgn.Game) (*output.Writer, error) { return b.w, nil }
+
+// openFileDestination creates (or, with mode os.O_APPEND, extends) the
+// file name in the current directory as a buffered destination; mode is
+// os.O_TRUNC or os.O_APPEND. The split and ECO-split destinations open
+// their files through it.
+func openFileDestination(name string, mode int, opts output.Options) (*bufferedDestination, error) {
+	f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|mode, 0o644)
+	if err != nil {
+		return nil, err
+	}
+	return newBufferedDestination(f, f, opts), nil
+}
 
 // Close flushes what the run buffered and closes the file. A flush error
 // is the write error the file refused with; it wins over a close error.

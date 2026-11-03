@@ -262,6 +262,93 @@ below. Known, intentional differences:
   `M`, which matches nothing. pgnx leaves `m` unchanged in the reversed
   pattern.
 
+## Output transforms (Phase 2b: convert transforms, `pgnx split`)
+
+`convert`, `filter` and `split` port pgn-extract's output-side rewrites
+(output.c `format_game`/`print_items_following_move`, apply.c
+`rewrite_moves`/`drop_plies_from_start`/`shannonEvaluation`, map.c
+`init_hashtab` for the HashCode tag, grammar.c `select_output_file` for
+`-#`). Every in-scope target of the C test suite is a golden row or
+harness function (test-plycount, test-addhashcode, test-plylimit,
+test-FF, test-fencomments, test-evaluation, test-nochecks, test-notags,
+test-linenumbers, test-dropply, test-hash), and a differential sweep of
+nineteen flag combinations over the 6,083-game TWIC issue 1200
+(`--plycount --totalplycount --addhashcode`, `--fencomments`,
+`--hashcomments`, `--evaluation`, `-F`, `--commentlines`, `--commentlines
+--fencomments -w40`, `--notags` in SAN and EPD, `--nochecks` in SAN and
+ELALG, `--linenumbers`, `--plylimit 7` with and without `-V -C`,
+`--dropply 6`, `--dropply -4 --plycount`, `--dropply 2 -Wfen`,
+`-#500,3`) was byte-identical. Known, intentional differences:
+
+- **A game too short for `--drop-ply` is reported.** The C tool's
+  rewrite fails for a game with fewer plies than `--dropply` asks to
+  drop (or to keep, for a negative count); `format_game` then emits
+  nothing, silently, while the run's summary still counts the game as
+  matched. pgnx Rejects the game with a reason on the log (`cannot drop
+  N plies from a game of M`), emits it nowhere, and exits 2. Output is
+  identical. Three games of TWIC 1200 (0- and 1-ply games) hit this.
+  Under `--keep-broken` both tools emit the game untouched by the drop
+  (`rewrite_game` keeps the board); pgnx also logs it and exits 2.
+- **`--drop-before` sees a comment that follows a NAG.** The C lexer
+  attaches a comment written after a NAG (`e5 $1 { c2 }`) to the NAG,
+  where `find_matching_comment` never looks, so `--dropbefore c2` drops
+  nothing there; pgn.Move keeps every comment on the move, so pgnx
+  drops. The same data-model difference as the NAG/comment ordering
+  entry above (beads `pgnx-ordered-annotations`).
+- **Kept broken games count and annotate their typed moves.** With
+  `--keep-broken`, the C tool's PlyCount, TotalPlyCount, `--evaluation`
+  and `--fencomments` cover only the plies that replayed (the rest
+  become a comment); pgnx counts every parsed move and, emitting the
+  game in Source format without a replay (the `--keep-broken` entry
+  above), adds no generated comments. HashCode sums the plies that
+  replayed in both tools.
+- **`--drop-before` counts absolute plies, as the C tool does.** The
+  number of plies to drop is taken from the board's move number after
+  the commented move (`(move_number - 1) * 2`, plus one for Black to
+  move), which for a game starting from a FEN counts from move 1, not
+  from the game's first move. So `--drop-before` on a FEN game can drop
+  more plies than lie before the comment, or reject the game as too
+  short. Mirrored deliberately (`transform.dropPlies`); it is what the
+  C tool outputs.
+- **A HashCode tag is always recomputed.** `format_game` rewrites a
+  HashCode tag the game already carries whether or not `--addhashcode`
+  was given; pgnx does the same (`transform.Apply` with zero options).
+  The value is the C tool's: the low 32 bits of the sum of its weak
+  hash (`chess.Board.WeakHash`, a port of map.c's table) over every
+  main-line position after a move, taken before any plies are dropped.
+- **`-Fpattern`, `--fencommentformat` and `--quiescent` are not
+  ported.** `--final-fen` is the plain `-F` (a quoted FEN comment after
+  the last move); the C form that replaces a comment matching a
+  pattern with the FEN, the format string for FEN comments, and the
+  quiescence threshold that lets `--plylimit` run on past the limit
+  until a quiet move have no pgnx surface. The C test suite's
+  test-FF-text target (`-Fdiagram`) is excluded from the golden harness
+  on this basis.
+- **`--splitvariants` is not ported yet.** Its golden target already
+  diverges on comment placement across a variation's closing paren
+  (parser data-model section above), so it waits on beads
+  `pgnx-ordered-annotations`.
+- **Usage errors instead of warnings.** `--no-tags` with
+  `--seven-tag-roster` or `--roster`, a negative `--ply-limit`, a
+  missing player file, and `split` with `--output` or `--eco-split`
+  exit 1; the C tool exits 1 for the first three and warns-and-ignores
+  `-o` with `-#`.
+- **`--fen-comments` in UCI output.** `-Wuci` disables comments, NAGs,
+  variations, move numbers and check suffixes in the C tool, but not
+  the generated FEN/hash/evaluation comments, which it still emits; pgnx
+  mirrors this.
+- **`--ply-limit` in FEN output.** `print_FEN_move_list` tests the limit
+  once, against the starting ply: a game that starts past it lists no
+  positions, one within it lists every position; EPD output ignores the
+  limit altogether. Mirrored.
+- **`--no-checks` on Source output.** The C tool cuts the move text at
+  its first `+` (failing that, `#`) and drops whatever followed. pgnx's
+  Source format keeps `!`/`?` glyphs on the move text rather than
+  turning them into NAGs (the C lexer does), so `Qh4#!!` becomes `Qh4`
+  in both tools, but the C tool also emits `$3` where pgnx emits
+  nothing; that is the pre-existing glyph difference, not a
+  `--no-checks` one.
+
 ## Differential-testing findings (2026-08-07 run)
 
 `scripts/difftest.sh` was run over every file in
