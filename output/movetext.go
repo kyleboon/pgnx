@@ -271,14 +271,59 @@ func renderMove(mv *pgn.Move, info *replay.MoveInfo, opts Options) string {
 	switch opts.Format {
 	case LAlg, HAlg, ELAlg, XLAlg, UCI:
 		if info != nil {
-			return renderAlgebraic(*info, opts.Format, noChecks)
+			return renderAlgebraic(*info, opts.Format, opts.PieceLetters, noChecks)
 		}
 	case SAN:
 		if info != nil {
-			return stripChecks(info.SAN, noChecks)
+			return stripChecks(respellSAN(info.SAN, opts.PieceLetters), noChecks)
 		}
 	}
 	return stripChecks(mv.SAN, noChecks)
+}
+
+// respellSAN rewrites the piece letter and promotion letter of a replay-
+// normalised SAN (replay's sanFor: an English piece letter first, "=X"
+// for a promotion) in the letters alphabet, as apply.c rewrite_SAN_string
+// spells them with piece_str. Castling, pawn moves without promotion and
+// the null move pass through. It works on the text rather than rebuilding
+// the move from its MoveInfo so that everything else about the SAN
+// (disambiguation, capture marks) stays exactly what replay produced.
+func respellSAN(san string, letters PieceLetters) string {
+	if letters == (PieceLetters{}) || san == "" {
+		return san
+	}
+	var b strings.Builder
+	rest := san
+	if pt, ok := englishPieceType(san[0]); ok {
+		b.WriteString(letters.Letter(pt))
+		rest = san[1:]
+	}
+	if i := strings.IndexByte(rest, '='); i >= 0 && i+1 < len(rest) {
+		if pt, ok := englishPieceType(rest[i+1]); ok {
+			b.WriteString(rest[:i+1])
+			b.WriteString(letters.Letter(pt))
+			rest = rest[i+2:]
+		}
+	}
+	b.WriteString(rest)
+	return b.String()
+}
+
+// englishPieceType maps an English SAN piece letter to its type.
+func englishPieceType(c byte) (chess.PieceType, bool) {
+	switch c {
+	case 'K':
+		return chess.King, true
+	case 'Q':
+		return chess.Queen, true
+	case 'R':
+		return chess.Rook, true
+	case 'B':
+		return chess.Bishop, true
+	case 'N':
+		return chess.Knight, true
+	}
+	return chess.NoPiece, false
 }
 
 // stripChecks cuts san at its first "+" (or, failing that, "#") when
@@ -296,19 +341,6 @@ func stripChecks(san string, noChecks bool) string {
 		return san
 	}
 	return san[:i]
-}
-
-// pieceLetters is the C oracle's default (English) output_piece_characters,
-// used to prefix ELAlg/XLAlg piece moves and to render promotions in every
-// long-algebraic-family format (including UCI): promotion letters are
-// uppercase, matching piece_str() in apply.c — not the lowercase convention
-// used by the standalone UCI protocol / chess.Move.UCI().
-var pieceLetters = map[chess.PieceType]string{
-	chess.King:   "K",
-	chess.Queen:  "Q",
-	chess.Rook:   "R",
-	chess.Knight: "N",
-	chess.Bishop: "B",
 }
 
 // renderAlgebraic renders mi in one of the long-algebraic family formats
@@ -332,9 +364,16 @@ var pieceLetters = map[chess.PieceType]string{
 // capture). A null move is "--" in every one of these formats, UCI
 // included (print_move's NULL_MOVE case writes NULL_MOVE_STRING; the C
 // tool never writes "0000"). The check suffix is appended unless
-// noChecks.
-func renderAlgebraic(mi replay.MoveInfo, f Format, noChecks bool) string {
+// noChecks. letters spells the piece prefix and the promotion letter, but
+// only for ELAlg and XLAlg: output.c set_output_format sets the output
+// piece characters for those formats (and san) alone, so LAlg, HAlg and
+// UCI keep the English promotion letter whatever -W suffix was given.
+func renderAlgebraic(mi replay.MoveInfo, f Format, letters PieceLetters, noChecks bool) string {
 	m := mi.Move
+	spellsPieces := f == ELAlg || f == XLAlg
+	if !spellsPieces {
+		letters = PieceLetters{}
+	}
 	var b strings.Builder
 	if m.IsNull() {
 		return replay.NullMoveSAN + checkSuffix(mi, noChecks)
@@ -344,8 +383,8 @@ func renderAlgebraic(mi replay.MoveInfo, f Format, noChecks bool) string {
 	// (its own move class) and pawn moves never get a piece letter, but an
 	// ordinary (non-castling) king move does.
 	isPieceMove := mi.Piece.Type != chess.Pawn && m.Castle == chess.NoCastle
-	if (f == ELAlg || f == XLAlg) && isPieceMove {
-		b.WriteString(pieceLetters[mi.Piece.Type])
+	if spellsPieces && isPieceMove {
+		b.WriteString(letters.Letter(mi.Piece.Type))
 	}
 
 	b.WriteString(m.From.String())
@@ -365,8 +404,8 @@ func renderAlgebraic(mi replay.MoveInfo, f Format, noChecks bool) string {
 	b.WriteString(m.To.String())
 
 	if m.Promotion != chess.NoPiece {
-		b.WriteString(pieceLetters[m.Promotion])
-	} else if (f == ELAlg || f == XLAlg) && mi.EnPassant {
+		b.WriteString(letters.Letter(m.Promotion))
+	} else if spellsPieces && mi.EnPassant {
 		b.WriteString("ep")
 	}
 

@@ -29,11 +29,23 @@ held to parity; see below.
 
 ## Feature-scope differences
 
-- **`-W` German/language-specific piece-letter output is unsupported.**
-  pgn-extract's `-Wsan[PNBRQK]` form (e.g. `-WsanBSLTDK`, exercised by the
-  C test suite's `test-WWdeutsch` target) lets the output use
-  language-specific piece letters. pgnx's `-f`/`--format` has no CLI
-  surface for alternative piece-letter alphabets.
+- **`-W` language-specific piece letters are a separate flag.**
+  pgn-extract's `-Wsan[PNBRQK]` suffix (e.g. `-WsanBSLTDK`, exercised by
+  the C test suite's `test-WWdeutsch` target, also accepted after `elalg`
+  and `xlalg`) is `pgnx convert --piece-letters LETTERS` with `-f san`,
+  `elalg` or `xlalg`; the emitted moves match byte for byte, the `X+Y`
+  two-character form included. Two deliberate differences at the CLI:
+  the C tool silently drops the suffix after `lalg`, `halg`, `uci` and
+  `epd` (output.c `set_output_format` sets the letters for san, elalg,
+  xlalg and xolalg only), where pgnx rejects `--piece-letters` as a usage
+  error; and the C tool counts bytes, so a multi-byte UTF-8 letter is
+  "too many piece letters", where pgnx counts runes and accepts e.g.
+  Cyrillic `ПКСЛФК+р`. The suffix affects output only: on input both
+  tools read the fixed English set plus the German D/T/S/L (decode.c
+  `is_piece`; `replay/san.go`) whatever the suffix says, and never the
+  suffix's own letters. Covered by the `test-WWdeutsch`
+  golden row, `TestPieceLettersRendering` (output) and
+  `TestConvertPieceLettersUsageErrors` (cmd/pgnx).
 - **CM (ChessMaster) format is unsupported.** pgn-extract's `-Wcm` output
   format has no pgnx equivalent.
 - **JSON output and argument files are unsupported.** `--json` and

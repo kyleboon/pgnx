@@ -133,3 +133,51 @@ func TestConvertDropsSetUpWithoutFEN(t *testing.T) {
 		t.Errorf("stderr should name the game and the tag: %q", errOut)
 	}
 }
+
+// --piece-letters is pgn-extract's -Wsan<letters> suffix: the alphabet
+// san, elalg and xlalg output spells pieces with. Oracle:
+//
+//	printf '1. f3 e5 2. g4 Qh4# 0-1\n' | pgn-extract -WsanBSLTDK --quiet  -> 1. f3 e5 2. g4 Dh4# 0-1
+func TestConvertPieceLetters(t *testing.T) {
+	for _, c := range []struct {
+		format, want string
+	}{
+		{"san", "1. f3 e5 2. g4 Dh4# 0-1"},
+		{"elalg", "1. f2f3 e7e5 2. g2g4 Dd8h4# 0-1"},
+		{"xlalg", "1. f2-f3 e7-e5 2. g2-g4 Dd8-h4# 0-1"},
+	} {
+		out, errOut, code := runCLI(t, fools, "convert", "--quiet", "-f", c.format, "--piece-letters", "BSLTDK")
+		if code != 0 {
+			t.Fatalf("-f %s: exit %d (%s)", c.format, code, errOut)
+		}
+		if !strings.Contains(out, c.want) {
+			t.Errorf("-f %s: output %q, want line %q", c.format, out, c.want)
+		}
+	}
+	// filter and split share the output flags.
+	out, _, code := runCLI(t, fools, "filter", "--quiet", "--checkmate", "--piece-letters", "BSLTDK")
+	if code != 0 || !strings.Contains(out, "Dh4#") {
+		t.Errorf("filter: exit %d, output %q", code, out)
+	}
+}
+
+// A malformed alphabet, or one given for a format that cannot spell
+// pieces with it, is a usage error (exit 1). The C tool exits 1 on the
+// former and silently ignores -Wlalg<letters>; pgnx refuses both.
+func TestConvertPieceLettersUsageErrors(t *testing.T) {
+	for _, args := range [][]string{
+		{"--piece-letters", "BSLTD"},
+		{"--piece-letters", "BSLTDKX"},
+		{"--piece-letters", "P+"},
+		{"--piece-letters", "BSLTDK", "-f", "lalg"},
+		{"--piece-letters", "BSLTDK", "-f", "halg"},
+		{"--piece-letters", "BSLTDK", "-f", "uci"},
+		{"--piece-letters", "BSLTDK", "-f", "epd"},
+		{"--piece-letters", "BSLTDK", "-f", "source"},
+	} {
+		_, errOut, code := runCLI(t, fools, append([]string{"convert", "--quiet"}, args...)...)
+		if code != 1 || !strings.Contains(errOut, "piece-letters") {
+			t.Errorf("%v: exit %d, want 1 naming the flag (%s)", args, code, errOut)
+		}
+	}
+}

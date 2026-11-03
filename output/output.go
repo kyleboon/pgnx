@@ -195,6 +195,12 @@ type Options struct {
 	// (--nochecks).
 	NoChecks bool
 
+	// PieceLetters is the alphabet SAN, ELAlg and XLAlg spell pieces
+	// with (-Wsan<letters>, --piece-letters); the zero value is the
+	// English PNBRQK. The other formats ignore it, as the C tool does:
+	// LAlg, HAlg and UCI promotions keep the English letter.
+	PieceLetters PieceLetters
+
 	// CommentLines puts every comment on a line of its own
 	// (--commentlines).
 	CommentLines bool

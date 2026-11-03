@@ -52,6 +52,7 @@ func addOutputFlags(cmd *cobra.Command) {
 	// Output options (pgn-extract's output.c): how the game is rendered.
 	flags.Bool("no-tags", false, "omit the tag section (--notags; conflicts with --seven-tag-roster and --roster)")
 	flags.Bool("no-checks", false, "omit + and # from emitted moves (--nochecks)")
+	flags.String("piece-letters", "", "spell pieces in san, elalg and xlalg output with these six letters, in the order pawn, knight, bishop, rook, queen, king; X+Y spells a piece XY (-Wsan<LETTERS>, e.g. BSLTDK)")
 	flags.Bool("comment-lines", false, "put each comment on a line of its own (--commentlines)")
 	flags.Bool("fen-comments", false, "follow every move with a { FEN } comment of the position reached (--fencomments)")
 	flags.Bool("hash-comments", false, "follow every move with a { hash } comment of the position reached, in hex (--hashcomments)")
@@ -112,6 +113,21 @@ func outputOptions(cmd *cobra.Command) (output.Options, error) {
 		return output.Options{}, errors.New("--no-tags conflicts with --seven-tag-roster and --roster")
 	}
 	noChecks, _ := flags.GetBool("no-checks")
+	var pieceLetters output.PieceLetters
+	if letters, _ := flags.GetString("piece-letters"); letters != "" {
+		// output.c set_output_format consults the suffix only for san,
+		// elalg and xlalg; the C tool silently drops it elsewhere, pgnx
+		// refuses it.
+		switch format {
+		case output.SAN, output.ELAlg, output.XLAlg:
+		default:
+			return output.Options{}, fmt.Errorf("--piece-letters applies to the san, elalg and xlalg formats only, not %s", format)
+		}
+		pieceLetters, err = output.ParsePieceLetters(letters)
+		if err != nil {
+			return output.Options{}, fmt.Errorf("--piece-letters: %w", err)
+		}
+	}
 	commentLines, _ := flags.GetBool("comment-lines")
 	fenComments, _ := flags.GetBool("fen-comments")
 	hashComments, _ := flags.GetBool("hash-comments")
@@ -142,6 +158,7 @@ func outputOptions(cmd *cobra.Command) (output.Options, error) {
 		NoResults:      noResults,
 		NoTags:         noTags,
 		NoChecks:       noChecks,
+		PieceLetters:   pieceLetters,
 		CommentLines:   commentLines,
 		FENComments:    fenComments,
 		HashComments:   hashComments,

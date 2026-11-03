@@ -15,6 +15,7 @@ so far to their pgnx equivalents, and lists what is not yet ported.
 | `-V` | `pgnx convert --no-variations` |
 | `-w N` | `pgnx convert --line-width N` (or `-w N`) |
 | `-W<fmt>` | `pgnx convert -f <fmt>` (e.g. `-Wuci` → `convert -f uci`) |
+| `-Wsan<letters>`, `-Welalg<letters>`, `-Wxlalg<letters>` | `pgnx convert -f <fmt> --piece-letters <letters>` (e.g. `-WsanBSLTDK` → `convert --piece-letters BSLTDK`; also on `filter`, `split`) |
 | `-o F` | `pgnx convert -o F` |
 | `-a F` | `pgnx convert -o F --append` |
 | `-r` | `pgnx validate` |
@@ -35,6 +36,11 @@ Notes:
   `uci`→`uci`, `san`→`san` (the default). `-Wuci` also implicitly forces a
   very wide (5000-column) line width in the C tool; `pgnx convert -f uci`
   does the same unless `-w`/`--line-width` is given explicitly.
+- `--piece-letters` takes the six letters pieces are spelled with, in the
+  order pawn, knight, bishop, rook, queen, king (`PNBRQK` is the default);
+  `X+Y` spells a piece as the two characters `XY`. It applies to `san`,
+  `elalg` and `xlalg` output and is a usage error with any other format,
+  where the C tool ignores the suffix (see CONFORMANCE.md).
 - pgn-extract's `-r` only reports errors; it does not extract PGN output.
   `pgnx validate` is the direct equivalent — findings go to stdout, with
   `--summary` to collapse them to a single tally line.

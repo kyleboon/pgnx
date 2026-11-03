@@ -45,6 +45,8 @@ var goldenCases = []struct {
 	{"test-WWelalg", []string{"convert", "-f", "elalg"}, "test-ucW.pgn", "test-WWelalg-out.pgn", false},
 	// test-WW: pgn-extract -Wxlalg -otest-WWxlalg-out.pgn --quiet test-ucW.pgn
 	{"test-WWxlalg", []string{"convert", "-f", "xlalg"}, "test-ucW.pgn", "test-WWxlalg-out.pgn", false},
+	// test-WW: pgn-extract -WsanBSLTDK -otest-WWdeutsch-out.pgn --quiet test-ucW.pgn
+	{"test-WWdeutsch", []string{"convert", "-f", "san", "--piece-letters", "BSLTDK"}, "test-ucW.pgn", "test-WWdeutsch-out.pgn", false},
 	// test-WW: pgn-extract -Wuci -otest-WWuci-out.pgn --quiet test-ucW.pgn
 	// -Wuci implicitly forces a very large (5000) output line width
 	// (argsfile.c, OUTPUT_FORMAT_ARGUMENT case, "@@@ Warning: arbitrary
@@ -290,10 +292,7 @@ var goldenCases = []struct {
 	//   ported; see CONFORMANCE.md).
 	//   Not byte-compared by the C Makefile either: test-r (report mode),
 	//   test-h (help text), test-LL (log-file-only comparison);
-	//   sub-targets not promoted to their own row: -WsanBSLTDK (custom
-	//   output piece letters within test-WW, no CLI surface for
-	//   alternative piece letters yet); two-run targets with their own
-	//   test function: test-append (TestGoldenConformanceAppend),
+	//   two-run targets with their own test function: test-append (TestGoldenConformanceAppend),
 	//   test-nagcomments (TestGoldenConformanceNAGComments);
 	//   no-flags-1/no-flags-2 (fools-mate.pgn is vendored under infiles/,
 	//   not outfiles/, and isn't a $(CMP) target in the C Makefile itself
