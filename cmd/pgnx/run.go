@@ -107,6 +107,7 @@ func newRunTo(cmd *cobra.Command, criteria *filter.Options, open func(*run) (des
 	}
 	flags := cmd.Flags()
 	keepBroken, _ := flags.GetBool("keep-broken")
+	allowNullMoves, _ := flags.GetBool("allow-null-moves")
 	quiet, _ := flags.GetBool("quiet")
 
 	r := &run{cmd: cmd, quiet: quiet, route: routeAll}
@@ -142,22 +143,23 @@ func newRunTo(cmd *cobra.Command, criteria *filter.Options, open func(*run) (des
 	}
 	r.closers = append(r.closers, r.output)
 
-	r.pipe = pipeline.New(pipeline.Config{ECO: ecoSet.table, KeepBroken: keepBroken, Criteria: criteria, Transform: transforms})
+	r.pipe = pipeline.New(pipeline.Config{ECO: ecoSet.table, KeepBroken: keepBroken, AllowNullMoves: allowNullMoves, Criteria: criteria, Transform: transforms})
 	return r, nil
 }
 
 // newReportOnlyRun is the run of a command that writes no games
 // (validate): the pipeline has no ECO table, no criteria and does not
 // keep broken games, so a game fails exactly where convert would fail
-// on it, and every game is routed nowhere. It has no destinations, no
-// output options and no log of its own, so only game may be called on
-// it (exec and close need the destinations and the log that newRun
-// opens); the caller drives it through a runReport of its own. The tag
-// registry is observed, as game requires, and never read.
-func newReportOnlyRun() *run {
+// on it (with the same null-move policy), and every game is routed
+// nowhere. It has no destinations, no output options and no log of its
+// own, so only game may be called on it (exec and close need the
+// destinations and the log that newRun opens); the caller drives it
+// through a runReport of its own. The tag registry is observed, as game
+// requires, and never read.
+func newReportOnlyRun(allowNullMoves bool) *run {
 	return &run{
 		tags:  output.NewTagRegistry(),
-		pipe:  pipeline.New(pipeline.Config{}),
+		pipe:  pipeline.New(pipeline.Config{AllowNullMoves: allowNullMoves}),
 		route: routeNowhere,
 	}
 }

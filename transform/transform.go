@@ -239,7 +239,13 @@ func dropPlies(g *pgn.Game, r *replay.Result, n int, opts Options) (*replay.Resu
 	if _, ok := g.Tag("TotalPlyCount"); ok || opts.TotalPlyCount {
 		g.SetTag("TotalPlyCount", strconv.Itoa(countPlies(g.Moves, opts.CountVariations)))
 	}
-	nr, err := replay.Game(g, replay.Options{})
+	// The run's null-move policy has already judged the game: a
+	// main-line null move either passed under --allow-null-moves or made
+	// the game Broken, and under --keep-broken a Broken game still goes
+	// out (rewrite_moves keeps the board). Either way the remainder is
+	// replayed as it stands, so that the null move is not refused a
+	// second time here and the dropped game silently lost.
+	nr, err := replay.Game(g, replay.Options{AllowNullMoves: true})
 	if err != nil {
 		return nil, fmt.Errorf("replaying from the dropped-ply position: %w", err)
 	}

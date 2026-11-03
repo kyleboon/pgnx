@@ -3,9 +3,22 @@ package chess
 // Apply mutates the board by making move m. The caller must ensure m is
 // pseudo-legal for the side to move (e.g. a move produced by LegalMoves or
 // replayed from a game record); Apply does not validate legality.
+//
+// The null move (NullMove) only passes the turn: the side to move flips
+// and the fullmove number advances after Black. The en passant square,
+// the halfmove clock and the castling rights are left exactly as they
+// were, as pgn-extract's apply_move skips make_move for a NULL_MOVE
+// (apply.c), so the position after "1. e4 --" still carries e3.
 func (b *Board) Apply(m Move) {
-	mover := b.PieceAt(m.From)
 	color := b.SideToMove
+	if m.IsNull() {
+		if color == Black {
+			b.FullmoveNumber++
+		}
+		b.SideToMove = color.Opponent()
+		return
+	}
+	mover := b.PieceAt(m.From)
 
 	// Step 1: en passant capture removes the pawn captured "in passing",
 	// which sits beside the destination square rather than on it.

@@ -98,10 +98,18 @@ func (b *Board) genPawnMoves(sq Square, color Color, moves *[]Move) {
 	dir := 1
 	startRank := 1
 	lastRank := 7
+	// The rank an en passant capture lands on: White's sixth, Black's
+	// third. map.c generate_pawn_moves "rejects ep attempts for the
+	// colour that has just moved" with the same rule, which matters once
+	// a null move passes the turn without clearing the square ("1. e4
+	// --" leaves e3 set with White to move): White's d2/f2 pawns must
+	// not capture onto it.
+	epRank := 5
 	if color == Black {
 		dir = -1
 		startRank = 6
 		lastRank = 0
+		epRank = 2
 	}
 
 	// Single push.
@@ -130,7 +138,7 @@ func (b *Board) genPawnMoves(sq Square, color Color, moves *[]Move) {
 			b.addPawnMove(sq, to, lastRank, moves)
 			continue
 		}
-		if b.HasEP && to == b.EPSquare && target.Type == NoPiece {
+		if b.HasEP && to == b.EPSquare && to.Rank == epRank && target.Type == NoPiece {
 			*moves = append(*moves, Move{From: sq, To: to})
 		}
 	}

@@ -305,10 +305,16 @@ var pieceLetters = map[chess.PieceType]string{
 // Castling is rendered as the king's own from-to move (never "O-O"), with
 // no piece-letter prefix (castling is not class PIECE_MOVE in the C
 // source) and, for HAlg/XLAlg, a "-" separator (castling is never a
-// capture). The check suffix is appended unless noChecks.
+// capture). A null move is "--" in every one of these formats, UCI
+// included (print_move's NULL_MOVE case writes NULL_MOVE_STRING; the C
+// tool never writes "0000"). The check suffix is appended unless
+// noChecks.
 func renderAlgebraic(mi replay.MoveInfo, f Format, noChecks bool) string {
 	m := mi.Move
 	var b strings.Builder
+	if m.IsNull() {
+		return replay.NullMoveSAN + checkSuffix(mi, noChecks)
+	}
 
 	// The C oracle only prefixes moves of class PIECE_MOVE — castling
 	// (its own move class) and pawn moves never get a piece letter, but an
@@ -340,15 +346,22 @@ func renderAlgebraic(mi replay.MoveInfo, f Format, noChecks bool) string {
 		b.WriteString("ep")
 	}
 
-	if !noChecks {
-		if mi.IsMate {
-			b.WriteByte('#')
-		} else if mi.IsCheck {
-			b.WriteByte('+')
-		}
-	}
-
+	b.WriteString(checkSuffix(mi, noChecks))
 	return b.String()
+}
+
+// checkSuffix is the "+"/"#" suffix mi gets in the long-algebraic family,
+// or "" when noChecks.
+func checkSuffix(mi replay.MoveInfo, noChecks bool) string {
+	switch {
+	case noChecks:
+		return ""
+	case mi.IsMate:
+		return "#"
+	case mi.IsCheck:
+		return "+"
+	}
+	return ""
 }
 
 // isWhiteMove reports whether moves[i] within a line that begins with

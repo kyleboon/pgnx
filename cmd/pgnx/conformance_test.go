@@ -20,7 +20,7 @@ import (
 // from Phase 2 the filter command's selection criteria, and from Phase 3
 // positional/sequence matching and ECO classification. See the "Phase 4+"
 // comment at the bottom of this table for targets deliberately excluded
-// (deduplication, null moves, and output transforms not yet implemented).
+// (deduplication and output transforms not yet implemented).
 var goldenCases = []struct {
 	name   string
 	args   []string // pgnx args; input/output paths are appended by the runner
@@ -266,6 +266,13 @@ var goldenCases = []struct {
 	// test-linenumbers: pgn-extract --quiet --linenumbers marker infiles/petrosian.pgn -o test-linenumbers-out.pgn
 	{"test-linenumbers", []string{"convert", "--line-numbers", "marker"}, "petrosian.pgn", "test-linenumbers-out.pgn", false},
 
+	// ---- Null moves ----
+
+	// test-allownullmoves: pgn-extract --allownullmoves -otest-allownullmoves-out.pgn -ltest-allownullmoves-log.txt --quiet test-allownullmoves.pgn
+	{"test-allownullmoves", []string{"convert", "--allow-null-moves"}, "test-allownullmoves.pgn", "test-allownullmoves-out.pgn", false},
+	// test-odds: pgn-extract --quiet --odds --allownullmoves infiles/odds.pgn -o odds-out.pgn
+	{"test-odds", []string{"filter", "--odds", "--allow-null-moves"}, "odds.pgn", "odds-out.pgn", false},
+
 	// test-dropply (four -a runs into one file) is in
 	// TestGoldenConformanceAppendRuns; test-hash (-#, file splitting) is
 	// in TestGoldenConformanceSplit.
@@ -277,8 +284,6 @@ var goldenCases = []struct {
 	//   Duplicate detection (Phase 4): test-AA, test-checkfile,
 	//   test-duplicates, test-noduplicates, test-nounique, test-ZZ,
 	//   test-fuzzydepth.
-	//   Null moves: test-allownullmoves, test-odds (null-move decoding, not
-	//   implemented).
 	//   Output transforms not yet implemented: test-splitvariants
 	//   (--splitvariants, blocked on NAG/comment ordering, beads
 	//   pgnx-ordered-annotations), test-FF-text (-Fpattern, the

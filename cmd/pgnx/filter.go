@@ -46,6 +46,7 @@ colour.`,
 	flags.Bool("lower-rated-winner", false, "only games won by the lower-rated player")
 	flags.Bool("no-setup-tags", false, "exclude games with a SetUp tag")
 	flags.Bool("only-setup-tags", false, "only games with a SetUp tag")
+	flags.Bool("odds", false, "only games played at odds: a FEN start with the middle ranks empty and different pieces per side (--odds)")
 
 	flags.Int("min-moves", 0, "at least N full moves (-bl)")
 	flags.Int("max-moves", 0, "at most N full moves (-bu)")
@@ -190,6 +191,7 @@ func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions,
 		o.Bounds.SetPly(getInt("ply"))
 	}
 
+	o.Odds = getBool("odds")
 	o.Checkmate = getBool("checkmate")
 	o.Stalemate = getBool("stalemate")
 	o.Insufficient = getBool("insufficient")

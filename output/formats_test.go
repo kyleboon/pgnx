@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/kyleboon/pgnx/pgn"
+	"github.com/kyleboon/pgnx/replay"
 )
 
 func render(t *testing.T, src string, opts Options) string {
@@ -320,5 +323,56 @@ func TestFENGameNoResultLine(t *testing.T) {
 	}
 	if strings.Contains(body, "*") {
 		t.Errorf("FEN body should not contain a result token:\n%q", body)
+	}
+}
+
+// TestNullMoveFormats pins how a main-line null move is rendered in
+// every format against the C oracle (output.c print_move writes
+// NULL_MOVE_STRING for SAN and the whole long-algebraic family, UCI
+// included; it is never "0000"). Oracle (from ~/code/pgn-extract):
+//
+//	printf '[Result "*"]\n\n1. e4 -- 2. d4 d5 3. exd5 -- 4. Nc3 *\n' | ./build/bin/pgn-extract --allownullmoves -Wxlalg --quiet
+//	  -> 1. e2-e4 -- 2. d2-d4 d7-d5 3. e4xd5 -- 4. Nb1-c3 *
+//	... -Wuci   -> e2e4 -- d2d4 d7d5 e4d5 -- b1c3 *
+//	... --fencomments (SAN) ->
+//	  1. e4 { rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1 } 1...
+//	  -- { rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e3 0 2 } 2. d4 {
+//	... --evaluation -> 1. e4 { 1.00 } 1... -- { 1.00 } 2. d4 { 1.80 } *
+func TestNullMoveFormats(t *testing.T) {
+	const src = "[Result \"*\"]\n\n1. e4 -- 2. d4 d5 3. exd5 -- 4. Nc3 *\n"
+	s := pgn.NewScanner(strings.NewReader(src), pgn.ParserOptions{})
+	if !s.Next() {
+		t.Fatalf("parse: %v", s.Err())
+	}
+	g := s.Game()
+	r, err := replay.Game(g, replay.Options{AllowNullMoves: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name string
+		opts Options
+		want string
+	}{
+		{"san", Options{Format: SAN}, "1. e4 -- 2. d4 d5 3. exd5 -- 4. Nc3 *"},
+		{"source", Options{Format: Source}, "1. e4 -- 2. d4 d5 3. exd5 -- 4. Nc3 *"},
+		{"lalg", Options{Format: LAlg}, "1. e2e4 -- 2. d2d4 d7d5 3. e4d5 -- 4. b1c3 *"},
+		{"halg", Options{Format: HAlg}, "1. e2-e4 -- 2. d2-d4 d7-d5 3. e4-d5 -- 4. b1-c3 *"},
+		{"elalg", Options{Format: ELAlg}, "1. e2e4 -- 2. d2d4 d7d5 3. e4d5 -- 4. Nb1c3 *"},
+		{"xlalg", Options{Format: XLAlg}, "1. e2-e4 -- 2. d2-d4 d7-d5 3. e4xd5 -- 4. Nb1-c3 *"},
+		{"uci", Options{Format: UCI, LineWidth: 5000}, "e2e4 -- d2d4 d7d5 e4d5 -- b1c3 *"},
+		{"fen comments", Options{Format: SAN, FENComments: true}, "1...\n-- { rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e3 0 2 } 2. d4 {"},
+		{"evaluation", Options{Format: SAN, Evaluation: true}, "1. e4 { 1.00 } 1... -- { 1.00 } 2. d4 { 1.80 }"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := NewWriter(&buf, c.opts).WriteGame(g, r); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(buf.String(), c.want) {
+				t.Errorf("got:\n%s\nwant to contain %q", buf.String(), c.want)
+			}
+		})
 	}
 }

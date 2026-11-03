@@ -85,20 +85,20 @@ func (b *Board) Zobrist() uint64 {
 	return h
 }
 
-// epCapturable reports whether a pawn of the side to move stands adjacent
-// (file ±1) to the EP-captured pawn, i.e. on the rank from which it would
-// capture onto b.EPSquare. This is the Polyglot rule: the EP file is only
-// hashed in if an en passant capture is actually available.
+// epCapturable reports whether a pawn of the side to move stands beside
+// the pawn that would be captured en passant, i.e. on the rank from which
+// it would capture onto b.EPSquare: White's fifth rank, Black's fourth.
+// This is the Polyglot rule, as pgn-extract's zobrist.c applies it: the
+// EP file is only hashed in if an en passant capture is actually
+// available. The rank is fixed per side rather than derived from the EP
+// square so that the square a null move leaves behind ("1. e4 --" keeps
+// e3 with White to move) does not count White's own second-rank pawns,
+// matching the C tool.
 func epCapturable(b *Board) bool {
 	ep := b.EPSquare
-	// The capturing pawn sits on the same rank as the pawn that just moved
-	// two squares, which is adjacent to the EP square's rank: one rank
-	// toward the side to move relative to the EP square.
-	var capturingRank int
-	if b.SideToMove == White {
-		capturingRank = ep.Rank - 1
-	} else {
-		capturingRank = ep.Rank + 1
+	capturingRank := 4 // fifth rank: a white pawn capturing a black one
+	if b.SideToMove == Black {
+		capturingRank = 3 // fourth rank
 	}
 
 	for _, df := range [...]int{-1, 1} {

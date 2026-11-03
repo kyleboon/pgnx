@@ -70,3 +70,58 @@ func TestApplyUCI(t *testing.T) {
 		t.Errorf("UCI() = %q", m.UCI())
 	}
 }
+
+// A null move (pgn-extract's "--") passes the turn: the side to move
+// flips and the fullmove number advances after Black, but nothing else
+// changes, as apply.c apply_move skips make_move for NULL_MOVE and so
+// leaves the en passant square, the clocks and the castling rights as
+// they were. Confirmed against the C binary with --fencomments:
+// "1. e4 --" reaches "... w KQkq e3 0 2".
+func TestApplyNullMove(t *testing.T) {
+	cases := []struct {
+		name, fen, want string
+	}{
+		{"black passes, keeps ep and clock",
+			"rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+			"rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e3 0 2"},
+		{"white passes, fullmove unchanged",
+			"rnbqkbnr/ppp1pppp/8/3P4/3P4/8/PPP2PPP/RNBQKBNR w KQkq - 3 4",
+			"rnbqkbnr/ppp1pppp/8/3P4/3P4/8/PPP2PPP/RNBQKBNR b KQkq - 3 4"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			b := apply(t, c.fen, NullMove)
+			if got := b.FEN(); got != c.want {
+				t.Errorf("after null move: got %s, want %s", got, c.want)
+			}
+		})
+	}
+	if !NullMove.IsNull() || (Move{}).IsNull() {
+		t.Error("IsNull must be true only for NullMove")
+	}
+	if got := NullMove.UCI(); got != "0000" {
+		t.Errorf("NullMove.UCI() = %q, want 0000", got)
+	}
+}
+
+// An en passant square left behind by a null move ("1. e4 --" keeps e3
+// with White to move) must not give White a capture onto it: map.c
+// generate_pawn_moves "rejects ep attempts for the colour that has just
+// moved" by requiring the square to be on the capturing side's sixth
+// (White) or third (Black) rank. The C tool's --evaluation mobility
+// term, and SAN resolution, depend on it.
+func TestLegalMovesIgnoreEnPassantOnWrongRank(t *testing.T) {
+	b, err := FromFEN("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.Apply(NullMove)
+	for _, m := range b.LegalMoves() {
+		if m.To == MustSquare("e3") && m.From.File != 4 {
+			t.Errorf("white may not capture en passant onto e3: %v", m)
+		}
+	}
+	if n := len(b.LegalMoves()); n != 30 {
+		t.Errorf("white has %d legal moves after 1. e4 --, want 30", n)
+	}
+}

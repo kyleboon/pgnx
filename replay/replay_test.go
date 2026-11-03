@@ -287,3 +287,56 @@ func TestFullmoveClampedInFEN(t *testing.T) {
 		t.Errorf("start position: %+v", p)
 	}
 }
+
+// A null move ("--", or the "Z0" spelling pgn-extract's lexer also takes)
+// in the main line is rejected unless AllowNullMoves, and is always
+// accepted inside a variation (grammar.c parse_move_unit, apply.c
+// play_moves: "Null moves (--) only allowed in variations").
+func TestReplayNullMoveMainLineNeedsOption(t *testing.T) {
+	g := parseOne(t, "1. e4 -- 2. d4 *\n")
+	_, err := Game(g, Options{})
+	var ill *IllegalMoveError
+	if !errors.As(err, &ill) || ill.Ply != 2 || ill.SAN != "--" {
+		t.Fatalf("want IllegalMoveError at ply 2 for --, got %v", err)
+	}
+}
+
+func TestReplayNullMoveMainLineAllowed(t *testing.T) {
+	for _, spelling := range []string{"--", "Z0"} {
+		g := parseOne(t, "1. e4 "+spelling+" 2. d4 *\n")
+		r, err := Game(g, Options{AllowNullMoves: true})
+		if err != nil {
+			t.Fatalf("%s: %v", spelling, err)
+		}
+		null := r.Moves[1]
+		if !null.Move.IsNull() || null.SAN != "--" || null.IsCheck || null.Captured != chess.NoPiece {
+			t.Errorf("%s: null MoveInfo = %+v", spelling, null)
+		}
+		// apply.c leaves the board as it was: e3 stays, the clock does
+		// not advance, only the side to move and move number change.
+		if got := r.Positions[2].FEN; got != "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e3 0 2" {
+			t.Errorf("%s: FEN after null = %s", spelling, got)
+		}
+		if got := r.Positions[3].FEN; got != "rnbqkbnr/pppppppp/8/8/3PP3/8/PPP2PPP/RNBQKBNR b KQkq d3 0 2" {
+			t.Errorf("%s: FEN after 2. d4 = %s", spelling, got)
+		}
+		if r.PlyCount() != 3 {
+			t.Errorf("%s: PlyCount = %d, want 3", spelling, r.PlyCount())
+		}
+	}
+}
+
+func TestReplayNullMoveInVariationAlwaysAllowed(t *testing.T) {
+	g := parseOne(t, "1. e4 (1. d4 --) e5 *\n")
+	r, err := Game(g, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := r.Moves[0].Variations[0]
+	if v == nil || len(v.Moves) != 2 || !v.Moves[1].Move.IsNull() {
+		t.Fatalf("variation replay = %+v", v)
+	}
+	if got := v.Positions[2].FEN; got != "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR w KQkq d3 0 2" {
+		t.Errorf("FEN after variation null = %s", got)
+	}
+}

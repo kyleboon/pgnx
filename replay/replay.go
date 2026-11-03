@@ -2,14 +2,22 @@ package replay
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/kyleboon/pgnx/chess"
 	"github.com/kyleboon/pgnx/pgn"
 )
 
-// Options controls replay behavior. It is currently reserved: Chess960
-// castling is data-driven via the game's FEN tag rather than a flag here.
-type Options struct{}
+// Options controls replay behavior. Chess960 castling is data-driven via
+// the game's FEN tag rather than a flag here.
+type Options struct {
+	// AllowNullMoves accepts the null move "--" (pgn-extract also takes
+	// the spelling "Z0") in the main line (--allownullmoves). Without it
+	// a main-line null move is an illegal move, as apply.c play_moves
+	// rejects the game ("Null moves (--) only allowed in variations");
+	// inside a variation a null move is always accepted.
+	AllowNullMoves bool
+}
 
 // Result is the outcome of replaying a sequence of moves (a main line or a
 // variation) against a starting position.
@@ -79,7 +87,7 @@ func Game(g *pgn.Game, opts Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return replayMoves(g.Moves, b)
+	return replayMoves(g.Moves, b, opts.AllowNullMoves)
 }
 
 // startingBoard returns the board g's replay should start from: the
@@ -124,8 +132,9 @@ func (p Position) PlyNumber() int {
 // variation whose own replay fails does not fail the parent replay — it is
 // recorded as a nil *Result. The first illegal move in moves itself stops
 // replay and returns the partial Result together with an *IllegalMoveError
-// whose Ply is the 1-based index of the failing move within moves.
-func replayMoves(moves []*pgn.Move, b *chess.Board) (*Result, error) {
+// whose Ply is the 1-based index of the failing move within moves. A null
+// move is illegal in moves unless allowNull; variations always allow it.
+func replayMoves(moves []*pgn.Move, b *chess.Board, allowNull bool) (*Result, error) {
 	r := &Result{
 		Positions: make([]Position, 0, len(moves)+1),
 		start:     b.Copy(),
@@ -134,18 +143,36 @@ func replayMoves(moves []*pgn.Move, b *chess.Board) (*Result, error) {
 	r.Positions = append(r.Positions, positionOf(b))
 
 	for i, mv := range moves {
-		m, err := decodeSAN(mv.SAN, b)
-		if err != nil {
-			return r, &IllegalMoveError{
-				Ply:    i + 1,
-				SAN:    mv.SAN,
-				Reason: err.Error(),
+		var (
+			m         chess.Move
+			san       string
+			piece     chess.Piece
+			captured  chess.PieceType
+			enPassant bool
+		)
+		if isNullMove(mv.SAN) {
+			if !allowNull {
+				return r, &IllegalMoveError{
+					Ply:    i + 1,
+					SAN:    mv.SAN,
+					Reason: "null move (--) only allowed in variations without --allow-null-moves",
+				}
 			}
+			m, san = chess.NullMove, NullMoveSAN
+		} else {
+			var err error
+			m, err = decodeSAN(mv.SAN, b)
+			if err != nil {
+				return r, &IllegalMoveError{
+					Ply:    i + 1,
+					SAN:    mv.SAN,
+					Reason: err.Error(),
+				}
+			}
+			san = sanFor(m, b)
+			piece = b.PieceAt(m.From)
+			captured, enPassant = capturedPieceType(m, b)
 		}
-
-		san := sanFor(m, b)
-		piece := b.PieceAt(m.From)
-		captured, enPassant := capturedPieceType(m, b)
 
 		// Variations replay from the position before this move, so branch
 		// off a copy of b prior to applying m.
@@ -154,7 +181,7 @@ func replayMoves(moves []*pgn.Move, b *chess.Board) (*Result, error) {
 			variations = make([]*Result, len(mv.Variations))
 			for vi, v := range mv.Variations {
 				vb := b.Copy()
-				vr, verr := replayMoves(v.Moves, vb)
+				vr, verr := replayMoves(v.Moves, vb, true)
 				if verr != nil {
 					variations[vi] = nil
 					continue
@@ -188,6 +215,21 @@ func replayMoves(moves []*pgn.Move, b *chess.Board) (*Result, error) {
 	}
 
 	return r, nil
+}
+
+// NullMoveSAN is how pgn-extract writes a null move in every format
+// (defs.h NULL_MOVE_STRING); it is the SAN of a null MoveInfo.
+const NullMoveSAN = "--"
+
+// isNullMove reports whether san, as written, is a null move: "--" or
+// pgn-extract's alternative spelling "Z0" (lex.c), either with trailing
+// annotation glyphs, which the C parser may append and the output drops.
+func isNullMove(san string) bool {
+	switch strings.TrimRight(san, "!?+#") {
+	case NullMoveSAN, "Z0":
+		return true
+	}
+	return false
 }
 
 // capturedPieceType returns the type of piece m captures on b, before m is

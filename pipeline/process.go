@@ -25,6 +25,12 @@ type Config struct {
 	// is still classified and evaluated, against the partial replay.
 	KeepBroken bool
 
+	// AllowNullMoves accepts the null move "--" in a game's main line
+	// (--allownullmoves); without it such a game fails replay. Null
+	// moves inside variations are always accepted (grammar.c
+	// parse_move_unit).
+	AllowNullMoves bool
+
 	// Criteria is the run's selection criteria (filter.Options). nil is
 	// the empty criteria, which every game that is not Rejected matches:
 	// convert is filter with no criteria by construction. The criteria
@@ -151,7 +157,8 @@ func (p *Pipeline) Process(g *pgn.Game) Outcome {
 		return o
 	}
 
-	r, replayErr := replay.Game(g, replay.Options{})
+	ropts := replay.Options{AllowNullMoves: p.cfg.AllowNullMoves}
+	r, replayErr := replay.Game(g, ropts)
 	if replayErr != nil && !p.cfg.KeepBroken && g.Result == "" && len(g.Moves) > 0 {
 		// pgn-extract never replays a game whose movetext has no result
 		// token (grammar.c parse_game reports "Missing result" and
@@ -160,7 +167,7 @@ func (p *Pipeline) Process(g *pgn.Game) Outcome {
 		// the same for that case only; KeepBroken wants the moves back.
 		// See CONFORMANCE.md.
 		g.Moves = nil
-		r, _ = replay.Game(g, replay.Options{})
+		r, _ = replay.Game(g, ropts)
 		o.Warnings = append(o.Warnings, fmt.Errorf("no result token and the moves do not replay (%v); moves dropped", replayErr))
 		replayErr = nil
 	}

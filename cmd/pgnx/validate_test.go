@@ -69,3 +69,20 @@ func TestInfo(t *testing.T) {
 		}
 	}
 }
+
+// A main-line null move is a finding unless --allow-null-moves, as
+// convert drops the game unless told to keep it (pgn-extract's
+// --allownullmoves); a null move inside a variation is always fine.
+func TestValidateNullMoves(t *testing.T) {
+	input := "1. e4 -- 2. d4 *\n"
+	out, _, code := runCLI(t, input, "validate")
+	if code != 2 || !strings.Contains(out, "game 1") {
+		t.Errorf("without the flag: exit %d, out %q", code, out)
+	}
+	if _, _, code := runCLI(t, input, "validate", "--allow-null-moves"); code != 0 {
+		t.Errorf("with --allow-null-moves: exit %d", code)
+	}
+	if _, _, code := runCLI(t, "1. e4 (1. d4 --) e5 *\n", "validate"); code != 0 {
+		t.Errorf("variation null move without the flag: exit %d", code)
+	}
+}

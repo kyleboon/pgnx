@@ -36,6 +36,12 @@ type Options struct {
 	// Bounds restricts the ply count.
 	Bounds Bounds
 
+	// Odds requires the game to have been played at odds (--odds): it
+	// starts from a FEN with the middle ranks empty, White to move at
+	// move 1, and one side has different pieces from the other
+	// (grammar.c check_for_odds).
+	Odds bool
+
 	// Material patterns (-z/-y); any one matching suffices. AddMatchTag
 	// adds a MaterialMatch tag naming the colour that took the first set.
 	Material    []*MaterialPattern
@@ -224,7 +230,7 @@ func (o *Options) SetNMoveRule(n int) error {
 //     may return ErrBadResult).
 //  8. Positions sought but unmatched, the N-move rule, underpromotion,
 //     stalemate and insufficient material reject the game.
-//  9. Ply-count bounds.
+//  9. Ply-count bounds, then the odds check.
 //  10. Move sequences (check_textual_variations): any one of Sequences,
 //     straight or permuted, from the first move or, with
 //     SequenceAnywhere, from any move.
@@ -305,6 +311,9 @@ func Evaluate(g *pgn.Game, r *replay.Result, o *Options) (bool, error) {
 	}
 
 	if !o.Bounds.Match(r.PlyCount()) {
+		return false, nil
+	}
+	if o.Odds && !matchOdds(g) {
 		return false, nil
 	}
 	if !matchSequences(g, o.Sequences, o.ExactOrder, o.SequenceAnywhere) {

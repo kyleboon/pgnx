@@ -46,6 +46,7 @@ func addOutputFlags(cmd *cobra.Command) {
 	flags.Bool("no-move-numbers", false, "omit move numbers")
 	flags.Bool("no-results", false, "omit the trailing result token")
 	flags.Bool("keep-broken", false, "emit games that fail replay, in Source format, instead of skipping them")
+	flags.Bool("allow-null-moves", false, "accept the null move -- in the main line; always accepted in variations (--allownullmoves)")
 	flags.Bool("nested-comments", false, "allow { to nest inside a comment")
 
 	// Output options (pgn-extract's output.c): how the game is rendered.

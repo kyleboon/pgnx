@@ -75,3 +75,22 @@ func TestPlacementKey(t *testing.T) {
 		t.Errorf("PlacementKey(start) = %#x, want %#x", got, want)
 	}
 }
+
+// After a null move the en passant square can belong to the side now to
+// move ("1. e4 --" leaves e3 set with White to move). pgn-extract's
+// zobrist.c hashes the file only when a pawn of the side to move stands
+// on its own fifth rank (White) or fourth rank (Black) beside the square;
+// White's d2/f2 pawns must not count, so the hash after "1. e4 --"
+// differs from the hash after "1. e4" only by the side to move.
+func TestZobristEnPassantAfterNullMove(t *testing.T) {
+	afterE4, err := FromFEN("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterNull := afterE4.Copy()
+	afterNull.Apply(NullMove)
+	want := afterE4.Zobrist() ^ polyglotRandom[polyglotTurnOffset]
+	if got := afterNull.Zobrist(); got != want {
+		t.Errorf("hash after null move = %016x, want %016x (side to move only)", got, want)
+	}
+}

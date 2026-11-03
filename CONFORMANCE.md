@@ -29,15 +29,6 @@ held to parity; see below.
 
 ## Feature-scope differences
 
-- **Null moves (`--`) are rejected.** pgn-extract accepts `--` as a null
-  move when `--allownullmoves` is given (and always within variations).
-  pgnx's replay does not implement null-move decoding in Phase 1: any game
-  containing `--` in the main line fails replay and is dropped by
-  `convert`/`validate` regardless of flags. Confirmed against
-  `testdata/golden/infiles/test-allownullmoves.pgn` and against `odds.pgn`
-  (games 29 and 31, which embed `{1.e4 --}`/`{1.d4 --}` null moves in a
-  comment before the real second move) — pgn-extract accepts these lines,
-  pgnx does not.
 - **`-W` German/language-specific piece-letter output is unsupported.**
   pgn-extract's `-Wsan[PNBRQK]` form (e.g. `-WsanBSLTDK`, exercised by the
   C test suite's `test-WWdeutsch` target) lets the output use
@@ -589,7 +580,8 @@ remaining diffs are pre-existing classes already documented here.
   roster tags and after any ECO extras. `SetUp` without `FEN` is not
   emitted. `test-promotion-in.pgn` and `test-setup-in.pgn` are now
   byte-identical under `-7` (with and without `-e`); `odds.pgn` still
-  differs for Latin-1 bytes and null moves, documented above. The
+  differs for Latin-1 bytes (null moves have since been ported; see
+  "Null moves" below). The
   separate gap that `consistent_FEN_tags` does not add a Chess960
   `Variant` tag is unchanged.
 - Also seen, already documented above: NAG/comment interleaving
@@ -716,3 +708,68 @@ baseline exactly: 744/749 identical, the same five divergent issues
 identical per-file counts; and filter mode (`-TpCarlsen`,
 `--checkmate`, and `-n` against `--unmatched`) was byte-identical over
 twic1000, twic1250 and twic1500.
+
+## Null moves (2026-11-03, beads `pgnx-nullmoves`)
+
+`--allownullmoves` and `--odds` are ported: `pgnx convert`, `filter`,
+`split` and `validate` take `--allow-null-moves`, and `filter` takes
+`--odds`. The golden targets `test-allownullmoves` and `test-odds` are
+rows in `conformance_test.go`, and the 39 local TWIC issues that contain
+a main-line `--` (the "null moves on the main line" rejection class of
+the 2026-10-29 baseline) are byte-identical to the C tool under the
+flag, in every format and with every generated comment.
+
+- **What a null move does to the board** follows `apply.c` `apply_move`,
+  which skips `make_move` for a `NULL_MOVE` and only flips the side to
+  move (advancing the move number after Black): the en passant square,
+  the halfmove clock and the castling rights are left exactly as they
+  were, so `1. e4 --` reaches `... w KQkq e3 0 2`. `chess.NullMove` and
+  `Board.Apply` reproduce this; the FEN, EPD, `--fencomments`,
+  `--hashcomments`, `--evaluation`, `HashCode`, `PlyCount` and
+  `--dropply` outputs were each checked against the C binary.
+- **The stale en passant square** that a null move leaves with the
+  *other* side to move is where two latent differences hid, both now
+  fixed to the C rule: `map.c` `generate_pawn_moves` only generates an
+  en passant capture onto the capturing side's sixth (White) or third
+  (Black) rank, and `zobrist.c` only hashes the en passant file when a
+  pawn of the side to move stands on that same fixed rank beside it.
+  pgnx's move generator and `Board.Zobrist` used to derive the
+  capturing rank from the square itself, which let White's d2/f2 pawns
+  "capture" onto e3 after `1. e4 --` (two extra moves in the
+  `--evaluation` mobility term, a different `--hashcomments` value).
+- **Every format writes `--`**, UCI included: `output.c` `print_move`
+  writes `NULL_MOVE_STRING` in its SAN and long-algebraic cases alike
+  and never `0000`. `chess.Move.UCI()` returns `0000` for the null move
+  as the UCI protocol spells it, but the `uci` output format does not
+  use it. `Z0`, the alternative spelling `lex.c` accepts, replays as a
+  null move too and is written `--` in every format but Source, which
+  keeps `Z0` as written (the C lexer rewrites it before parsing, a
+  source-fidelity difference of the same kind as the others listed
+  under "Parser data-model differences").
+- **Without the flag** a main-line null move is an illegal move:
+  `convert` rejects the game (Broken under `--keep-broken`, emitted in
+  Source format as every broken game is) and `validate` reports it. The
+  C tool replays the whole game before rejecting it; pgnx stops at the
+  null move, which is only observable through `--keep-broken`'s partial
+  replay (ECO classification of a broken game's plies). Null moves in
+  variations are accepted by both tools without any flag (`grammar.c`
+  `parse_move_unit` tests `RAV_level == 0`).
+- **`--odds`** is `grammar.c` `check_for_odds`, run after the length
+  bounds: a FEN tag whose middle four ranks are empty, White to move at
+  move 1 (a fullmove field below 1 counts as 1, as `new_fen_board` reads
+  it), and a difference between the sides in their number of pawns,
+  knights, bishops, rooks or queens. `odds.pgn` reproduces the C tool's
+  56 of 64 games.
+- **Known divergence, not held to parity:** the stale en passant
+  square can also be "captured" onto by the side that created it in
+  the C tool: `decode.c`'s SAN path is looser than its move generator
+  and accepts `1. e4 -- 2. dxe3` (emitting it, with a pawn on e3 and
+  the e4 pawn still there) and `2... f5 3. -- exf6` (as `e7xf6ep`).
+  pgnx resolves SAN against its generated legal moves and rejects both
+  as illegal. Neither occurs in a real game record.
+- **Known divergence, not held to parity:** a null move can leave a
+  king en prise, and both tools then accept its capture (`1. Rh8+ --
+  2. Rxa8`). pgnx appends a check glyph computed against the captured
+  king's cached square (`Rxa8#`); the C tool writes `Rxa8` and warns
+  about an inconsistent result. A position with no king is outside
+  what either tool defines, so this is documented rather than matched.

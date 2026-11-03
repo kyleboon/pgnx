@@ -21,6 +21,7 @@ func newValidateCmd() *cobra.Command {
 
 	cmd.Flags().Bool("summary", false, "print only the final \"<valid> of <total> games valid\" line")
 	cmd.Flags().Bool("nested-comments", false, "allow { to nest inside a comment")
+	cmd.Flags().Bool("allow-null-moves", false, "accept the null move -- in the main line; always accepted in variations (--allownullmoves)")
 
 	return cmd
 }
@@ -53,7 +54,8 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	// "Valid" means convert would emit the game with no failure: the same
 	// per-game sequence, routed nowhere, so a Rejected game or a warning
 	// is a finding.
-	r := newReportOnlyRun()
+	allowNullMoves, _ := cmd.Flags().GetBool("allow-null-moves")
+	r := newReportOnlyRun(allowNullMoves)
 	rep := newRunReport(findings, logW)
 	rep.each(games(args, cmd.InOrStdin(), parserOptions(cmd)), r.game)
 

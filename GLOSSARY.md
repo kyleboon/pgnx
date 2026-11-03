@@ -76,6 +76,10 @@ Whether a game satisfied the run's criteria. A run with no criteria matches ever
 The absolute, one-based number of the move about to be played from a position, as pgn-extract's `play_moves` counts: 1 at the standard starting position, and for a FEN start derived from the FEN's move number and side to move.
 _Avoid_: half-move index, depth
 
+**Null move**:
+A ply on which the side to move passes, written `--` (pgn-extract also reads `Z0`). Replay applies it as the C tool does: the turn changes and nothing else on the board does, en passant square and clocks included. Always allowed inside a variation; allowed on the main line only by the `--allow-null-moves` option, otherwise the game is broken.
+_Avoid_: pass move, skip, 0000 (the UCI protocol's spelling, which no output format uses)
+
 **Source format**:
 Output that reproduces the game's moves as written, needing no replay. The only format a broken game can be emitted in.
 

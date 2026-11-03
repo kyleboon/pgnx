@@ -25,6 +25,7 @@ so far to their pgnx equivalents, and lists what is not yet ported.
 | `--nomovenumbers` | `pgnx convert --no-move-numbers` |
 | `--noresults` | `pgnx convert --no-results` |
 | `--keepbroken` | `pgnx convert --keep-broken` |
+| `--allownullmoves` | `pgnx convert --allow-null-moves` (also on `filter`, `split`, `validate`; null moves in variations never need it) |
 | `-f file_list` (list of input files) | pass the files as positional arguments instead |
 
 Notes:
@@ -71,6 +72,7 @@ tag are alternatives (ORed); criteria on different tags must all hold.
 | `--checkmate` / `--stalemate` / `--insufficient` | same names |
 | `--underpromotion` / `--commented` | same names |
 | `--fifty` / `--seventyfive` | `pgnx filter --fifty` / `--seventy-five` |
+| `--odds` | `pgnx filter --odds` (pair with `--allow-null-moves` as the C test does; odds games often record the given move as `--`) |
 | `--repetition` / `--repetition5` | `pgnx filter --repetition` / `--repetition=5` |
 | `--piececount N` | `pgnx filter --piece-count N` |
 | `-z FILE` / `--materialz SPEC` | `pgnx filter --material-file FILE` / `--material SPEC` |
@@ -181,8 +183,6 @@ The following pgn-extract flags have no pgnx equivalent yet:
 
 - Duplicate detection (Phase 4): `-D`, `-U`, `-d`, `-c`, `-Z`,
   `--fuzzydepth`, `--deletesamesetup`
-- `--odds` — needs null-move support (`--allownullmoves`), which `replay`
-  does not have
 - `--splitvariants` — one game per variation; waits on the parser
   preserving NAG/comment order across variations (beads
   `pgnx-ordered-annotations`), which its golden test depends on
