@@ -35,7 +35,7 @@ func newConvertCmd() *cobra.Command {
 // convert.
 func addOutputFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
-	flags.StringP("format", "f", "san", "output format: san, source, lalg, halg, elalg, xlalg, uci, epd, fen")
+	flags.StringP("format", "f", "san", "output format: san, source, lalg, halg, elalg, xlalg, uci, epd, fen, cm")
 	flags.StringP("output", "o", "", "write output to FILE instead of stdout")
 	flags.Bool("append", false, "append to the --output file instead of truncating it")
 	flags.IntP("line-width", "w", 75, "word-wrap movetext at this column")
@@ -99,7 +99,7 @@ func outputOptions(cmd *cobra.Command) (output.Options, error) {
 	}
 
 	json, _ := flags.GetBool("json")
-	if json && (format == output.EPD || format == output.FEN) {
+	if json && !format.HasJSON() {
 		// main.c: "JSON output is not currently supported with -E, -Wepd
 		// or -Wcm", where the C tool warns and drops --json.
 		return output.Options{}, fmt.Errorf("--json cannot be combined with --format %s", format)

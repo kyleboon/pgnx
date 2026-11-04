@@ -14,8 +14,15 @@ import (
 
 // errJSONFormat is returned when JSON output is asked for in a format
 // that has no JSON form; the C tool turns --json off with a warning for
-// -Wepd (main.c), pgnx refuses.
-var errJSONFormat = errors.New("output: JSON output is not available in epd or fen format")
+// -Wepd and -Wcm (main.c), pgnx refuses.
+var errJSONFormat = errors.New("output: JSON output is not available in epd, fen or cm format")
+
+// HasJSON reports whether f has a JSON form (Options.JSON, --json): every
+// movetext format does; EPD, FEN and CM do not (main.c: "JSON output is
+// not currently supported with -E, -Wepd or -Wcm").
+func (f Format) HasJSON() bool {
+	return f != EPD && f != FEN && f != CM
+}
 
 // writeJSONGame renders g as one object of the JSON array the Writer's
 // games form (output.c print_algebraic_game under json_format): "[" or
@@ -24,7 +31,7 @@ var errJSONFormat = errors.New("output: JSON output is not available in epd or f
 // "Moves" array, laid out exactly as the C tool lays it out. opts is
 // w.opts with the format WriteGame settled on, which spells the moves.
 func (w *Writer) writeJSONGame(g *pgn.Game, r *replay.Result, opts Options) error {
-	if opts.Format == EPD || opts.Format == FEN {
+	if !opts.Format.HasJSON() {
 		return errJSONFormat
 	}
 	sep := ",\n"

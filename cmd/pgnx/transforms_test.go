@@ -103,17 +103,22 @@ func TestTotalPlyCountUCI(t *testing.T) {
 	}
 }
 
-// pgnx split names its files by format, as -# does (.pgn, .epd, .fen).
+// pgnx split names its files by format, as -# does (.pgn, .epd, .fen,
+// .cm; output.c output_file_suffix).
 func TestSplitFileSuffix(t *testing.T) {
-	t.Chdir(t.TempDir())
-	_, errOut, code := runCLI(t, fools+"\n"+fools, "split", "--quiet", "--games", "1", "-f", "epd")
-	if code != 0 {
-		t.Fatalf("exit %d\n%s", code, errOut)
-	}
-	for _, name := range []string{"1.epd", "2.epd"} {
-		if _, err := os.Stat(name); err != nil {
-			t.Errorf("%s: %v", name, err)
-		}
+	for _, format := range []string{"epd", "cm"} {
+		t.Run(format, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			_, errOut, code := runCLI(t, fools+"\n"+fools, "split", "--quiet", "--games", "1", "-f", format)
+			if code != 0 {
+				t.Fatalf("exit %d\n%s", code, errOut)
+			}
+			for _, name := range []string{"1." + format, "2." + format} {
+				if _, err := os.Stat(name); err != nil {
+					t.Errorf("%s: %v", name, err)
+				}
+			}
+		})
 	}
 }
 

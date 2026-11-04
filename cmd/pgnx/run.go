@@ -268,6 +268,11 @@ func (r *run) write(target routeTarget, o pipeline.Outcome) error {
 		return err
 	}
 	for _, e := range o.Emissions() {
+		if r.opts.Format == output.CM && !output.CMFromStart(e.Replay) {
+			// output.c output_cm_game writes the game anyway; the message
+			// is a log line, not a failure, there and here.
+			fmt.Fprintln(r.logW, "Unable to output CM games other than from the starting position.")
+		}
 		if err := w.WriteGame(e.Game, e.Replay); err != nil {
 			return err
 		}

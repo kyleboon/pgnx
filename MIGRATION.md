@@ -27,7 +27,7 @@ so far to their pgnx equivalents, and lists what is not yet ported.
 | `--noresults` | `pgnx convert --no-results` |
 | `--keepbroken` | `pgnx convert --keep-broken` |
 | `--allownullmoves` | `pgnx convert --allow-null-moves` (also on `filter`, `split`, `validate`; null moves in variations never need it) |
-| `--json` | `pgnx convert --json` (also on `filter`, `split`); `-f` still picks the move spelling, and `epd`, `fen` and `--eco-split` are usage errors where the C tool warns and drops `--json` |
+| `--json` | `pgnx convert --json` (also on `filter`, `split`); `-f` still picks the move spelling, and `epd`, `fen`, `cm` and `--eco-split` are usage errors where the C tool warns and drops `--json` |
 | `-f file_list` (list of input files) | pass the files as positional arguments instead (or list them in an argument file, below) |
 | `-A FILE` (argument file) | `pgnx <command> @FILE`, in pgnx's own grammar (see [Argument files](#argument-files)) |
 
@@ -35,7 +35,7 @@ Notes:
 
 - `-W` output formats map to `--format`/`-f` values: `epd`→`epd`, `fen`→`fen`,
   `halg`→`halg`, `lalg`→`lalg`, `elalg`→`elalg`, `xlalg`→`xlalg`,
-  `uci`→`uci`, `san`→`san` (the default). `-Wuci` also implicitly forces a
+  `uci`→`uci`, `cm`→`cm` (ChessMaster), `san`→`san` (the default). `-Wuci` also implicitly forces a
   very wide (5000-column) line width in the C tool; `pgnx convert -f uci`
   does the same unless `-w`/`--line-width` is given explicitly.
 - `--piece-letters` takes the six letters pieces are spelled with, in the

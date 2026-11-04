@@ -65,6 +65,8 @@ func fileSuffix(f output.Format) string {
 		return ".epd"
 	case output.FEN:
 		return ".fen"
+	case output.CM:
+		return ".cm"
 	}
 	return ".pgn"
 }

@@ -577,6 +577,7 @@ func TestParseFormat(t *testing.T) {
 		"uci":    UCI,
 		"epd":    EPD,
 		"fen":    FEN,
+		"cm":     CM,
 	}
 	for s, want := range cases {
 		got, err := ParseFormat(s)

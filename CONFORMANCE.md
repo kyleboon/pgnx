@@ -46,8 +46,29 @@ held to parity; see below.
   suffix's own letters. Covered by the `test-WWdeutsch`
   golden row, `TestPieceLettersRendering` (output) and
   `TestConvertPieceLettersUsageErrors` (cmd/pgnx).
-- **CM (ChessMaster) format is unsupported.** pgn-extract's `-Wcm` output
-  format has no pgnx equivalent.
+- **CM (ChessMaster) format is `-f cm`, byte-identical to `-Wcm`.**
+  `output.c` `output_cm_game` ("probably obsolete"): a `WHITE:`/`BLACK:`
+  header from those two tags alone, fixed-width move columns, SAN with
+  checkmate spelled `++`, only the comments written directly after a
+  move (the C `comment_list`; comments after a NAG or a variation are
+  dropped with the NAGs and variations), the result as a `;` comment in
+  words, and the layout's quirks (a game ending in white's mating move
+  has no blank line after it; `-C` leaves a bare `;` line for a prefix
+  comment; a FEN game is written numbered from its position). The format
+  ignores every output option but the line width and `--no-comments`, as
+  the C tool's does. `split -f cm` names its files `1.cm`, `2.cm`, ...
+  (output.c `output_file_suffix`). Pinned by `TestCMOracle` (output) and
+  `TestCMConformance` (cmd/pgnx, oracles the C binary produced under
+  `cmd/pgnx/testdata/cm`, as the C test suite has no `-Wcm` target).
+  Divergences, all outside the output: the C tool's "Unable to output CM
+  games other than from the starting position." is a log line in both
+  (pgnx's wording is the same; the game is written and the run does not
+  fail); `--json` with `-f cm` is a usage error where the C tool warns
+  and drops `--json`; `--piece-letters` with `-f cm` is a usage error
+  where the C tool ignores the `-Wcm` suffix; and `--keep-broken` emits
+  a broken game in Source format, as for every format (see the
+  `--keep-broken` bullet). `--eco-split` files stay `.pgn` whatever the
+  format, in both tools (eco.c hardcodes the suffix).
 - **JSON output (`--json`) is byte-identical to the C tool's where the C
   tool's is JSON.** `convert`/`filter`/`split --json` writes pgn-extract's
   `--json` layout exactly (`output.c` `print_algebraic_game` under
@@ -75,7 +96,7 @@ held to parity; see below.
   which JSON output then drops). The
   combinations the C tool refuses with a warning ("JSON output is not
   currently supported with -E, -Wepd or -Wcm") are usage errors in
-  pgnx: `--json` with `-f epd`, `-f fen` or `--eco-split`. As in the C
+  pgnx: `--json` with `-f epd`, `-f fen`, `-f cm` or `--eco-split`. As in the C
   tool, `--json` forces comments, variations and results off, so
   `--split-variants` splits nothing and `--total-ply-count` counts the
   main line only; tag values are written exactly as the PGN output

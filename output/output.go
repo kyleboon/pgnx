@@ -24,6 +24,7 @@ const (
 	UCI                  // UCI move format
 	EPD                  // Extended Position Description
 	FEN                  // Forsyth-Edwards Notation
+	CM                   // ChessMaster: WHITE:/BLACK: header and fixed-width move columns
 )
 
 // String returns the canonical lowercase name for f, as accepted by
@@ -48,13 +49,15 @@ func (f Format) String() string {
 		return "epd"
 	case FEN:
 		return "fen"
+	case CM:
+		return "cm"
 	default:
 		return fmt.Sprintf("Format(%d)", int(f))
 	}
 }
 
 // ParseFormat parses a format name ("san", "source", "lalg", "halg",
-// "elalg", "xlalg", "uci", "epd", "fen") into a Format.
+// "elalg", "xlalg", "uci", "epd", "fen", "cm") into a Format.
 func ParseFormat(s string) (Format, error) {
 	switch s {
 	case "san":
@@ -75,6 +78,8 @@ func ParseFormat(s string) (Format, error) {
 		return EPD, nil
 	case "fen":
 		return FEN, nil
+	case "cm":
+		return CM, nil
 	default:
 		return 0, fmt.Errorf("output: unknown format %q", s)
 	}
@@ -284,6 +289,8 @@ func (w *Writer) WriteGame(g *pgn.Game, r *replay.Result) error {
 		return w.writeMovetextGame(g, r, opts)
 	case EPD, FEN:
 		return w.writePositionGame(g, r)
+	case CM:
+		return w.writeCMGame(g, r, opts)
 	default:
 		return fmt.Errorf("output: format %v not implemented", opts.Format)
 	}
