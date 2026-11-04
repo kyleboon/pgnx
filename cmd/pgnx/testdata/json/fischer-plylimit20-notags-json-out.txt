@@ -1,0 +1,138 @@
+[
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "e6" }, { "move" : "d4" }, { "move" : "Nd7" }, { "move" : "Bd3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Ngf6" }, { "move" : "O-O" }, { "move" : "Nxe4" }, { "move" : "Qxe4" }, { "move" : "Nf6" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Nf6" }, { "move" : "Nxf6+" }, { "move" : "exf6" }, { "move" : "Bc4" }, { "move" : "Bd6" }, { "move" : "Qe2+" }, { "move" : "Qe7" }, { "move" : "Qxe7+" }, { "move" : "Kxe7" }, { "move" : "d4" }, { "move" : "Bf5" }, { "move" : "Bb3" }, { "move" : "Re8" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d6" }, { "move" : "d4" }, { "move" : "Nd7" }, { "move" : "Nf3" }, { "move" : "e5" }, { "move" : "Bc4" }, { "move" : "Be7" }, { "move" : "dxe5" }, { "move" : "Nxe5" }, { "move" : "Nxe5" }, { "move" : "dxe5" }, { "move" : "Qh5" }, { "move" : "g6" }, { "move" : "Qxe5" }, { "move" : "Nf6" }, { "move" : "Bg5" }, { "move" : "Bd7" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nd7" }, { "move" : "Ng5" }, { "move" : "Ngf6" }, { "move" : "Qb3" }, { "move" : "e6" }, { "move" : "Qxb7" }, { "move" : "Nd5" }, { "move" : "Ne4" }, { "move" : "Nb4" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "g3" }, { "move" : "Be7" }, { "move" : "Bg2" }, { "move" : "dxe4" }, { "move" : "dxe4" }, { "move" : "e5" }, { "move" : "O-O" }, { "move" : "Nbd7" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "g3" }, { "move" : "Bb4" }, { "move" : "Bd2" }, { "move" : "d4" }, { "move" : "Nb1" }, { "move" : "Qb6" }, { "move" : "b3" }, { "move" : "a5" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "g3" }, { "move" : "Bb4" }, { "move" : "Bd2" }, { "move" : "d4" }, { "move" : "Nb1" }, { "move" : "Qb6" }, { "move" : "b3" }, { "move" : "Nbd7" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "g3" }, { "move" : "Bb4" }, { "move" : "Bd2" }, { "move" : "d4" }, { "move" : "Nb1" }, { "move" : "Qb6" }, { "move" : "b3" }, { "move" : "a5" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Nf6" }, { "move" : "e5" }, { "move" : "Ne4" }, { "move" : "Ne2" }, { "move" : "Qb6" }, { "move" : "d4" }, { "move" : "c5" }, { "move" : "dxc5" }, { "move" : "Qxc5" }, { "move" : "Ned4" }, { "move" : "Nc6" }, { "move" : "Bb5" }, { "move" : "a6" }, { "move" : "Bxc6+" }, { "move" : "bxc6" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bh5" }, { "move" : "exd5" }, { "move" : "cxd5" }, { "move" : "Bb5+" }, { "move" : "Nc6" }, { "move" : "g4" }, { "move" : "Bg6" }, { "move" : "Ne5" }, { "move" : "Rc8" }, { "move" : "h4" }, { "move" : "f6" }, { "move" : "Nxg6" }, { "move" : "hxg6" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "g3" }, { "move" : "Bb4" }, { "move" : "Bd2" }, { "move" : "d4" }, { "move" : "Nb1" }, { "move" : "Bxd2+" }, { "move" : "Nxd2" }, { "move" : "e5" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "g3" }, { "move" : "Bb4" }, { "move" : "Bd2" }, { "move" : "d4" }, { "move" : "Nb1" }, { "move" : "Bxd2+" }, { "move" : "Nxd2" }, { "move" : "e5" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nf3" }, { "move" : "d5" }, { "move" : "Nc3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "a3" }, { "move" : "Bc5" }, { "move" : "Be2" }, { "move" : "O-O" }, { "move" : "O-O" }, { "move" : "Nbd7" }, { "move" : "Qg3" }, { "move" : "Bd4" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "Nc3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Bf5" }, { "move" : "Ng3" }, { "move" : "Bg6" }, { "move" : "Nh3" }, { "move" : "Nf6" }, { "move" : "Nf4" }, { "move" : "e5" }, { "move" : "dxe5" }, { "move" : "Qxd1+" }, { "move" : "Kxd1" }, { "move" : "Ng4" }, { "move" : "Nxg6" }, { "move" : "hxg6" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "exd5" }, { "move" : "cxd5" }, { "move" : "c4" }, { "move" : "Nf6" }, { "move" : "Nc3" }, { "move" : "e6" }, { "move" : "Nf3" }, { "move" : "Be7" }, { "move" : "c5" }, { "move" : "O-O" }, { "move" : "b4" }, { "move" : "b6" }, { "move" : "Bd3" }, { "move" : "bxc5" }, { "move" : "bxc5" }, { "move" : "Nc6" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "exd5" }, { "move" : "cxd5" }, { "move" : "c4" }, { "move" : "Nf6" }, { "move" : "Nc3" }, { "move" : "Nc6" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "cxd5" }, { "move" : "Nxd5" }, { "move" : "Qb3" }, { "move" : "Bxf3" }, { "move" : "gxf3" }, { "move" : "e6" }, { "move" : "Qxb7" }, { "move" : "Nxd4" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d4" }, { "move" : "dxe4" }, { "move" : "Qe3" }, { "move" : "Nbd7" }, { "move" : "Nxe4" }, { "move" : "Nxe4" }, { "move" : "Qxe4" }, { "move" : "Nf6" }, { "move" : "Qd3" }, { "move" : "Qd5" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "Nc3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Nd7" }, { "move" : "Nf3" }, { "move" : "Ngf6" }, { "move" : "Nxf6+" }, { "move" : "Nxf6" }, { "move" : "Bc4" }, { "move" : "Bf5" }, { "move" : "Qe2" }, { "move" : "e6" }, { "move" : "Bg5" }, { "move" : "Bg4" }, { "move" : "O-O-O" }, { "move" : "Be7" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Nf6" }, { "move" : "Nxf6+" }, { "move" : "exf6" }, { "move" : "d4" }, { "move" : "Bd6" }, { "move" : "Bc4" }, { "move" : "O-O" }, { "move" : "O-O" }, { "move" : "Re8" }, { "move" : "Bb3" }, { "move" : "Nd7" }, { "move" : "Nh4" }, { "move" : "Nf8" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "Nc3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Bf5" }, { "move" : "Ng3" }, { "move" : "Bg6" }, { "move" : "h4" }, { "move" : "h6" }, { "move" : "Nf3" }, { "move" : "Nd7" }, { "move" : "Bd3" }, { "move" : "Bxd3" }, { "move" : "Qxd3" }, { "move" : "e6" }, { "move" : "Bf4" }, { "move" : "Qa5+" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "Nc3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Bf5" }, { "move" : "Ng3" }, { "move" : "Bg6" }, { "move" : "Nf3" }, { "move" : "Nf6" }, { "move" : "h4" }, { "move" : "h6" }, { "move" : "Bd3" }, { "move" : "Bxd3" }, { "move" : "Qxd3" }, { "move" : "e6" }, { "move" : "Bd2" }, { "move" : "Nbd7" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Nf6" }, { "move" : "Nxf6+" }, { "move" : "exf6" }, { "move" : "Bc4" }, { "move" : "Bd6" }, { "move" : "O-O" }, { "move" : "O-O" }, { "move" : "d4" }, { "move" : "Be6" }, { "move" : "Bxe6" }, { "move" : "fxe6" }, { "move" : "Re1" }, { "move" : "Re8" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "a3" }, { "move" : "Nbd7" }, { "move" : "g4" }, { "move" : "Bd6" }, { "move" : "g5" }, { "move" : "Ng8" }, { "move" : "h4" }, { "move" : "Ne7" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "exd5" }, { "move" : "cxd5" }, { "move" : "Bd3" }, { "move" : "Nc6" }, { "move" : "c3" }, { "move" : "Nf6" }, { "move" : "Bf4" }, { "move" : "g6" }, { "move" : "Nf3" }, { "move" : "Bg7" }, { "move" : "Nbd2" }, { "move" : "Nh5" }, { "move" : "Be3" }, { "move" : "O-O" }, { "move" : "O-O" }, { "move" : "f5" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "exd5" }, { "move" : "cxd5" }, { "move" : "c4" }, { "move" : "Nf6" }, { "move" : "Nc3" }, { "move" : "g6" }, { "move" : "Qb3" }, { "move" : "Bg7" }, { "move" : "cxd5" }, { "move" : "O-O" }, { "move" : "Be2" }, { "move" : "Na6" }, { "move" : "Bg5" }, { "move" : "Qb6" }, { "move" : "Qxb6" }, { "move" : "axb6" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "exd5" }, { "move" : "cxd5" }, { "move" : "Nf3" }, { "move" : "Nf6" }, { "move" : "c3" }, { "move" : "Bf5" }, { "move" : "Bb5+" }, { "move" : "Nbd7" }, { "move" : "Nh4" }, { "move" : "Bg6" }, { "move" : "Bf4" }, { "move" : "e6" }, { "move" : "Nd2" }, { "move" : "Nh5" }, { "move" : "Nxg6" }, { "move" : "hxg6" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d3" }, { "move" : "d5" }, { "move" : "Nd2" }, { "move" : "g6" }, { "move" : "g3" }, { "move" : "Bg7" }, { "move" : "Bg2" }, { "move" : "e5" }, { "move" : "Ngf3" }, { "move" : "Ne7" }, { "move" : "O-O" }, { "move" : "O-O" }, { "move" : "Re1" }, { "move" : "d4" }, { "move" : "a4" }, { "move" : "c5" }, { "move" : "Nc4" }, { "move" : "Nbc6" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d3" }, { "move" : "d5" }, { "move" : "Nd2" }, { "move" : "g6" }, { "move" : "g3" }, { "move" : "Bg7" }, { "move" : "Bg2" }, { "move" : "e5" }, { "move" : "Ngf3" }, { "move" : "Ne7" }, { "move" : "O-O" }, { "move" : "O-O" }, { "move" : "Re1" }, { "move" : "Nd7" }, { "move" : "b3" }, { "move" : "d4" }, { "move" : "Bb2" }, { "move" : "b5" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d3" }, { "move" : "d5" }, { "move" : "Nd2" }, { "move" : "g6" }, { "move" : "Ngf3" }, { "move" : "Bg7" }, { "move" : "g3" }, { "move" : "Nf6" }, { "move" : "Bg2" }, { "move" : "O-O" }, { "move" : "O-O" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nbd7" }, { "move" : "Qe2" }, { "move" : "dxe4" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "exd5" }, { "move" : "cxd5" }, { "move" : "Bd3" }, { "move" : "Nc6" }, { "move" : "c3" }, { "move" : "Nf6" }, { "move" : "Bf4" }, { "move" : "Bg4" }, { "move" : "Qb3" }, { "move" : "Na5" }, { "move" : "Qa4+" }, { "move" : "Bd7" }, { "move" : "Qc2" }, { "move" : "e6" }, { "move" : "Nf3" }, { "move" : "Qb6" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "Nc3" }, { "move" : "g6" }, { "move" : "e5" }, { "move" : "Bg7" }, { "move" : "f4" }, { "move" : "h5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "e6" }, { "move" : "g3" }, { "move" : "Qb6" }, { "move" : "Qf2" }, { "move" : "Ne7" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d3" }, { "move" : "d5" }, { "move" : "Nd2" }, { "move" : "Nd7" }, { "move" : "Ngf3" }, { "move" : "Qc7" }, { "move" : "exd5" }, { "move" : "cxd5" }, { "move" : "d4" }, { "move" : "g6" }, { "move" : "Bd3" }, { "move" : "Bg7" }, { "move" : "O-O" }, { "move" : "e6" }, { "move" : "Re1" }, { "move" : "Ne7" }, { "move" : "Nf1" }, { "move" : "Nc6" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Nd7" }, { "move" : "Bc4" }, { "move" : "Ngf6" }, { "move" : "Neg5" }, { "move" : "Nd5" }, { "move" : "d4" }, { "move" : "h6" }, { "move" : "Ne4" }, { "move" : "N7b6" }, { "move" : "Bb3" }, { "move" : "Bf5" }, { "move" : "Ng3" }, { "move" : "Bh7" }]
+
+},
+{
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "g3" }, { "move" : "Bb4" }, { "move" : "Bd2" }, { "move" : "d4" }, { "move" : "Nb1" }, { "move" : "Qb6" }, { "move" : "b3" }, { "move" : "a5" }]
+
+}
+]

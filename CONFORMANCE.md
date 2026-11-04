@@ -48,8 +48,38 @@ held to parity; see below.
   `TestConvertPieceLettersUsageErrors` (cmd/pgnx).
 - **CM (ChessMaster) format is unsupported.** pgn-extract's `-Wcm` output
   format has no pgnx equivalent.
-- **JSON output is unsupported.** `--json` is deferred to a later phase
-  (see MIGRATION.md).
+- **JSON output (`--json`) is byte-identical to the C tool's where the C
+  tool's is JSON.** `convert`/`filter`/`split --json` writes pgn-extract's
+  `--json` layout exactly (`output.c` `print_algebraic_game` under
+  `json_format`: the `"Tag" : "value",` members, the blank line, the
+  `"Moves":[{ "move" : "e4", "nags" : ["$1"]  }, ...]` array with its
+  doubled spaces, the generated `evaluation`/`FEN`/`HashCode` fields and
+  the trailing-space `-F` form, `[`/`,`/`]` framing per output file), as
+  `TestJSONConformance` pins over the golden corpus with oracles the C
+  binary produced. Four divergences, all where the C output is not JSON
+  or not meant: (1) the C tool keeps writing move numbers through its
+  line buffer under `--json`, so once a game passes about twenty moves
+  a line of `1. 2. 3. ...` is flushed into the middle of the array;
+  pgnx never writes them, which is what `pgn-extract --json
+  --nomovenumbers` produces, and `--no-move-numbers` changes nothing
+  under `--json`. (2) NAGs that follow one another directly are written
+  `["$1""$2"]` by the C tool (`print_items_following_move` only puts a
+  comma between separate `Nag` nodes, and consecutive NAGs share one);
+  pgnx writes `["$1", "$2"]`. (3) The C tool's `-n` unmatched file gets
+  an extra `,` line before each game once more than one game has
+  matched (`grammar.c` writes the separator and `print_algebraic_game`
+  writes it again by the matched count); pgnx frames each destination
+  as one array. (4) `--keep-broken` emits a broken game's source moves,
+  as it does in PGN output, where the C tool emits only the moves up to
+  the one that failed (its PGN output turns the rest into a comment,
+  which JSON output then drops). The
+  combinations the C tool refuses with a warning ("JSON output is not
+  currently supported with -E, -Wepd or -Wcm") are usage errors in
+  pgnx: `--json` with `-f epd`, `-f fen` or `--eco-split`. As in the C
+  tool, `--json` forces comments, variations and results off, so
+  `--split-variants` splits nothing and `--total-ply-count` counts the
+  main line only; tag values are written exactly as the PGN output
+  writes them (source escapes kept, no JSON escaping of anything else).
 - **Argument files have pgnx's own grammar, not the C `:-` grammar.**
   pgn-extract's `-A FILE` reads `argsfile.c`'s format (`:-X` flag lines,
   `:-t`/`:-v`/`:-x` sections of bare criteria lines, `:file` inputs); pgnx

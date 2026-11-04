@@ -10,6 +10,7 @@ import (
 	"github.com/kyleboon/pgnx/output"
 	"github.com/kyleboon/pgnx/transform"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // newConvertCmd builds the "pgnx convert" subcommand: it reads PGN games
@@ -48,6 +49,7 @@ func addOutputFlags(cmd *cobra.Command) {
 	flags.Bool("keep-broken", false, "emit games that fail replay, in Source format, instead of skipping them")
 	flags.Bool("allow-null-moves", false, "accept the null move -- in the main line; always accepted in variations (--allownullmoves)")
 	flags.Bool("nested-comments", false, "allow { to nest inside a comment")
+	flags.Bool("json", false, "write each game as a JSON object (tags, then a Moves array in the --format spelling) instead of PGN; comments, variations, move numbers and results are never written (--json; not with epd, fen or --eco-split)")
 
 	// Output options (pgn-extract's output.c): how the game is rendered.
 	flags.Bool("no-tags", false, "omit the tag section (--notags; conflicts with --seven-tag-roster and --roster)")
@@ -94,6 +96,13 @@ func outputOptions(cmd *cobra.Command) (output.Options, error) {
 	format, err := output.ParseFormat(formatName)
 	if err != nil {
 		return output.Options{}, err
+	}
+
+	json, _ := flags.GetBool("json")
+	if json && (format == output.EPD || format == output.FEN) {
+		// main.c: "JSON output is not currently supported with -E, -Wepd
+		// or -Wcm", where the C tool warns and drops --json.
+		return output.Options{}, fmt.Errorf("--json cannot be combined with --format %s", format)
 	}
 
 	lineWidth, _ := flags.GetInt("line-width")
@@ -166,6 +175,7 @@ func outputOptions(cmd *cobra.Command) (output.Options, error) {
 		FinalFEN:       finalFEN,
 		PlyLimit:       plyLimit,
 		HasPlyLimit:    hasPlyLimit,
+		JSON:           json,
 	}, nil
 }
 
@@ -181,11 +191,9 @@ func transformOptions(cmd *cobra.Command) (*transform.Options, error) {
 	opts.TotalPlyCount, _ = flags.GetBool("total-ply-count")
 	opts.HashCode, _ = flags.GetBool("add-hash-code")
 	opts.LineNumbers, _ = flags.GetString("line-numbers")
-	// -Wuci forces variations off in the C tool (argsfile.c), and
-	// TotalPlyCount follows keep_variations.
+	// TotalPlyCount follows keep_variations in the C tool.
 	noVariations, _ := flags.GetBool("no-variations")
-	formatName, _ := flags.GetString("format")
-	opts.CountVariations = !noVariations && formatName != "uci"
+	opts.CountVariations = !noVariations && !variationsForcedOff(flags)
 
 	for _, f := range []struct {
 		flag string
@@ -209,11 +217,19 @@ func transformOptions(cmd *cobra.Command) (*transform.Options, error) {
 	return &opts, nil
 }
 
+// variationsForcedOff reports whether the output asked for drops
+// variations whatever --no-variations says: -Wuci turns keep_variations
+// off in the C tool (argsfile.c), and so does --json (main.c).
+func variationsForcedOff(flags *pflag.FlagSet) bool {
+	formatName, _ := flags.GetString("format")
+	json, _ := flags.GetBool("json")
+	return formatName == "uci" || json
+}
+
 // splitOptions reads --split-variants and --split-depth. Their conflicts
 // are usage errors (exit 1), as -V with --splitvariants is in the C tool.
-// UCI output drops variations (-Wuci turns keep_variations off in
-// argsfile.c), and the C tool splits only with them kept, so --format uci
-// does not split.
+// The C tool splits only with variations kept, so --format uci and
+// --json do not split (variationsForcedOff).
 func splitOptions(cmd *cobra.Command) (split bool, depth int, err error) {
 	flags := cmd.Flags()
 	split, _ = flags.GetBool("split-variants")
@@ -228,8 +244,7 @@ func splitOptions(cmd *cobra.Command) (split bool, depth int, err error) {
 	case depth < 0:
 		return false, 0, errors.New("--split-depth requires a number greater than or equal to zero")
 	}
-	formatName, _ := flags.GetString("format")
-	if format, err := output.ParseFormat(formatName); err == nil && format == output.UCI {
+	if variationsForcedOff(flags) {
 		split = false
 	}
 	return split, depth, nil

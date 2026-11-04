@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -64,10 +63,10 @@ type run struct {
 	// output is the main destination; unmatched is the --unmatched
 	// destination, nil when the command has none.
 	output, unmatched destination
-	// stdout is the one buffer every destination on stdout shares, so
-	// that games to --output and --unmatched, both "-", stay in input
-	// order; created on first use.
-	stdout *bufio.Writer
+	// stdout is the one destination every "-" flag resolves to, so that
+	// games to --output and --unmatched, both "-", stay in input order
+	// and, under --json, form one array; created on first use.
+	stdout *bufferedDestination
 	// matched counts the games the summary line reports as matched; nil
 	// means the games that succeeded (convert). filter reports the
 	// Selector's count instead.
@@ -108,6 +107,10 @@ func newRunTo(cmd *cobra.Command, criteria *filter.Options, open func(*run) (des
 	split, splitDepth, err := splitOptions(cmd)
 	if err != nil {
 		return nil, err
+	}
+	if opts.JSON && ecoSet.split > 0 {
+		// main.c: the C tool warns and drops --json under -E.
+		return nil, errors.New("--json cannot be combined with --eco-split")
 	}
 	flags := cmd.Flags()
 	keepBroken, _ := flags.GetBool("keep-broken")
@@ -307,11 +310,12 @@ func (r *run) openDestination(flagName string, splitLevel int) (destination, err
 		return nil, err
 	}
 	if closer == nil {
-		// stdout: one buffer for every destination on it.
+		// stdout: one destination, so one buffer and one writer, however
+		// many flags name it. Closing it twice is harmless.
 		if r.stdout == nil {
-			r.stdout = bufio.NewWriter(out)
+			r.stdout = newBufferedDestination(out, nil, r.opts)
 		}
-		return &bufferedDestination{w: output.NewWriter(r.stdout, r.opts), buf: r.stdout}, nil
+		return r.stdout, nil
 	}
 	return newBufferedDestination(out, closer, r.opts), nil
 }

@@ -27,6 +27,7 @@ so far to their pgnx equivalents, and lists what is not yet ported.
 | `--noresults` | `pgnx convert --no-results` |
 | `--keepbroken` | `pgnx convert --keep-broken` |
 | `--allownullmoves` | `pgnx convert --allow-null-moves` (also on `filter`, `split`, `validate`; null moves in variations never need it) |
+| `--json` | `pgnx convert --json` (also on `filter`, `split`); `-f` still picks the move spelling, and `epd`, `fen` and `--eco-split` are usage errors where the C tool warns and drops `--json` |
 | `-f file_list` (list of input files) | pass the files as positional arguments instead (or list them in an argument file, below) |
 | `-A FILE` (argument file) | `pgnx <command> @FILE`, in pgnx's own grammar (see [Argument files](#argument-files)) |
 
@@ -260,7 +261,6 @@ The following pgn-extract flags have no pgnx equivalent yet:
 
 Also not yet supported, regardless of flag:
 
-- JSON output (`--json`)
 - `-e` without a file name (the `eco.pgn`/`$ECO_FILE` default)
 - `pgnx dedupe` — planned as a new subcommand in a later phase, not a
   flag on `convert`

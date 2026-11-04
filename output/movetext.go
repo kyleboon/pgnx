@@ -39,11 +39,7 @@ func (e *emitter) movetext(g *pgn.Game, r *replay.Result) {
 	// 55\"]") numbers its first move "55.", and a black-to-move start is
 	// numbered "N..." with the next move N+1. Without a replay (Source
 	// format) the standard start is assumed.
-	baseMoveNumber, startWhite := 1, true
-	if r != nil && len(r.Positions) > 0 {
-		baseMoveNumber = r.Positions[0].FullmoveNumber
-		startWhite = r.Positions[0].SideToMove == chess.White
-	}
+	baseMoveNumber, startWhite := mainLineStart(r)
 	cut := e.line(g.Moves, r, startWhite, true, baseMoveNumber)
 
 	if cut {
@@ -113,12 +109,7 @@ func (e *emitter) line(moves []*pgn.Move, r *replay.Result, startWhite, blackNee
 	if opts.Evaluation && r != nil {
 		board = r.StartBoard()
 	}
-	// The ply number of moves[0], as print_move_list computes it from
-	// the move number and side to move.
-	startPly := 2*(baseMoveNumber-1) + 1
-	if !startWhite {
-		startPly++
-	}
+	startPly := firstPly(baseMoveNumber, startWhite)
 
 	for i, mv := range moves {
 		if opts.HasPlyLimit && startPly+i > opts.PlyLimit {
@@ -425,6 +416,28 @@ func checkSuffix(mi replay.MoveInfo, noChecks bool) string {
 		return "+"
 	}
 	return ""
+}
+
+// mainLineStart is the full-move number and side to move a game's main
+// line starts from: its replay's starting position, or the standard
+// start when there is no replay (Source format), which is where the C
+// tool's print_game takes them from (see movetext).
+func mainLineStart(r *replay.Result) (baseMoveNumber int, startWhite bool) {
+	if r != nil && len(r.Positions) > 0 {
+		return r.Positions[0].FullmoveNumber, r.Positions[0].SideToMove == chess.White
+	}
+	return 1, true
+}
+
+// firstPly is the ply number of the first move of a line that starts at
+// full move baseMoveNumber with startWhite to move, as print_move_list
+// computes it for --plylimit.
+func firstPly(baseMoveNumber int, startWhite bool) int {
+	ply := 2*(baseMoveNumber-1) + 1
+	if !startWhite {
+		ply++
+	}
+	return ply
 }
 
 // isWhiteMove reports whether moves[i] within a line that begins with

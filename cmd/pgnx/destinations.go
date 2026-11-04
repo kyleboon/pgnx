@@ -53,10 +53,15 @@ func openFileDestination(name string, mode int, opts output.Options) (*bufferedD
 	return newBufferedDestination(f, f, opts), nil
 }
 
-// Close flushes what the run buffered and closes the file. A flush error
-// is the write error the file refused with; it wins over a close error.
+// Close ends the writer's output (the closing "]" of JSON output; nothing
+// otherwise), flushes what the run buffered and closes the file. A flush
+// error is the write error the file refused with; it wins over a close
+// error.
 func (b *bufferedDestination) Close() error {
-	err := b.buf.Flush()
+	err := b.w.Close()
+	if ferr := b.buf.Flush(); err == nil {
+		err = ferr
+	}
 	if b.file != nil {
 		if cerr := b.file.Close(); err == nil {
 			err = cerr

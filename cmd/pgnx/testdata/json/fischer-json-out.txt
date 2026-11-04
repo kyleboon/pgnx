@@ -1,0 +1,410 @@
+[
+{
+"Event" : "Milwaukee Northwestern",
+"Site" : "?",
+"Date" : "1957",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Kampars, N.",
+"Result" : "1/2-1/2",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "e6" }, { "move" : "d4" }, { "move" : "Nd7" }, { "move" : "Bd3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Ngf6" }, { "move" : "O-O" }, { "move" : "Nxe4" }, { "move" : "Qxe4" }, { "move" : "Nf6" }, { "move" : "Qe3" }, { "move" : "Nd5" }, { "move" : "Qf3" }, { "move" : "Qf6" }, { "move" : "Qxf6" }, { "move" : "Nxf6" }, { "move" : "Rd1" }, { "move" : "O-O-O" }, { "move" : "Be3" }, { "move" : "Nd5" }, { "move" : "Bg5" }, { "move" : "Be7" }, { "move" : "Bxe7" }, { "move" : "Nxe7" }, { "move" : "Be4" }, { "move" : "Nd5" }, { "move" : "g3" }, { "move" : "Nf6" }, { "move" : "Bf3" }, { "move" : "Kc7" }, { "move" : "Kf1" }, { "move" : "Rhe8" }, { "move" : "Be2" }, { "move" : "e5" }, { "move" : "dxe5" }, { "move" : "Rxe5" }, { "move" : "Bc4" }, { "move" : "Rxd1+" }, { "move" : "Rxd1" }, { "move" : "Re7" }, { "move" : "Bb3" }, { "move" : "Ne4" }, { "move" : "Rd4" }, { "move" : "Nd6" }, { "move" : "c3" }, { "move" : "f6" }, { "move" : "Bc2" }, { "move" : "h6" }, { "move" : "Bd3" }, { "move" : "Nf7" }, { "move" : "f4" }, { "move" : "Rd7" }, { "move" : "Rxd7+" }, { "move" : "Kxd7" }, { "move" : "Kf2" }, { "move" : "Nd6" }, { "move" : "Kf3" }, { "move" : "f5" }, { "move" : "Ke3" }, { "move" : "c5" }, { "move" : "Be2" }, { "move" : "Ke6" }, { "move" : "Bd3" }]
+
+},
+{
+"Event" : "US Open",
+"Site" : "?",
+"Date" : "1957",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Addison, William G.",
+"Result" : "1-0",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Nf6" }, { "move" : "Nxf6+" }, { "move" : "exf6" }, { "move" : "Bc4" }, { "move" : "Bd6" }, { "move" : "Qe2+" }, { "move" : "Qe7" }, { "move" : "Qxe7+" }, { "move" : "Kxe7" }, { "move" : "d4" }, { "move" : "Bf5" }, { "move" : "Bb3" }, { "move" : "Re8" }, { "move" : "Be3" }, { "move" : "Kf8" }, { "move" : "O-O-O" }, { "move" : "Nd7" }, { "move" : "c4" }, { "move" : "Rad8" }, { "move" : "Bc2" }, { "move" : "Bxc2" }, { "move" : "Kxc2" }, { "move" : "f5" }, { "move" : "Rhe1" }, { "move" : "f4" }, { "move" : "Bd2" }, { "move" : "Nf6" }, { "move" : "Ne5" }, { "move" : "g5" }, { "move" : "f3" }, { "move" : "Nh5" }, { "move" : "Ng4" }, { "move" : "Kg7" }, { "move" : "Bc3" }, { "move" : "Kg6" }, { "move" : "Rxe8" }, { "move" : "Rxe8" }, { "move" : "c5" }, { "move" : "Bb8" }, { "move" : "d5" }, { "move" : "cxd5" }, { "move" : "Rxd5" }, { "move" : "f5" }, { "move" : "Ne5+" }, { "move" : "Bxe5" }, { "move" : "Rxe5" }, { "move" : "Nf6" }, { "move" : "Rxe8" }, { "move" : "Nxe8" }, { "move" : "Be5" }, { "move" : "Kh5" }, { "move" : "Kd3" }, { "move" : "g4" }, { "move" : "b4" }, { "move" : "a6" }, { "move" : "a4" }, { "move" : "gxf3" }, { "move" : "gxf3" }, { "move" : "Kh4" }, { "move" : "b5" }, { "move" : "axb5" }, { "move" : "a5" }, { "move" : "Kh3" }, { "move" : "c6" }]
+
+},
+{
+"Event" : "West Orange Open",
+"Site" : "?",
+"Date" : "1957",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Goldsmith, Julius",
+"Result" : "1-0",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d6" }, { "move" : "d4" }, { "move" : "Nd7" }, { "move" : "Nf3" }, { "move" : "e5" }, { "move" : "Bc4" }, { "move" : "Be7" }, { "move" : "dxe5" }, { "move" : "Nxe5" }, { "move" : "Nxe5" }, { "move" : "dxe5" }, { "move" : "Qh5" }, { "move" : "g6" }, { "move" : "Qxe5" }, { "move" : "Nf6" }, { "move" : "Bg5" }, { "move" : "Bd7" }, { "move" : "O-O-O" }, { "move" : "O-O" }, { "move" : "Rxd7" }, { "move" : "Qxd7" }, { "move" : "Bxf6" }, { "move" : "Bxf6" }, { "move" : "Qxf6" }, { "move" : "Rae8" }, { "move" : "f3" }, { "move" : "Qc7" }, { "move" : "h4" }, { "move" : "Qe5" }, { "move" : "Qxe5" }, { "move" : "Rxe5" }, { "move" : "Rd1" }, { "move" : "Re7" }, { "move" : "Rd6" }, { "move" : "Kg7" }, { "move" : "a3" }, { "move" : "f5" }, { "move" : "Kd2" }, { "move" : "fxe4" }, { "move" : "Nxe4" }, { "move" : "Rf4" }, { "move" : "h5" }, { "move" : "gxh5" }, { "move" : "Rd8" }, { "move" : "h4" }, { "move" : "Rg8+" }, { "move" : "Kh6" }, { "move" : "Ke3" }, { "move" : "Rf5" }, { "move" : "Rg4" }, { "move" : "Rh5" }, { "move" : "Kf2" }, { "move" : "Rg7" }, { "move" : "Rxg7" }, { "move" : "Kxg7" }, { "move" : "Bf1" }, { "move" : "Rd5" }, { "move" : "Bd3" }, { "move" : "h6" }, { "move" : "Ke3" }, { "move" : "Rh5" }, { "move" : "Nd6" }, { "move" : "h3" }, { "move" : "gxh3" }, { "move" : "Rxh3" }, { "move" : "Nxb7" }, { "move" : "Rh5" }, { "move" : "b4" }, { "move" : "Re5+" }, { "move" : "Kf4" }, { "move" : "Re7" }, { "move" : "Nd8" }, { "move" : "c5" }, { "move" : "bxc5" }, { "move" : "Kf6" }, { "move" : "c6" }, { "move" : "Rc7" }, { "move" : "Be4" }, { "move" : "Ke7" }, { "move" : "Nb7" }, { "move" : "Kf6" }, { "move" : "Nd6" }, { "move" : "Re7" }, { "move" : "c7" }]
+
+},
+{
+"Event" : "Bad Portoroz Interzonal",
+"Site" : "?",
+"Date" : "1958",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Cardoso, Rudolfo T.",
+"Result" : "1-0",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nd7" }, { "move" : "Ng5" }, { "move" : "Ngf6" }, { "move" : "Qb3" }, { "move" : "e6" }, { "move" : "Qxb7" }, { "move" : "Nd5" }, { "move" : "Ne4" }, { "move" : "Nb4" }, { "move" : "Kd1" }, { "move" : "f5" }, { "move" : "c3" }, { "move" : "Rb8" }, { "move" : "Qxa7" }, { "move" : "fxe4" }, { "move" : "cxb4" }, { "move" : "Bxb4" }, { "move" : "Qd4" }, { "move" : "O-O" }, { "move" : "Bc4" }, { "move" : "Nc5" }, { "move" : "Qxd8" }, { "move" : "Rbxd8" }, { "move" : "Rf1" }, { "move" : "Rd4" }, { "move" : "b3" }, { "move" : "Bxd2" }, { "move" : "Ke2" }, { "move" : "Bxc1" }, { "move" : "Raxc1" }, { "move" : "Rfd8" }, { "move" : "Rfd1" }, { "move" : "Kf8" }, { "move" : "Rxd4" }, { "move" : "Rxd4" }, { "move" : "Rd1" }, { "move" : "Rxd1" }, { "move" : "Kxd1" }, { "move" : "Ke7" }, { "move" : "Kd2" }, { "move" : "Kd6" }, { "move" : "Kc3" }, { "move" : "Nd7" }, { "move" : "Kd4" }, { "move" : "Nf6" }, { "move" : "a4" }, { "move" : "c5+" }, { "move" : "Ke3" }, { "move" : "g5" }, { "move" : "Be2" }, { "move" : "Kc6" }, { "move" : "Bc4" }, { "move" : "e5" }, { "move" : "a5" }, { "move" : "h6" }, { "move" : "Kd2" }, { "move" : "h5" }, { "move" : "Ke3" }, { "move" : "h4" }, { "move" : "Be2" }, { "move" : "Kb7" }, { "move" : "Bc4" }, { "move" : "Kc6" }, { "move" : "Ke2" }, { "move" : "Kb7" }, { "move" : "Kd2" }, { "move" : "Kc6" }, { "move" : "Ke3" }, { "move" : "Kb7" }, { "move" : "Kd2" }, { "move" : "Kc7" }, { "move" : "g4" }, { "move" : "Kc6" }, { "move" : "Kc3" }, { "move" : "Ne8" }, { "move" : "b4" }, { "move" : "Nd6" }, { "move" : "Bf1" }, { "move" : "cxb4+" }, { "move" : "Kxb4" }, { "move" : "Nc8" }, { "move" : "Bg2" }, { "move" : "Kd5" }, { "move" : "a6" }, { "move" : "Na7" }, { "move" : "Ka5" }, { "move" : "Kc5" }, { "move" : "Bxe4" }, { "move" : "Nb5" }, { "move" : "Bg2" }, { "move" : "Na7" }, { "move" : "Ka4" }, { "move" : "Nb5" }, { "move" : "Kb3" }, { "move" : "Kb6" }, { "move" : "Kc4" }, { "move" : "Kxa6" }, { "move" : "Kd5" }, { "move" : "Kb6" }, { "move" : "Kxe5" }, { "move" : "Kc7" }, { "move" : "Kf6" }, { "move" : "Nc3" }, { "move" : "Kxg5" }, { "move" : "Nd1" }, { "move" : "f4" }, { "move" : "Kd6" }, { "move" : "Kxh4" }, { "move" : "Ke6" }, { "move" : "Kg5" }, { "move" : "Kf7" }, { "move" : "f5" }]
+
+},
+{
+"Event" : "USA Championship",
+"Site" : "?",
+"Date" : "1959",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Weinstein, Raymond",
+"Result" : "1/2-1/2",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "g3" }, { "move" : "Be7" }, { "move" : "Bg2" }, { "move" : "dxe4" }, { "move" : "dxe4" }, { "move" : "e5" }, { "move" : "O-O" }, { "move" : "Nbd7" }, { "move" : "Nd1" }, { "move" : "O-O" }, { "move" : "Ne3" }, { "move" : "g6" }, { "move" : "Rd1" }, { "move" : "Qc7" }, { "move" : "Ng4" }, { "move" : "h5" }, { "move" : "Nxf6+" }, { "move" : "Nxf6" }, { "move" : "Bg5" }, { "move" : "Nh7" }, { "move" : "Bh6" }, { "move" : "Rfd8" }, { "move" : "Bf1" }, { "move" : "Bg5" }, { "move" : "Bxg5" }, { "move" : "Nxg5" }, { "move" : "Qe3" }, { "move" : "Qe7" }, { "move" : "h4" }, { "move" : "Ne6" }, { "move" : "Bc4" }, { "move" : "b5" }, { "move" : "Bxe6" }, { "move" : "Qxe6" }, { "move" : "Qc5" }, { "move" : "Qc4" }, { "move" : "Qxc4" }, { "move" : "bxc4" }, { "move" : "b3" }, { "move" : "Rd4" }, { "move" : "Rxd4" }, { "move" : "exd4" }, { "move" : "Kf1" }, { "move" : "Re8" }, { "move" : "f3" }, { "move" : "Re5" }, { "move" : "Rd1" }, { "move" : "c5" }, { "move" : "c3" }, { "move" : "dxc3" }, { "move" : "Rc1" }, { "move" : "f5" }, { "move" : "exf5" }, { "move" : "Rxf5" }, { "move" : "Rxc3" }, { "move" : "cxb3" }, { "move" : "Rxb3" }, { "move" : "c4" }, { "move" : "Ra3" }, { "move" : "Rc5" }, { "move" : "Ke2" }, { "move" : "c3" }, { "move" : "Kd1" }, { "move" : "c2+" }, { "move" : "Kc1" }, { "move" : "a5" }, { "move" : "Rb3" }, { "move" : "Kg7" }, { "move" : "Rb7+" }, { "move" : "Kf6" }, { "move" : "Rb6+" }, { "move" : "Kg7" }, { "move" : "g4" }]
+
+},
+{
+"Event" : "Yugoslavia Candidate Trn",
+"Site" : "?",
+"Date" : "1959",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Benko, Pal",
+"Result" : "1-0",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "g3" }, { "move" : "Bb4" }, { "move" : "Bd2" }, { "move" : "d4" }, { "move" : "Nb1" }, { "move" : "Qb6" }, { "move" : "b3" }, { "move" : "a5" }, { "move" : "a3" }, { "move" : "Bxd2+" }, { "move" : "Nxd2" }, { "move" : "Qc5" }, { "move" : "Qd1" }, { "move" : "h5" }, { "move" : "h4" }, { "move" : "Nbd7" }, { "move" : "Bg2" }, { "move" : "Ng4" }, { "move" : "O-O" }, { "move" : "g5" }, { "move" : "b4" }, { "move" : "Qe7" }, { "move" : "Nf3" }, { "move" : "gxh4" }, { "move" : "Nxh4" }, { "move" : "Nde5" }, { "move" : "Qd2" }, { "move" : "Rg8" }, { "move" : "Qf4" }, { "move" : "f6" }, { "move" : "bxa5" }, { "move" : "Rxa5" }, { "move" : "Rfb1" }, { "move" : "b5" }, { "move" : "Nf3" }, { "move" : "Ra4" }, { "move" : "Bh3" }, { "move" : "Nxf3+" }, { "move" : "Qxf3" }, { "move" : "Kd7" }, { "move" : "Kg2" }, { "move" : "Qg7" }, { "move" : "Rb4" }, { "move" : "Rga8" }, { "move" : "Rxa4" }, { "move" : "Rxa4" }, { "move" : "Bxg4" }, { "move" : "hxg4" }, { "move" : "Qf4" }, { "move" : "Ra8" }, { "move" : "Rh1" }, { "move" : "Rg8" }, { "move" : "a4" }, { "move" : "bxa4" }, { "move" : "Rb1" }, { "move" : "e5" }, { "move" : "Rb7+" }, { "move" : "Kd6" }, { "move" : "Rxg7" }, { "move" : "exf4" }, { "move" : "Rxg8" }, { "move" : "f3+" }, { "move" : "Kh1" }, { "move" : "Kc5" }, { "move" : "Rb8" }]
+
+},
+{
+"Event" : "Yugoslavia Candidate Trn",
+"Site" : "?",
+"Date" : "1959",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Keres, Paul",
+"Result" : "0-1",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "g3" }, { "move" : "Bb4" }, { "move" : "Bd2" }, { "move" : "d4" }, { "move" : "Nb1" }, { "move" : "Qb6" }, { "move" : "b3" }, { "move" : "Nbd7" }, { "move" : "Bg2" }, { "move" : "a5" }, { "move" : "a3" }, { "move" : "Bxd2+" }, { "move" : "Nxd2" }, { "move" : "Qc5" }, { "move" : "Qd1" }, { "move" : "h5" }, { "move" : "Nf3" }, { "move" : "Qc3+" }, { "move" : "Ke2" }, { "move" : "Qc5" }, { "move" : "Qd2" }, { "move" : "Ne5" }, { "move" : "b4" }, { "move" : "Nxf3" }, { "move" : "Bxf3" }, { "move" : "Qe5" }, { "move" : "Qf4" }, { "move" : "Nd7" }, { "move" : "Qxe5" }, { "move" : "Nxe5" }, { "move" : "bxa5" }, { "move" : "Kd7" }, { "move" : "Rhb1" }, { "move" : "Kc7" }, { "move" : "Rb4" }, { "move" : "Rxa5" }, { "move" : "Bg2" }, { "move" : "g5" }, { "move" : "f4" }, { "move" : "gxf4" }, { "move" : "gxf4" }, { "move" : "Ng6" }, { "move" : "Kf3" }, { "move" : "Rg8" }, { "move" : "Bf1" }, { "move" : "e5" }, { "move" : "fxe5" }, { "move" : "Nxe5+" }, { "move" : "Ke2" }, { "move" : "c5" }, { "move" : "Rb3" }, { "move" : "b6" }, { "move" : "Rab1" }, { "move" : "Rg6" }, { "move" : "h4" }, { "move" : "Ra6" }, { "move" : "Bh3" }, { "move" : "Rg3" }, { "move" : "Bf1" }, { "move" : "Rg4" }, { "move" : "Bh3" }, { "move" : "Rxh4" }, { "move" : "Rh1" }, { "move" : "Ra8" }, { "move" : "Rbb1" }, { "move" : "Rg8" }, { "move" : "Rbf1" }, { "move" : "Rg3" }, { "move" : "Bf5" }, { "move" : "Rg2+" }, { "move" : "Kd1" }, { "move" : "Rhh2" }, { "move" : "Rxh2" }, { "move" : "Rxh2" }, { "move" : "Rg1" }, { "move" : "c4" }, { "move" : "dxc4" }, { "move" : "Nxc4" }, { "move" : "Rg7" }, { "move" : "Kd6" }, { "move" : "Rxf7" }, { "move" : "Ne3+" }, { "move" : "Kc1" }, { "move" : "Rxc2+" }, { "move" : "Kb1" }, { "move" : "Rh2" }, { "move" : "Rd7+" }, { "move" : "Ke5" }, { "move" : "Re7+" }, { "move" : "Kf4" }, { "move" : "Rd7" }, { "move" : "Nd1" }, { "move" : "Kc1" }, { "move" : "Nc3" }, { "move" : "Bh7" }, { "move" : "h4" }, { "move" : "Rf7+" }, { "move" : "Ke3" }]
+
+},
+{
+"Event" : "Yugoslavia Candidate Trn",
+"Site" : "?",
+"Date" : "1959",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Keres, Paul",
+"Result" : "0-1",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "g3" }, { "move" : "Bb4" }, { "move" : "Bd2" }, { "move" : "d4" }, { "move" : "Nb1" }, { "move" : "Qb6" }, { "move" : "b3" }, { "move" : "a5" }, { "move" : "a3" }, { "move" : "Be7" }, { "move" : "Bg2" }, { "move" : "a4" }, { "move" : "b4" }, { "move" : "Nbd7" }, { "move" : "O-O" }, { "move" : "c5" }, { "move" : "Ra2" }, { "move" : "O-O" }, { "move" : "bxc5" }, { "move" : "Bxc5" }, { "move" : "Qe2" }, { "move" : "e5" }, { "move" : "f4" }, { "move" : "Rfc8" }, { "move" : "h4" }, { "move" : "Rc6" }, { "move" : "Bh3" }, { "move" : "Qc7" }, { "move" : "fxe5" }, { "move" : "Nxe5" }, { "move" : "Bf4" }, { "move" : "Bd6" }, { "move" : "h5" }, { "move" : "Ra5" }, { "move" : "h6" }, { "move" : "Ng6" }, { "move" : "Qf3" }, { "move" : "Rh5" }, { "move" : "Bg4" }, { "move" : "Nxf4" }, { "move" : "Bxh5" }, { "move" : "N4xh5" }, { "move" : "g4" }, { "move" : "Bh2+" }, { "move" : "Kg2" }, { "move" : "Nxg4" }, { "move" : "Nd2" }, { "move" : "Ne3+" }]
+
+},
+{
+"Event" : "Yugoslavia Candidate Trn",
+"Site" : "?",
+"Date" : "1959",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Olafsson, Fridrik",
+"Result" : "1-0",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Nf6" }, { "move" : "e5" }, { "move" : "Ne4" }, { "move" : "Ne2" }, { "move" : "Qb6" }, { "move" : "d4" }, { "move" : "c5" }, { "move" : "dxc5" }, { "move" : "Qxc5" }, { "move" : "Ned4" }, { "move" : "Nc6" }, { "move" : "Bb5" }, { "move" : "a6" }, { "move" : "Bxc6+" }, { "move" : "bxc6" }, { "move" : "O-O" }, { "move" : "Qb6" }, { "move" : "e6" }, { "move" : "fxe6" }, { "move" : "Bf4" }, { "move" : "g6" }, { "move" : "Be5" }, { "move" : "Nf6" }, { "move" : "Ng5" }, { "move" : "Bh6" }, { "move" : "Ndxe6" }, { "move" : "Bxg5" }, { "move" : "Nxg5" }, { "move" : "O-O" }, { "move" : "Qd2" }, { "move" : "Bf5" }, { "move" : "Rae1" }, { "move" : "Rad8" }, { "move" : "Bc3" }, { "move" : "Rd7" }, { "move" : "Ne6" }, { "move" : "Bxe6" }, { "move" : "Rxe6" }, { "move" : "d4" }, { "move" : "Bb4" }, { "move" : "Nd5" }, { "move" : "Ba3" }, { "move" : "Rf7" }, { "move" : "g3" }, { "move" : "Nc7" }, { "move" : "Re5" }, { "move" : "Nd5" }, { "move" : "Qd3" }, { "move" : "Nf6" }, { "move" : "Qc4" }, { "move" : "Ng4" }, { "move" : "Re6" }, { "move" : "Qb5" }, { "move" : "Qxb5" }, { "move" : "axb5" }, { "move" : "Rxc6" }, { "move" : "Ne5" }, { "move" : "Rc8+" }, { "move" : "Kg7" }, { "move" : "Bb4" }, { "move" : "Nf3+" }, { "move" : "Kg2" }, { "move" : "e5" }, { "move" : "Rd1" }, { "move" : "g5" }, { "move" : "Bf8+" }, { "move" : "Rxf8" }, { "move" : "Rxf8" }, { "move" : "Kxf8" }, { "move" : "Kxf3" }, { "move" : "Kf7" }, { "move" : "c3" }, { "move" : "Ke6" }, { "move" : "cxd4" }, { "move" : "exd4" }, { "move" : "Ke4" }, { "move" : "Rf7" }, { "move" : "f3" }]
+
+},
+{
+"Event" : "Yugoslavia Candidate Trn",
+"Site" : "?",
+"Date" : "1959",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Smyslov, Vasily V.",
+"Result" : "1/2-1/2",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bh5" }, { "move" : "exd5" }, { "move" : "cxd5" }, { "move" : "Bb5+" }, { "move" : "Nc6" }, { "move" : "g4" }, { "move" : "Bg6" }, { "move" : "Ne5" }, { "move" : "Rc8" }, { "move" : "h4" }, { "move" : "f6" }, { "move" : "Nxg6" }, { "move" : "hxg6" }, { "move" : "d4" }, { "move" : "e6" }, { "move" : "Qd3" }, { "move" : "Kf7" }, { "move" : "h5" }, { "move" : "gxh5" }, { "move" : "gxh5" }, { "move" : "Nge7" }, { "move" : "Be3" }, { "move" : "Nf5" }, { "move" : "Bxc6" }, { "move" : "Rxc6" }, { "move" : "Ne2" }, { "move" : "Qa5+" }, { "move" : "c3" }, { "move" : "Qa6" }, { "move" : "Qc2" }, { "move" : "Bd6" }, { "move" : "Bf4" }, { "move" : "Bxf4" }, { "move" : "Nxf4" }, { "move" : "Rh6" }, { "move" : "Qe2" }, { "move" : "Qxe2+" }, { "move" : "Kxe2" }, { "move" : "Rh8" }, { "move" : "Kd3" }, { "move" : "b5" }, { "move" : "Rhe1" }, { "move" : "b4" }, { "move" : "cxb4" }, { "move" : "Rc4" }, { "move" : "Nxe6" }, { "move" : "Rxh5" }, { "move" : "b3" }, { "move" : "Rh3+" }, { "move" : "Kd2" }, { "move" : "Rcc3" }, { "move" : "Nf4" }, { "move" : "Rhf3" }, { "move" : "Re2" }, { "move" : "g5" }, { "move" : "Nxd5" }, { "move" : "Rcd3+" }, { "move" : "Kc1" }, { "move" : "Rxd4" }, { "move" : "Ne3" }, { "move" : "Nxe3" }, { "move" : "fxe3" }, { "move" : "Rxb4" }, { "move" : "Kd2" }, { "move" : "g4" }, { "move" : "Rc1" }, { "move" : "Rb7" }, { "move" : "Rg1" }, { "move" : "Rd7+" }, { "move" : "Kc2" }, { "move" : "f5" }, { "move" : "e4" }, { "move" : "Kf6" }, { "move" : "exf5" }, { "move" : "g3" }, { "move" : "Re8" }, { "move" : "Rg7" }, { "move" : "Rf8+" }, { "move" : "Ke7" }, { "move" : "Ra8" }, { "move" : "Kd6" }, { "move" : "Rf8" }, { "move" : "Rf2+" }, { "move" : "Kd3" }, { "move" : "g2" }, { "move" : "f6" }, { "move" : "Rg3+" }, { "move" : "Kc4" }, { "move" : "Ke6" }, { "move" : "Re1+" }, { "move" : "Kf5" }, { "move" : "f7" }, { "move" : "Rg7" }, { "move" : "Rg1" }, { "move" : "Kf6" }, { "move" : "a4" }, { "move" : "Rxf7" }]
+
+},
+{
+"Event" : "?",
+"Site" : "Yugoslavia, Bled",
+"Date" : "1959.??.??",
+"Round" : "02",
+"White" : "Fischer, R.",
+"Black" : "Petrosian, T.",
+"Result" : "0-1",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "g3" }, { "move" : "Bb4" }, { "move" : "Bd2" }, { "move" : "d4" }, { "move" : "Nb1" }, { "move" : "Bxd2+" }, { "move" : "Nxd2" }, { "move" : "e5" }, { "move" : "Bg2" }, { "move" : "c5" }, { "move" : "O-O" }, { "move" : "Nc6" }, { "move" : "Qe2" }, { "move" : "g5" }, { "move" : "Nf3" }, { "move" : "h6" }, { "move" : "h4" }, { "move" : "Rg8" }, { "move" : "a3" }, { "move" : "Qe7" }, { "move" : "hxg5" }, { "move" : "hxg5" }, { "move" : "Qd2" }, { "move" : "Nd7" }, { "move" : "c3" }, { "move" : "O-O-O" }, { "move" : "cxd4" }, { "move" : "exd4" }, { "move" : "b4" }, { "move" : "Kb8" }, { "move" : "Rfc1" }, { "move" : "Nce5" }, { "move" : "Nxe5" }, { "move" : "Qxe5" }, { "move" : "Rc4" }, { "move" : "Rc8" }, { "move" : "Rac1" }, { "move" : "g4" }, { "move" : "Qb2" }, { "move" : "Rgd8" }, { "move" : "a4" }, { "move" : "Qe7" }, { "move" : "Rb1" }, { "move" : "Ne5" }, { "move" : "Rxc5" }, { "move" : "Rxc5" }, { "move" : "bxc5" }, { "move" : "Nxd3" }, { "move" : "Qd2" }, { "move" : "Nxc5" }, { "move" : "Qf4+" }, { "move" : "Qc7" }, { "move" : "Qxg4" }, { "move" : "Nxa4" }, { "move" : "e5" }, { "move" : "Nc5" }, { "move" : "Qf3" }, { "move" : "d3" }, { "move" : "Qe3" }, { "move" : "d2" }, { "move" : "Bf3" }, { "move" : "Na4" }, { "move" : "Qe4" }, { "move" : "Nc5" }, { "move" : "Qe2" }, { "move" : "a6" }, { "move" : "Kg2" }, { "move" : "Ka7" }, { "move" : "Qe3" }, { "move" : "Rd3" }, { "move" : "Qf4" }, { "move" : "Qd7" }, { "move" : "Qc4" }, { "move" : "b6" }, { "move" : "Rd1" }, { "move" : "a5" }, { "move" : "Qf4" }, { "move" : "Rd4" }, { "move" : "Qh6" }, { "move" : "b5" }, { "move" : "Qe3" }, { "move" : "Kb6" }, { "move" : "Qh6+" }, { "move" : "Ne6" }, { "move" : "Qe3" }, { "move" : "Ka6" }, { "move" : "Be2" }, { "move" : "a4" }, { "move" : "Qc3" }, { "move" : "Kb6" }, { "move" : "Qe3" }, { "move" : "Nc5" }, { "move" : "Bf3" }, { "move" : "b4" }, { "move" : "Qh6+" }, { "move" : "Ne6" }, { "move" : "Qh8" }, { "move" : "Qd8" }, { "move" : "Qh7" }, { "move" : "Qd7" }, { "move" : "Qh8" }, { "move" : "b3" }, { "move" : "Qb8+" }, { "move" : "Ka5" }, { "move" : "Qa8+" }, { "move" : "Kb5" }, { "move" : "Qb8+" }, { "move" : "Kc4" }, { "move" : "Qg8" }, { "move" : "Kc3" }, { "move" : "Bh5" }, { "move" : "Nd8" }, { "move" : "Bf3" }, { "move" : "a3" }, { "move" : "Qf8" }, { "move" : "Kb2" }, { "move" : "Qh8" }, { "move" : "Ne6" }, { "move" : "Qa8" }, { "move" : "a2" }, { "move" : "Qa5" }, { "move" : "Qa4" }, { "move" : "Rxd2+" }, { "move" : "Ka3" }]
+
+},
+{
+"Event" : "?",
+"Site" : "Yugoslavia, Zagreb",
+"Date" : "1959.??.??",
+"Round" : "16",
+"White" : "Fischer, R.",
+"Black" : "Petrosian, T.",
+"Result" : "1/2-1/2",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "g3" }, { "move" : "Bb4" }, { "move" : "Bd2" }, { "move" : "d4" }, { "move" : "Nb1" }, { "move" : "Bxd2+" }, { "move" : "Nxd2" }, { "move" : "e5" }, { "move" : "Bg2" }, { "move" : "c5" }, { "move" : "O-O" }, { "move" : "Nc6" }, { "move" : "Qe2" }, { "move" : "Qe7" }, { "move" : "f4" }, { "move" : "O-O-O" }, { "move" : "a3" }, { "move" : "Ne8" }, { "move" : "b4" }, { "move" : "cxb4" }, { "move" : "Nc4" }, { "move" : "f6" }, { "move" : "fxe5" }, { "move" : "fxe5" }, { "move" : "axb4" }, { "move" : "Nc7" }, { "move" : "Na5" }, { "move" : "Nb5" }, { "move" : "Nxc6" }, { "move" : "bxc6" }, { "move" : "Rf2" }, { "move" : "g6" }, { "move" : "h4" }, { "move" : "Kb7" }, { "move" : "h5" }, { "move" : "Qxb4" }, { "move" : "Rf7+" }, { "move" : "Kb6" }, { "move" : "Qf2" }, { "move" : "a5" }, { "move" : "c4" }, { "move" : "Nc3" }, { "move" : "Rf1" }, { "move" : "a4" }, { "move" : "Qf6" }, { "move" : "Qc5" }, { "move" : "Rxh7" }, { "move" : "Rdf8" }, { "move" : "Qxg6" }, { "move" : "Rxh7" }, { "move" : "Qxh7" }, { "move" : "Rxf1+" }, { "move" : "Bxf1" }, { "move" : "a3" }, { "move" : "h6" }, { "move" : "a2" }, { "move" : "Qg8" }, { "move" : "a1=Q" }, { "move" : "h7" }, { "move" : "Qd6" }, { "move" : "h8=Q" }, { "move" : "Qa7" }, { "move" : "g4" }, { "move" : "Kc5" }, { "move" : "Qf8" }, { "move" : "Qae7" }, { "move" : "Qa8" }, { "move" : "Kb4" }, { "move" : "Qh2" }, { "move" : "Kb3" }, { "move" : "Qa1" }, { "move" : "Qa3" }, { "move" : "Qxa3+" }, { "move" : "Kxa3" }, { "move" : "Qh6" }, { "move" : "Qf7" }, { "move" : "Kg2" }, { "move" : "Kb3" }, { "move" : "Qd2" }, { "move" : "Qh7" }, { "move" : "Kg3" }, { "move" : "Qxe4" }, { "move" : "Qf2" }, { "move" : "Qh1" }]
+
+},
+{
+"Event" : "Zurich",
+"Site" : "?",
+"Date" : "1959",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Larsen, Bent",
+"Result" : "1/2-1/2",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nf3" }, { "move" : "d5" }, { "move" : "Nc3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "a3" }, { "move" : "Bc5" }, { "move" : "Be2" }, { "move" : "O-O" }, { "move" : "O-O" }, { "move" : "Nbd7" }, { "move" : "Qg3" }, { "move" : "Bd4" }, { "move" : "Bh6" }, { "move" : "Ne8" }, { "move" : "Bg5" }, { "move" : "Ndf6" }, { "move" : "Bf3" }, { "move" : "Qd6" }, { "move" : "Bf4" }, { "move" : "Qc5" }, { "move" : "Rab1" }, { "move" : "dxe4" }, { "move" : "dxe4" }, { "move" : "e5" }, { "move" : "Bg5" }, { "move" : "Bxc3" }, { "move" : "bxc3" }, { "move" : "b5" }, { "move" : "c4" }, { "move" : "a6" }, { "move" : "Bd2" }, { "move" : "Qe7" }, { "move" : "Bb4" }, { "move" : "Nd6" }, { "move" : "Rfd1" }, { "move" : "Rfd8" }, { "move" : "cxb5" }, { "move" : "cxb5" }, { "move" : "Rd3" }, { "move" : "Qe6" }, { "move" : "Rbd1" }, { "move" : "Nb7" }, { "move" : "Bc3" }, { "move" : "Rxd3" }, { "move" : "cxd3" }, { "move" : "Re8" }, { "move" : "Kh2" }, { "move" : "h6" }, { "move" : "d4" }, { "move" : "Nd6" }, { "move" : "Re1" }, { "move" : "Nc4" }, { "move" : "dxe5" }, { "move" : "Nxe5" }, { "move" : "Bd1" }, { "move" : "Ng6" }, { "move" : "e5" }, { "move" : "Nd5" }, { "move" : "Bb3" }, { "move" : "Qc6" }, { "move" : "Bb2" }, { "move" : "Ndf4" }, { "move" : "Rd1" }, { "move" : "a5" }, { "move" : "Rd6" }, { "move" : "Qe4" }, { "move" : "Rd7" }, { "move" : "Ne6" }, { "move" : "Bd5" }, { "move" : "Qe2" }, { "move" : "Bc3" }, { "move" : "b4" }, { "move" : "axb4" }, { "move" : "axb4" }, { "move" : "Bxb4" }, { "move" : "Qxe5" }, { "move" : "Ba5" }, { "move" : "Qxg3+" }, { "move" : "Kxg3" }, { "move" : "Re7" }, { "move" : "Rd6" }, { "move" : "Nef4" }, { "move" : "Bf3" }, { "move" : "Ne6" }, { "move" : "Bb6" }, { "move" : "Ne5" }, { "move" : "Bd5" }, { "move" : "Rd7" }, { "move" : "Rxd7" }, { "move" : "Nxd7" }, { "move" : "Be3" }, { "move" : "Nf6" }, { "move" : "Bc6" }, { "move" : "g5" }, { "move" : "Kf3" }, { "move" : "Kg7" }, { "move" : "Ba4" }, { "move" : "Nd5" }, { "move" : "Bc1" }, { "move" : "h5" }, { "move" : "Bb2+" }, { "move" : "Kh6" }, { "move" : "Bb3" }, { "move" : "Ndf4" }, { "move" : "Bc2" }, { "move" : "Ng6" }, { "move" : "Kg3" }, { "move" : "Nef4" }, { "move" : "Be4" }, { "move" : "Nh4" }, { "move" : "Bf6" }, { "move" : "Nhg6" }, { "move" : "Kf3" }, { "move" : "Nh4+" }, { "move" : "Kg3" }, { "move" : "Nhg6" }, { "move" : "Kh2" }, { "move" : "h4" }, { "move" : "Kg1" }, { "move" : "Nh5" }, { "move" : "Bc3" }, { "move" : "Ngf4" }, { "move" : "Kf1" }, { "move" : "Ng7" }, { "move" : "Bf6" }, { "move" : "Nfh5" }, { "move" : "Be5" }, { "move" : "f6" }, { "move" : "Bd6" }, { "move" : "f5" }, { "move" : "Bf3" }, { "move" : "Nf4" }, { "move" : "Ke1" }, { "move" : "Kg6" }, { "move" : "Kd2" }, { "move" : "Nge6" }, { "move" : "Be5" }, { "move" : "Nc5" }, { "move" : "Ke3" }, { "move" : "Nce6" }, { "move" : "Bc6" }, { "move" : "Kf7" }, { "move" : "Kf3" }, { "move" : "Ke7" }, { "move" : "Bb7" }, { "move" : "Ng6" }, { "move" : "Bc3" }, { "move" : "Ngf4" }, { "move" : "Ba6" }, { "move" : "Nd5" }, { "move" : "Be5" }, { "move" : "Nf6" }, { "move" : "Bd3" }, { "move" : "g4+" }, { "move" : "Ke2" }, { "move" : "Nd7" }, { "move" : "Bh2" }, { "move" : "gxh3" }, { "move" : "gxh3" }, { "move" : "Kf6" }, { "move" : "Ke3" }, { "move" : "Ne5" }, { "move" : "Be2" }, { "move" : "Ng6" }, { "move" : "Bf1" }, { "move" : "f4+" }, { "move" : "Kf3" }, { "move" : "Ne5+" }, { "move" : "Ke4" }, { "move" : "Ng5+" }, { "move" : "Kxf4" }, { "move" : "Nef3" }, { "move" : "Bg3" }, { "move" : "hxg3" }, { "move" : "fxg3" }]
+
+},
+{
+"Event" : "Buenos Aires",
+"Site" : "?",
+"Date" : "1960",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Foguelman, Alberto",
+"Result" : "1/2-1/2",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "Nc3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Bf5" }, { "move" : "Ng3" }, { "move" : "Bg6" }, { "move" : "Nh3" }, { "move" : "Nf6" }, { "move" : "Nf4" }, { "move" : "e5" }, { "move" : "dxe5" }, { "move" : "Qxd1+" }, { "move" : "Kxd1" }, { "move" : "Ng4" }, { "move" : "Nxg6" }, { "move" : "hxg6" }, { "move" : "Ne4" }, { "move" : "Nxe5" }, { "move" : "Be2" }, { "move" : "f6" }, { "move" : "c3" }, { "move" : "Nbd7" }, { "move" : "Be3" }, { "move" : "O-O-O" }, { "move" : "Kc2" }, { "move" : "Nb6" }, { "move" : "h4" }, { "move" : "Nec4" }, { "move" : "Bf4" }, { "move" : "Nd5" }, { "move" : "Bg3" }, { "move" : "Nd6" }, { "move" : "Nxd6+" }, { "move" : "Bxd6" }, { "move" : "Bxd6" }, { "move" : "Rxd6" }, { "move" : "g3" }, { "move" : "Kc7" }, { "move" : "c4" }, { "move" : "Nb4+" }, { "move" : "Kc3" }, { "move" : "c5" }, { "move" : "a3" }, { "move" : "Re8" }, { "move" : "Bf1" }, { "move" : "Nc6" }, { "move" : "Bd3" }, { "move" : "Ne5" }, { "move" : "Be4" }, { "move" : "Ng4" }, { "move" : "Bxg6" }, { "move" : "Re2" }, { "move" : "Rae1" }, { "move" : "Rxf2" }, { "move" : "Re7+" }, { "move" : "Kb6" }, { "move" : "Be4" }, { "move" : "Re2" }, { "move" : "Rxb7+" }, { "move" : "Ka6" }, { "move" : "Re7" }, { "move" : "Kb6" }, { "move" : "b4" }, { "move" : "Nf2" }, { "move" : "Rb7+" }, { "move" : "Ka6" }, { "move" : "b5+" }, { "move" : "Ka5" }, { "move" : "Rxa7+" }, { "move" : "Kb6" }, { "move" : "Ra6+" }, { "move" : "Kc7" }, { "move" : "b6+" }, { "move" : "Rxb6" }, { "move" : "Rxb6" }, { "move" : "Nxe4+" }, { "move" : "Kd3" }, { "move" : "Kxb6" }, { "move" : "Rg1" }, { "move" : "Rd2+" }, { "move" : "Kxe4" }, { "move" : "Rd4+" }, { "move" : "Kf5" }, { "move" : "Rxc4" }, { "move" : "Re1" }, { "move" : "Rc3" }, { "move" : "g4" }, { "move" : "Rf3+" }, { "move" : "Kg6" }, { "move" : "Rxa3" }, { "move" : "Kxg7" }, { "move" : "Rg3" }, { "move" : "Re4" }, { "move" : "f5" }, { "move" : "Re6+" }, { "move" : "Kb5" }, { "move" : "g5" }, { "move" : "Rg4" }, { "move" : "g6" }, { "move" : "Rxh4" }, { "move" : "Kf7" }, { "move" : "c4" }, { "move" : "g7" }, { "move" : "Rh7" }, { "move" : "Rg6" }, { "move" : "c3" }, { "move" : "Kf6" }, { "move" : "Rxg7" }, { "move" : "Rxg7" }, { "move" : "Kc4" }, { "move" : "Kxf5" }, { "move" : "c2" }]
+
+},
+{
+"Event" : "Buenos Aires",
+"Site" : "?",
+"Date" : "1960",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Ivkov, Boris",
+"Result" : "1/2-1/2",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "exd5" }, { "move" : "cxd5" }, { "move" : "c4" }, { "move" : "Nf6" }, { "move" : "Nc3" }, { "move" : "e6" }, { "move" : "Nf3" }, { "move" : "Be7" }, { "move" : "c5" }, { "move" : "O-O" }, { "move" : "b4" }, { "move" : "b6" }, { "move" : "Bd3" }, { "move" : "bxc5" }, { "move" : "bxc5" }, { "move" : "Nc6" }, { "move" : "O-O" }, { "move" : "Bd7" }, { "move" : "h3" }, { "move" : "Ne8" }, { "move" : "Bf4" }, { "move" : "Bf6" }, { "move" : "Bb5" }, { "move" : "Nc7" }, { "move" : "Be2" }, { "move" : "Nxd4" }, { "move" : "Nxd4" }, { "move" : "e5" }, { "move" : "c6" }, { "move" : "Be8" }, { "move" : "Bg3" }, { "move" : "exd4" }, { "move" : "Bxc7" }, { "move" : "Qxc7" }, { "move" : "Nxd5" }, { "move" : "Qd6" }, { "move" : "Nxf6+" }, { "move" : "Qxf6" }, { "move" : "c7" }, { "move" : "Rc8" }, { "move" : "Rc1" }, { "move" : "Bc6" }, { "move" : "Rc4" }, { "move" : "Rxc7" }, { "move" : "Bd3" }, { "move" : "Rd7" }, { "move" : "Qc2" }, { "move" : "Bd5" }, { "move" : "Ra4" }, { "move" : "g6" }, { "move" : "Qc5" }, { "move" : "Rfd8" }, { "move" : "Bb5" }, { "move" : "Rd6" }, { "move" : "Rd1" }, { "move" : "Be6" }, { "move" : "Bd3" }, { "move" : "Rd5" }, { "move" : "Qxa7" }, { "move" : "Bxh3" }, { "move" : "Be4" }, { "move" : "R5d7" }, { "move" : "Qa6" }, { "move" : "Qxa6" }, { "move" : "Rxa6" }, { "move" : "Be6" }, { "move" : "a4" }, { "move" : "d3" }, { "move" : "Rd2" }, { "move" : "Rd4" }, { "move" : "f3" }, { "move" : "Bd5" }, { "move" : "Bxd5" }, { "move" : "R8xd5" }, { "move" : "Kf2" }, { "move" : "Rc4" }, { "move" : "a5" }, { "move" : "Ra4" }, { "move" : "Rc6" }, { "move" : "Ra3" }, { "move" : "Rc1" }, { "move" : "h5" }, { "move" : "Rcd1" }, { "move" : "Kg7" }, { "move" : "a6" }, { "move" : "g5" }, { "move" : "a7" }, { "move" : "Rxa7" }, { "move" : "Rxd3" }, { "move" : "Ra2+" }, { "move" : "Kg1" }, { "move" : "Rxd3" }, { "move" : "Rxd3" }, { "move" : "Kg6" }, { "move" : "Kh2" }, { "move" : "Ra4" }, { "move" : "Rd5" }, { "move" : "g4" }, { "move" : "fxg4" }, { "move" : "hxg4" }, { "move" : "g3" }, { "move" : "Kf6" }, { "move" : "Rd7" }, { "move" : "Ke5" }, { "move" : "Kg2" }, { "move" : "f5" }, { "move" : "Rd2" }, { "move" : "Rc4" }, { "move" : "Re2+" }, { "move" : "Kd4" }, { "move" : "Rf2" }, { "move" : "Rc5" }, { "move" : "Rf4+" }, { "move" : "Ke3" }, { "move" : "Kg1" }]
+
+},
+{
+"Event" : "Leipzig Olympiad Final",
+"Site" : "?",
+"Date" : "1960",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Euwe, Max",
+"Result" : "1-0",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "exd5" }, { "move" : "cxd5" }, { "move" : "c4" }, { "move" : "Nf6" }, { "move" : "Nc3" }, { "move" : "Nc6" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "cxd5" }, { "move" : "Nxd5" }, { "move" : "Qb3" }, { "move" : "Bxf3" }, { "move" : "gxf3" }, { "move" : "e6" }, { "move" : "Qxb7" }, { "move" : "Nxd4" }, { "move" : "Bb5+" }, { "move" : "Nxb5" }, { "move" : "Qc6+" }, { "move" : "Ke7" }, { "move" : "Qxb5" }, { "move" : "Nxc3" }, { "move" : "bxc3" }, { "move" : "Qd7" }, { "move" : "Rb1" }, { "move" : "Rd8" }, { "move" : "Be3" }, { "move" : "Qxb5" }, { "move" : "Rxb5" }, { "move" : "Rd7" }, { "move" : "Ke2" }, { "move" : "f6" }, { "move" : "Rd1" }, { "move" : "Rxd1" }, { "move" : "Kxd1" }, { "move" : "Kd7" }, { "move" : "Rb8" }, { "move" : "Kc6" }, { "move" : "Bxa7" }, { "move" : "g5" }, { "move" : "a4" }, { "move" : "Bg7" }, { "move" : "Rb6+" }, { "move" : "Kd5" }, { "move" : "Rb7" }, { "move" : "Bf8" }, { "move" : "Rb8" }, { "move" : "Bg7" }, { "move" : "Rb5+" }, { "move" : "Kc6" }, { "move" : "Rb6+" }, { "move" : "Kd5" }, { "move" : "a5" }, { "move" : "f5" }, { "move" : "Bb8" }, { "move" : "Rc8" }, { "move" : "a6" }, { "move" : "Rxc3" }, { "move" : "Rb5+" }, { "move" : "Kc4" }, { "move" : "Rb7" }, { "move" : "Bd4" }, { "move" : "Rc7+" }, { "move" : "Kd3" }, { "move" : "Rxc3+" }, { "move" : "Kxc3" }, { "move" : "Be5" }]
+
+},
+{
+"Event" : "Bled",
+"Site" : "?",
+"Date" : "1961",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Keres, Paul",
+"Result" : "1/2-1/2",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d4" }, { "move" : "dxe4" }, { "move" : "Qe3" }, { "move" : "Nbd7" }, { "move" : "Nxe4" }, { "move" : "Nxe4" }, { "move" : "Qxe4" }, { "move" : "Nf6" }, { "move" : "Qd3" }, { "move" : "Qd5" }, { "move" : "c4" }, { "move" : "Qd6" }, { "move" : "Be2" }, { "move" : "e5" }, { "move" : "d5" }, { "move" : "e4" }, { "move" : "Qc2" }, { "move" : "Be7" }, { "move" : "dxc6" }, { "move" : "Qxc6" }, { "move" : "O-O" }, { "move" : "O-O" }, { "move" : "Be3" }, { "move" : "Bc5" }, { "move" : "Qc3" }, { "move" : "b6" }, { "move" : "Rfd1" }, { "move" : "Rfd8" }, { "move" : "b4" }, { "move" : "Bxe3" }, { "move" : "fxe3" }, { "move" : "Qc7" }, { "move" : "Rd4" }, { "move" : "a5" }, { "move" : "a3" }, { "move" : "axb4" }, { "move" : "axb4" }, { "move" : "h5" }, { "move" : "Rad1" }, { "move" : "Rxd4" }, { "move" : "Qxd4" }, { "move" : "Qg3" }, { "move" : "Qxb6" }, { "move" : "Ra2" }, { "move" : "Bf1" }, { "move" : "h4" }, { "move" : "Qc5" }, { "move" : "Qf2+" }, { "move" : "Kh1" }, { "move" : "g6" }, { "move" : "Qe5" }, { "move" : "Kg7" }, { "move" : "c5" }, { "move" : "Qxe3" }, { "move" : "c6" }, { "move" : "Rc2" }, { "move" : "b5" }, { "move" : "Rc1" }, { "move" : "Rxc1" }, { "move" : "Qxc1" }, { "move" : "Kg1" }, { "move" : "e3" }, { "move" : "c7" }, { "move" : "e2" }, { "move" : "Qxe2" }, { "move" : "Qxc7" }, { "move" : "Qf2" }, { "move" : "g5" }, { "move" : "b6" }, { "move" : "Qe5" }, { "move" : "b7" }, { "move" : "Nd7" }, { "move" : "Qd2" }, { "move" : "Nb8" }, { "move" : "Be2" }, { "move" : "Kf6" }, { "move" : "Bf3" }, { "move" : "Ke6" }, { "move" : "Bg4+" }, { "move" : "f5" }, { "move" : "Bd1" }, { "move" : "Kf6" }, { "move" : "Qd8+" }, { "move" : "Kg6" }, { "move" : "Qg8+" }, { "move" : "Kh6" }, { "move" : "Qf8+" }, { "move" : "Kg6" }, { "move" : "Qg8+" }, { "move" : "Kh6" }, { "move" : "Qf8+" }, { "move" : "Kg6" }, { "move" : "Qb4" }, { "move" : "Nc6" }, { "move" : "Qd2" }, { "move" : "Nd8" }, { "move" : "Bf3" }, { "move" : "Nxb7" }, { "move" : "Bxb7" }, { "move" : "Qa1+" }, { "move" : "Kh2" }, { "move" : "Qe5+" }]
+
+},
+{
+"Event" : "Bled",
+"Site" : "?",
+"Date" : "1961",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Petrosian, Tigran V.",
+"Result" : "1-0",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "Nc3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Nd7" }, { "move" : "Nf3" }, { "move" : "Ngf6" }, { "move" : "Nxf6+" }, { "move" : "Nxf6" }, { "move" : "Bc4" }, { "move" : "Bf5" }, { "move" : "Qe2" }, { "move" : "e6" }, { "move" : "Bg5" }, { "move" : "Bg4" }, { "move" : "O-O-O" }, { "move" : "Be7" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nd5" }, { "move" : "Bxe7" }, { "move" : "Qxe7" }, { "move" : "Kb1" }, { "move" : "Rd8" }, { "move" : "Qe4" }, { "move" : "b5" }, { "move" : "Bd3" }, { "move" : "a5" }, { "move" : "c3" }, { "move" : "Qd6" }, { "move" : "g3" }, { "move" : "b4" }, { "move" : "c4" }, { "move" : "Nf6" }, { "move" : "Qe5" }, { "move" : "c5" }, { "move" : "Qg5" }, { "move" : "h6" }, { "move" : "Qxc5" }, { "move" : "Qxc5" }, { "move" : "dxc5" }, { "move" : "Ke7" }, { "move" : "c6" }, { "move" : "Rd6" }, { "move" : "Rhe1" }, { "move" : "Rxc6" }, { "move" : "Re5" }, { "move" : "Ra8" }, { "move" : "Be4" }, { "move" : "Rd6" }, { "move" : "Bxa8" }, { "move" : "Rxd1+" }, { "move" : "Kc2" }, { "move" : "Rf1" }, { "move" : "Rxa5" }, { "move" : "Rxf2+" }, { "move" : "Kb3" }, { "move" : "Rh2" }, { "move" : "c5" }, { "move" : "Kd8" }, { "move" : "Rb5" }, { "move" : "Rxh3" }, { "move" : "Rb8+" }, { "move" : "Kc7" }, { "move" : "Rb7+" }, { "move" : "Kc6" }, { "move" : "Kc4" }]
+
+},
+{
+"Event" : "Stockholm Interzonal",
+"Site" : "?",
+"Date" : "1962",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Barcza, Gedeon",
+"Result" : "1-0",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Nf6" }, { "move" : "Nxf6+" }, { "move" : "exf6" }, { "move" : "d4" }, { "move" : "Bd6" }, { "move" : "Bc4" }, { "move" : "O-O" }, { "move" : "O-O" }, { "move" : "Re8" }, { "move" : "Bb3" }, { "move" : "Nd7" }, { "move" : "Nh4" }, { "move" : "Nf8" }, { "move" : "Qd3" }, { "move" : "Bc7" }, { "move" : "Be3" }, { "move" : "Qe7" }, { "move" : "Nf5" }, { "move" : "Qe4" }, { "move" : "Qxe4" }, { "move" : "Rxe4" }, { "move" : "Ng3" }, { "move" : "Re8" }, { "move" : "d5" }, { "move" : "cxd5" }, { "move" : "Bxd5" }, { "move" : "Bb6" }, { "move" : "Bxb6" }, { "move" : "axb6" }, { "move" : "a3" }, { "move" : "Ra5" }, { "move" : "Rad1" }, { "move" : "Rc5" }, { "move" : "c3" }, { "move" : "Rc7" }, { "move" : "Bf3" }, { "move" : "Rd7" }, { "move" : "Rxd7" }, { "move" : "Nxd7" }, { "move" : "Nf5" }, { "move" : "Nc5" }, { "move" : "Nd6" }, { "move" : "Rd8" }, { "move" : "Nxc8" }, { "move" : "Rxc8" }, { "move" : "Rd1" }, { "move" : "Kf8" }, { "move" : "Rd4" }, { "move" : "Rc7" }, { "move" : "h3" }, { "move" : "f5" }, { "move" : "Rb4" }, { "move" : "Nd7" }, { "move" : "Kf1" }, { "move" : "Ke7" }, { "move" : "Ke2" }, { "move" : "Kd8" }, { "move" : "Rb5" }, { "move" : "g6" }, { "move" : "Ke3" }, { "move" : "Kc8" }, { "move" : "Kd4" }, { "move" : "Kb8" }, { "move" : "Kd5" }, { "move" : "Rc6" }, { "move" : "Kd4" }, { "move" : "Re6" }, { "move" : "a4" }, { "move" : "Kc7" }, { "move" : "a5" }, { "move" : "Rd6+" }, { "move" : "Bd5" }, { "move" : "Kc8" }, { "move" : "axb6" }, { "move" : "f6" }, { "move" : "Ke3" }, { "move" : "Nxb6" }, { "move" : "Bg8" }, { "move" : "Kc7" }, { "move" : "Rc5+" }, { "move" : "Kb8" }, { "move" : "Bxh7" }, { "move" : "Nd5+" }, { "move" : "Kf3" }, { "move" : "Ne7" }, { "move" : "h4" }, { "move" : "b6" }, { "move" : "Rb5" }, { "move" : "Kb7" }, { "move" : "h5" }, { "move" : "Ka6" }, { "move" : "c4" }, { "move" : "gxh5" }, { "move" : "Bxf5" }, { "move" : "Rd4" }, { "move" : "b3" }, { "move" : "Nc6" }, { "move" : "Ke3" }, { "move" : "Rd8" }, { "move" : "Be4" }, { "move" : "Na5" }, { "move" : "Bc2" }, { "move" : "h4" }, { "move" : "Rh5" }, { "move" : "Re8+" }, { "move" : "Kd2" }, { "move" : "Rg8" }, { "move" : "Rxh4" }, { "move" : "b5" }, { "move" : "Rf4" }, { "move" : "bxc4" }, { "move" : "bxc4" }, { "move" : "Rxg2" }, { "move" : "Rxf6+" }, { "move" : "Ka7" }, { "move" : "Kc3" }, { "move" : "Rg4" }, { "move" : "f4" }, { "move" : "Nb7" }, { "move" : "Kb4" }]
+
+},
+{
+"Event" : "Varna Olympiad Final",
+"Site" : "?",
+"Date" : "1962",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Donner, Jan H.",
+"Result" : "0-1",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "Nc3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Bf5" }, { "move" : "Ng3" }, { "move" : "Bg6" }, { "move" : "h4" }, { "move" : "h6" }, { "move" : "Nf3" }, { "move" : "Nd7" }, { "move" : "Bd3" }, { "move" : "Bxd3" }, { "move" : "Qxd3" }, { "move" : "e6" }, { "move" : "Bf4" }, { "move" : "Qa5+" }, { "move" : "Bd2" }, { "move" : "Qc7" }, { "move" : "c4" }, { "move" : "Ngf6" }, { "move" : "Bc3" }, { "move" : "a5" }, { "move" : "O-O" }, { "move" : "Bd6" }, { "move" : "Ne4" }, { "move" : "Nxe4" }, { "move" : "Qxe4" }, { "move" : "O-O" }, { "move" : "d5" }, { "move" : "Rfe8" }, { "move" : "dxc6" }, { "move" : "bxc6" }, { "move" : "Rad1" }, { "move" : "Bf8" }, { "move" : "Nd4" }, { "move" : "Ra6" }, { "move" : "Nf5" }, { "move" : "Nc5" }, { "move" : "Qe3" }, { "move" : "Na4" }, { "move" : "Be5" }, { "move" : "Qa7" }, { "move" : "Nxh6+" }, { "move" : "gxh6" }, { "move" : "Rd4" }, { "move" : "f5" }, { "move" : "Rfd1" }, { "move" : "Nc5" }, { "move" : "Rd8" }, { "move" : "Qf7" }, { "move" : "Rxe8" }, { "move" : "Qxe8" }, { "move" : "Bd4" }, { "move" : "Ne4" }, { "move" : "f3" }, { "move" : "e5" }, { "move" : "fxe4" }, { "move" : "exd4" }, { "move" : "Qg3+" }, { "move" : "Bg7" }, { "move" : "exf5" }, { "move" : "Qe3+" }, { "move" : "Qxe3" }, { "move" : "dxe3" }, { "move" : "Rd8+" }, { "move" : "Kf7" }, { "move" : "Rd7+" }, { "move" : "Kf6" }, { "move" : "g4" }, { "move" : "Bf8" }, { "move" : "Kg2" }, { "move" : "Bc5" }, { "move" : "Rh7" }, { "move" : "Ke5" }, { "move" : "Kf3" }, { "move" : "Kd4" }, { "move" : "Rxh6" }, { "move" : "Rb6" }, { "move" : "b3" }, { "move" : "a4" }, { "move" : "Re6" }, { "move" : "axb3" }, { "move" : "axb3" }, { "move" : "Kd3" }]
+
+},
+{
+"Event" : "USA Championship",
+"Site" : "?",
+"Date" : "1963",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Steinmeyer, Robert H.",
+"Result" : "1-0",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "Nc3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Bf5" }, { "move" : "Ng3" }, { "move" : "Bg6" }, { "move" : "Nf3" }, { "move" : "Nf6" }, { "move" : "h4" }, { "move" : "h6" }, { "move" : "Bd3" }, { "move" : "Bxd3" }, { "move" : "Qxd3" }, { "move" : "e6" }, { "move" : "Bd2" }, { "move" : "Nbd7" }, { "move" : "O-O-O" }, { "move" : "Qc7" }, { "move" : "c4" }, { "move" : "O-O-O" }, { "move" : "Bc3" }, { "move" : "Qf4+" }, { "move" : "Kb1" }, { "move" : "Nc5" }, { "move" : "Qc2" }, { "move" : "Nce4" }, { "move" : "Ne5" }, { "move" : "Nxf2" }, { "move" : "Rdf1" }]
+
+},
+{
+"Event" : "Skopje",
+"Site" : "?",
+"Date" : "1967",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Panov, Vasil",
+"Result" : "1-0",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Nf6" }, { "move" : "Nxf6+" }, { "move" : "exf6" }, { "move" : "Bc4" }, { "move" : "Bd6" }, { "move" : "O-O" }, { "move" : "O-O" }, { "move" : "d4" }, { "move" : "Be6" }, { "move" : "Bxe6" }, { "move" : "fxe6" }, { "move" : "Re1" }, { "move" : "Re8" }, { "move" : "c4" }, { "move" : "Na6" }, { "move" : "Bd2" }, { "move" : "Qd7" }, { "move" : "Bc3" }, { "move" : "Bb4" }, { "move" : "Qb3" }, { "move" : "Bxc3" }, { "move" : "bxc3" }, { "move" : "Nc7" }, { "move" : "a4" }, { "move" : "b6" }, { "move" : "h3" }, { "move" : "Rab8" }, { "move" : "Re4" }, { "move" : "a6" }, { "move" : "Qc2" }, { "move" : "b5" }, { "move" : "axb5" }, { "move" : "axb5" }, { "move" : "cxb5" }, { "move" : "cxb5" }, { "move" : "Nd2" }, { "move" : "Ra8" }, { "move" : "Rae1" }, { "move" : "Qd5" }, { "move" : "Rh4" }, { "move" : "Qf5" }, { "move" : "Ne4" }, { "move" : "e5" }, { "move" : "Re3" }, { "move" : "h6" }, { "move" : "Rf3" }, { "move" : "Qh7" }, { "move" : "Nxf6+" }, { "move" : "gxf6" }, { "move" : "Rg3+" }, { "move" : "Kh8" }, { "move" : "Rg6" }]
+
+},
+{
+"Event" : "Nathania",
+"Site" : "?",
+"Date" : "1968",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Cagan, Shimon",
+"Result" : "1-0",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "a3" }, { "move" : "Nbd7" }, { "move" : "g4" }, { "move" : "Bd6" }, { "move" : "g5" }, { "move" : "Ng8" }, { "move" : "h4" }, { "move" : "Ne7" }, { "move" : "h5" }, { "move" : "Qb6" }, { "move" : "Bh3" }, { "move" : "O-O-O" }, { "move" : "a4" }, { "move" : "a5" }, { "move" : "O-O" }, { "move" : "Rhf8" }, { "move" : "Kh1" }, { "move" : "f5" }, { "move" : "Qg2" }, { "move" : "g6" }, { "move" : "h6" }, { "move" : "Kb8" }, { "move" : "f4" }, { "move" : "Rfe8" }, { "move" : "e5" }, { "move" : "Bc5" }, { "move" : "Qf3" }, { "move" : "Nc8" }, { "move" : "Bg2" }, { "move" : "Kc7" }, { "move" : "Ne2" }, { "move" : "Nb8" }, { "move" : "c3" }, { "move" : "Kd7" }, { "move" : "Bd2" }, { "move" : "Na6" }, { "move" : "Rfb1" }, { "move" : "Bf8" }, { "move" : "b4" }, { "move" : "axb4" }, { "move" : "cxb4" }, { "move" : "Bxb4" }, { "move" : "a5" }, { "move" : "Qc5" }, { "move" : "d4" }, { "move" : "Qf8" }, { "move" : "Bxb4" }, { "move" : "Nxb4" }, { "move" : "Qc3" }, { "move" : "Na6" }, { "move" : "Rxb7+" }, { "move" : "Nc7" }, { "move" : "Nc1" }, { "move" : "Re7" }, { "move" : "a6" }]
+
+},
+{
+"Event" : "Nathania",
+"Site" : "?",
+"Date" : "1968",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Czerniak, Moshe",
+"Result" : "1-0",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "exd5" }, { "move" : "cxd5" }, { "move" : "Bd3" }, { "move" : "Nc6" }, { "move" : "c3" }, { "move" : "Nf6" }, { "move" : "Bf4" }, { "move" : "g6" }, { "move" : "Nf3" }, { "move" : "Bg7" }, { "move" : "Nbd2" }, { "move" : "Nh5" }, { "move" : "Be3" }, { "move" : "O-O" }, { "move" : "O-O" }, { "move" : "f5" }, { "move" : "Nb3" }, { "move" : "Qd6" }, { "move" : "Re1" }, { "move" : "f4" }, { "move" : "Bd2" }, { "move" : "Bg4" }, { "move" : "Be2" }, { "move" : "Rae8" }, { "move" : "Nc1" }, { "move" : "Bxf3" }, { "move" : "Bxf3" }, { "move" : "e5" }, { "move" : "Qb3" }, { "move" : "exd4" }, { "move" : "Nd3" }, { "move" : "Rd8" }, { "move" : "c4" }, { "move" : "dxc4" }, { "move" : "Qxc4+" }, { "move" : "Kh8" }, { "move" : "Re6" }, { "move" : "Qb8" }, { "move" : "Rae1" }, { "move" : "Rc8" }, { "move" : "Bxc6" }, { "move" : "Rxc6" }, { "move" : "Rxc6" }, { "move" : "bxc6" }, { "move" : "Qxc6" }, { "move" : "Qc8" }, { "move" : "Qxc8" }, { "move" : "Rxc8" }, { "move" : "Kf1" }, { "move" : "Bh6" }, { "move" : "Rc1" }, { "move" : "Rxc1+" }, { "move" : "Bxc1" }, { "move" : "g5" }, { "move" : "b4" }, { "move" : "Kg8" }, { "move" : "b5" }, { "move" : "Kf7" }, { "move" : "Ba3" }, { "move" : "Bf8" }, { "move" : "Ne5+" }, { "move" : "Ke6" }, { "move" : "Bxf8" }, { "move" : "Kxe5" }, { "move" : "Bc5" }, { "move" : "Nf6" }, { "move" : "Bxa7" }, { "move" : "Ne4" }, { "move" : "f3" }, { "move" : "Nd2+" }, { "move" : "Ke2" }, { "move" : "Nc4" }, { "move" : "b6" }, { "move" : "Na5" }, { "move" : "b7" }, { "move" : "Nxb7" }, { "move" : "Kd3" }, { "move" : "h5" }, { "move" : "Bxd4+" }, { "move" : "Kd5" }, { "move" : "h3" }, { "move" : "Nd8" }, { "move" : "a4" }, { "move" : "Ne6" }, { "move" : "Bb6" }, { "move" : "g4" }, { "move" : "hxg4" }, { "move" : "hxg4" }, { "move" : "fxg4" }]
+
+},
+{
+"Event" : "Nathania",
+"Site" : "?",
+"Date" : "1968",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Yanofsky, Daniel A.",
+"Result" : "1/2-1/2",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "exd5" }, { "move" : "cxd5" }, { "move" : "c4" }, { "move" : "Nf6" }, { "move" : "Nc3" }, { "move" : "g6" }, { "move" : "Qb3" }, { "move" : "Bg7" }, { "move" : "cxd5" }, { "move" : "O-O" }, { "move" : "Be2" }, { "move" : "Na6" }, { "move" : "Bg5" }, { "move" : "Qb6" }, { "move" : "Qxb6" }, { "move" : "axb6" }, { "move" : "a3" }, { "move" : "Rd8" }, { "move" : "Bxf6" }, { "move" : "Bxf6" }, { "move" : "Rd1" }, { "move" : "Bf5" }, { "move" : "Bc4" }, { "move" : "Rac8" }, { "move" : "Bb3" }, { "move" : "b5" }, { "move" : "Nf3" }, { "move" : "b4" }, { "move" : "axb4" }, { "move" : "Nxb4" }, { "move" : "Ke2" }, { "move" : "Bc2" }, { "move" : "Bxc2" }, { "move" : "Nxc2" }, { "move" : "Kd3" }, { "move" : "Nb4+" }, { "move" : "Ke4" }, { "move" : "Rd6" }, { "move" : "Ne5" }, { "move" : "Bg7" }, { "move" : "g4" }, { "move" : "f5+" }, { "move" : "gxf5" }, { "move" : "gxf5+" }, { "move" : "Kf4" }, { "move" : "Rf8" }, { "move" : "Rhg1" }, { "move" : "Nxd5+" }, { "move" : "Nxd5" }, { "move" : "Rxd5" }, { "move" : "Nf3" }, { "move" : "Kh8" }, { "move" : "Rge1" }, { "move" : "Bf6" }, { "move" : "Ne5" }, { "move" : "e6" }, { "move" : "h4" }, { "move" : "Rc8" }, { "move" : "Nf7+" }, { "move" : "Kg7" }, { "move" : "Ng5" }, { "move" : "Bxg5+" }, { "move" : "Kxg5" }, { "move" : "Rc6" }, { "move" : "Re5" }, { "move" : "Rcd6" }, { "move" : "Rxd5" }, { "move" : "Rxd5" }, { "move" : "f4" }, { "move" : "Rb5" }, { "move" : "Rd2" }, { "move" : "Rb3" }, { "move" : "d5" }, { "move" : "h6+" }, { "move" : "Kh5" }, { "move" : "exd5" }, { "move" : "Rxd5" }, { "move" : "Rxb2" }, { "move" : "Rd7+" }, { "move" : "Kf6" }, { "move" : "Rd6+" }, { "move" : "Kf7" }, { "move" : "Rxh6" }, { "move" : "Rg2" }, { "move" : "Rb6" }, { "move" : "Rg4" }, { "move" : "Rxb7+" }, { "move" : "Kf6" }]
+
+},
+{
+"Event" : "Vinkovci",
+"Site" : "?",
+"Date" : "1968",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Hort, Vlastimil",
+"Result" : "1/2-1/2",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "exd5" }, { "move" : "cxd5" }, { "move" : "Nf3" }, { "move" : "Nf6" }, { "move" : "c3" }, { "move" : "Bf5" }, { "move" : "Bb5+" }, { "move" : "Nbd7" }, { "move" : "Nh4" }, { "move" : "Bg6" }, { "move" : "Bf4" }, { "move" : "e6" }, { "move" : "Nd2" }, { "move" : "Nh5" }, { "move" : "Nxg6" }, { "move" : "hxg6" }, { "move" : "Be3" }, { "move" : "Bd6" }, { "move" : "g3" }, { "move" : "a6" }, { "move" : "Bd3" }, { "move" : "Rc8" }, { "move" : "O-O" }, { "move" : "Nb6" }, { "move" : "a4" }, { "move" : "Rc7" }, { "move" : "Qb3" }, { "move" : "Nc8" }, { "move" : "c4" }, { "move" : "dxc4" }, { "move" : "Nxc4" }, { "move" : "Nf6" }, { "move" : "Rac1" }, { "move" : "O-O" }, { "move" : "Bd2" }, { "move" : "Nd5" }, { "move" : "Be4" }, { "move" : "Be7" }, { "move" : "Na5" }, { "move" : "Ncb6" }, { "move" : "Bxd5" }, { "move" : "Nxd5" }, { "move" : "Nxb7" }, { "move" : "Qb8" }, { "move" : "Rxc7" }, { "move" : "Qxc7" }, { "move" : "Rc1" }, { "move" : "Qb8" }, { "move" : "Rc4" }, { "move" : "Rd8" }, { "move" : "Bc3" }, { "move" : "Rd7" }, { "move" : "Na5" }, { "move" : "Qxb3" }, { "move" : "Rc8+" }, { "move" : "Kh7" }, { "move" : "Nxb3" }, { "move" : "Nb6" }, { "move" : "Rc6" }, { "move" : "Nxa4" }, { "move" : "Rxa6" }, { "move" : "Nxc3" }, { "move" : "bxc3" }, { "move" : "Rc7" }, { "move" : "Nd2" }, { "move" : "Rxc3" }, { "move" : "Ra7" }, { "move" : "Rd3" }, { "move" : "Nf1" }, { "move" : "Bf6" }, { "move" : "Rxf7" }, { "move" : "Rxd4" }, { "move" : "Kg2" }, { "move" : "g5" }, { "move" : "h3" }, { "move" : "Kg6" }, { "move" : "Rc7" }, { "move" : "Ra4" }, { "move" : "Nd2" }, { "move" : "Rd4" }, { "move" : "Nb3" }, { "move" : "Rd6" }, { "move" : "Nc5" }, { "move" : "Kf5" }, { "move" : "Kf3" }, { "move" : "Rb6" }, { "move" : "Rd7" }, { "move" : "Rc6" }, { "move" : "Ne4" }, { "move" : "Ra6" }, { "move" : "Rd3" }, { "move" : "Be7" }, { "move" : "Rb3" }, { "move" : "Ra3" }, { "move" : "Rxa3" }, { "move" : "Bxa3" }, { "move" : "g4+" }, { "move" : "Kg6" }, { "move" : "Ke3" }, { "move" : "Bc1+" }, { "move" : "Kd4" }, { "move" : "Bf4" }, { "move" : "Kc5" }, { "move" : "Kf7" }, { "move" : "Kb6" }, { "move" : "Ke8" }, { "move" : "Kc6" }, { "move" : "Ke7" }]
+
+},
+{
+"Event" : "Palma de Mallorca",
+"Site" : "?",
+"Date" : "1970",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Hubner, Robert",
+"Result" : "1/2-1/2",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d3" }, { "move" : "d5" }, { "move" : "Nd2" }, { "move" : "g6" }, { "move" : "g3" }, { "move" : "Bg7" }, { "move" : "Bg2" }, { "move" : "e5" }, { "move" : "Ngf3" }, { "move" : "Ne7" }, { "move" : "O-O" }, { "move" : "O-O" }, { "move" : "Re1" }, { "move" : "d4" }, { "move" : "a4" }, { "move" : "c5" }, { "move" : "Nc4" }, { "move" : "Nbc6" }, { "move" : "c3" }, { "move" : "Be6" }, { "move" : "cxd4" }, { "move" : "Bxc4" }, { "move" : "dxc4" }, { "move" : "exd4" }, { "move" : "e5" }, { "move" : "Qd7" }, { "move" : "h4" }, { "move" : "d3" }, { "move" : "Bd2" }, { "move" : "Rad8" }, { "move" : "Bc3" }, { "move" : "Nb4" }, { "move" : "Nd4" }, { "move" : "Rfe8" }, { "move" : "e6" }, { "move" : "fxe6" }, { "move" : "Nxe6" }, { "move" : "Bxc3" }, { "move" : "bxc3" }, { "move" : "Nc2" }, { "move" : "Nxd8" }, { "move" : "Rxd8" }, { "move" : "Qd2" }, { "move" : "Nxa1" }, { "move" : "Rxa1" }, { "move" : "Kg7" }, { "move" : "Re1" }, { "move" : "Ng8" }, { "move" : "Bd5" }, { "move" : "Qxa4" }, { "move" : "Qxd3" }, { "move" : "Re8" }, { "move" : "Rxe8" }, { "move" : "Qxe8" }, { "move" : "Bxb7" }, { "move" : "Nf6" }, { "move" : "Qd6" }, { "move" : "Qd7" }, { "move" : "Qa6" }, { "move" : "Qf7" }, { "move" : "Qxa7" }, { "move" : "Ne4" }, { "move" : "f3" }, { "move" : "Nd6" }, { "move" : "Qxc5" }, { "move" : "Nxb7" }, { "move" : "Qd4+" }, { "move" : "Kg8" }, { "move" : "Kf2" }, { "move" : "Qe7" }, { "move" : "Qd5+" }, { "move" : "Kf8" }, { "move" : "h5" }, { "move" : "gxh5" }, { "move" : "Qxh5" }, { "move" : "Nc5" }, { "move" : "Qd5" }, { "move" : "Kg7" }, { "move" : "Qd4+" }, { "move" : "Kf7" }, { "move" : "Qd5+" }, { "move" : "Kg7" }, { "move" : "Qd4+" }, { "move" : "Kf7" }, { "move" : "Qd5+" }]
+
+},
+{
+"Event" : "Siegen Olympiad Final",
+"Site" : "?",
+"Date" : "1970",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Hort, Vlastimil",
+"Result" : "1/2-1/2",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d3" }, { "move" : "d5" }, { "move" : "Nd2" }, { "move" : "g6" }, { "move" : "g3" }, { "move" : "Bg7" }, { "move" : "Bg2" }, { "move" : "e5" }, { "move" : "Ngf3" }, { "move" : "Ne7" }, { "move" : "O-O" }, { "move" : "O-O" }, { "move" : "Re1" }, { "move" : "Nd7" }, { "move" : "b3" }, { "move" : "d4" }, { "move" : "Bb2" }, { "move" : "b5" }, { "move" : "c3" }, { "move" : "c5" }, { "move" : "Rc1" }, { "move" : "Bb7" }, { "move" : "cxd4" }, { "move" : "cxd4" }, { "move" : "Bh3" }, { "move" : "Nc6" }, { "move" : "a3" }, { "move" : "Re8" }, { "move" : "Qe2" }, { "move" : "Rc8" }, { "move" : "Rc2" }, { "move" : "Ne7" }, { "move" : "Rec1" }, { "move" : "Rxc2" }, { "move" : "Rxc2" }, { "move" : "Nc6" }, { "move" : "Qd1" }, { "move" : "Nb6" }, { "move" : "Qc1" }, { "move" : "Qf6" }, { "move" : "Bg2" }, { "move" : "Rc8" }, { "move" : "h4" }, { "move" : "Bf8" }, { "move" : "Bh3" }, { "move" : "Rc7" }, { "move" : "Nh2" }, { "move" : "Bc8" }, { "move" : "Bf1" }, { "move" : "Bd7" }, { "move" : "h5" }, { "move" : "Rc8" }, { "move" : "Be2" }, { "move" : "Nd8" }, { "move" : "Rxc8" }, { "move" : "Bxc8" }, { "move" : "Ndf3" }, { "move" : "Nc6" }, { "move" : "Nh4" }, { "move" : "b4" }, { "move" : "axb4" }, { "move" : "Nxb4" }, { "move" : "N4f3" }, { "move" : "a5" }, { "move" : "Qc7" }, { "move" : "Qd6" }, { "move" : "Qa7" }, { "move" : "Ba6" }, { "move" : "Ba3" }, { "move" : "Nc8" }, { "move" : "Qa8" }, { "move" : "Qb6" }, { "move" : "Bxb4" }, { "move" : "Bxb4" }, { "move" : "Qd5" }, { "move" : "Qc5" }, { "move" : "Qxe5" }, { "move" : "Qxe5" }, { "move" : "Nxe5" }, { "move" : "Nd6" }, { "move" : "hxg6" }, { "move" : "hxg6" }, { "move" : "Kf1" }, { "move" : "Bb5" }, { "move" : "Nhf3" }, { "move" : "Bc3" }, { "move" : "Ne1" }, { "move" : "Nb7" }, { "move" : "Bd1" }, { "move" : "Nc5" }, { "move" : "f3" }, { "move" : "Kg7" }, { "move" : "Bc2" }, { "move" : "Kf6" }, { "move" : "Ng4+" }, { "move" : "Ke7" }, { "move" : "Nf2" }, { "move" : "Bd7" }, { "move" : "Nd1" }, { "move" : "Bb4" }, { "move" : "Nb2" }, { "move" : "Be6" }, { "move" : "Nc4" }, { "move" : "Bxc4" }, { "move" : "dxc4" }, { "move" : "Bxe1" }, { "move" : "Kxe1" }, { "move" : "g5" }, { "move" : "Ke2" }, { "move" : "Kd6" }, { "move" : "f4" }, { "move" : "gxf4" }, { "move" : "gxf4" }, { "move" : "f6" }, { "move" : "Kf3" }, { "move" : "Ke6" }, { "move" : "Ke2" }, { "move" : "Kd6" }]
+
+},
+{
+"Event" : "Siegen Olympiad Prelim",
+"Site" : "?",
+"Date" : "1970",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Ibrahimoglu, Ismet",
+"Result" : "1-0",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d3" }, { "move" : "d5" }, { "move" : "Nd2" }, { "move" : "g6" }, { "move" : "Ngf3" }, { "move" : "Bg7" }, { "move" : "g3" }, { "move" : "Nf6" }, { "move" : "Bg2" }, { "move" : "O-O" }, { "move" : "O-O" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nbd7" }, { "move" : "Qe2" }, { "move" : "dxe4" }, { "move" : "dxe4" }, { "move" : "Qc7" }, { "move" : "a4" }, { "move" : "Rad8" }, { "move" : "Nb3" }, { "move" : "b6" }, { "move" : "Be3" }, { "move" : "c5" }, { "move" : "a5" }, { "move" : "e5" }, { "move" : "Nd2" }, { "move" : "Ne8" }, { "move" : "axb6" }, { "move" : "axb6" }, { "move" : "Nb1" }, { "move" : "Qb7" }, { "move" : "Nc3" }, { "move" : "Nc7" }, { "move" : "Nb5" }, { "move" : "Qc6" }, { "move" : "Nxc7" }, { "move" : "Qxc7" }, { "move" : "Qb5" }, { "move" : "Ra8" }, { "move" : "c3" }, { "move" : "Rxa1" }, { "move" : "Rxa1" }, { "move" : "Rb8" }, { "move" : "Ra6" }, { "move" : "Bf8" }, { "move" : "Bf1" }, { "move" : "Kg7" }, { "move" : "Qa4" }, { "move" : "Rb7" }, { "move" : "Bb5" }, { "move" : "Nb8" }, { "move" : "Ra8" }, { "move" : "Bd6" }, { "move" : "Qd1" }, { "move" : "Nc6" }, { "move" : "Qd2" }, { "move" : "h5" }, { "move" : "Bh6+" }, { "move" : "Kh7" }, { "move" : "Bg5" }, { "move" : "Rb8" }, { "move" : "Rxb8" }, { "move" : "Nxb8" }, { "move" : "Bf6" }, { "move" : "Nc6" }, { "move" : "Qd5" }, { "move" : "Na7" }, { "move" : "Be8" }, { "move" : "Kg8" }, { "move" : "Bxf7+" }, { "move" : "Qxf7" }, { "move" : "Qxd6" }]
+
+},
+{
+"Event" : "USSR-World",
+"Site" : "?",
+"Date" : "1970",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Petrosian, Tigran V.",
+"Result" : "1-0",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "exd5" }, { "move" : "cxd5" }, { "move" : "Bd3" }, { "move" : "Nc6" }, { "move" : "c3" }, { "move" : "Nf6" }, { "move" : "Bf4" }, { "move" : "Bg4" }, { "move" : "Qb3" }, { "move" : "Na5" }, { "move" : "Qa4+" }, { "move" : "Bd7" }, { "move" : "Qc2" }, { "move" : "e6" }, { "move" : "Nf3" }, { "move" : "Qb6" }, { "move" : "a4" }, { "move" : "Rc8" }, { "move" : "Nbd2" }, { "move" : "Nc6" }, { "move" : "Qb1" }, { "move" : "Nh5" }, { "move" : "Be3" }, { "move" : "h6" }, { "move" : "Ne5" }, { "move" : "Nf6" }, { "move" : "h3" }, { "move" : "Bd6" }, { "move" : "O-O" }, { "move" : "Kf8" }, { "move" : "f4" }, { "move" : "Be8" }, { "move" : "Bf2" }, { "move" : "Qc7" }, { "move" : "Bh4" }, { "move" : "Ng8" }, { "move" : "f5" }, { "move" : "Nxe5" }, { "move" : "dxe5" }, { "move" : "Bxe5" }, { "move" : "fxe6" }, { "move" : "Bf6" }, { "move" : "exf7" }, { "move" : "Bxf7" }, { "move" : "Nf3" }, { "move" : "Bxh4" }, { "move" : "Nxh4" }, { "move" : "Nf6" }, { "move" : "Ng6+" }, { "move" : "Bxg6" }, { "move" : "Bxg6" }, { "move" : "Ke7" }, { "move" : "Qf5" }, { "move" : "Kd8" }, { "move" : "Rae1" }, { "move" : "Qc5+" }, { "move" : "Kh1" }, { "move" : "Rf8" }, { "move" : "Qe5" }, { "move" : "Rc7" }, { "move" : "b4" }, { "move" : "Qc6" }, { "move" : "c4" }, { "move" : "dxc4" }, { "move" : "Bf5" }, { "move" : "Rff7" }, { "move" : "Rd1+" }, { "move" : "Rfd7" }, { "move" : "Bxd7" }, { "move" : "Rxd7" }, { "move" : "Qb8+" }, { "move" : "Ke7" }, { "move" : "Rde1+" }]
+
+},
+{
+"Event" : "USSR-World",
+"Site" : "?",
+"Date" : "1970",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Petrosian, Tigran V.",
+"Result" : "1/2-1/2",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d4" }, { "move" : "d5" }, { "move" : "Nc3" }, { "move" : "g6" }, { "move" : "e5" }, { "move" : "Bg7" }, { "move" : "f4" }, { "move" : "h5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "e6" }, { "move" : "g3" }, { "move" : "Qb6" }, { "move" : "Qf2" }, { "move" : "Ne7" }, { "move" : "Bd3" }, { "move" : "Nd7" }, { "move" : "Ne2" }, { "move" : "O-O-O" }, { "move" : "c3" }, { "move" : "f6" }, { "move" : "b3" }, { "move" : "Nf5" }, { "move" : "Rg1" }, { "move" : "c5" }, { "move" : "Bxf5" }, { "move" : "gxf5" }, { "move" : "Be3" }, { "move" : "Qa6" }, { "move" : "Kf1" }, { "move" : "cxd4" }, { "move" : "cxd4" }, { "move" : "Nb8" }, { "move" : "Kg2" }, { "move" : "Nc6" }, { "move" : "Nc1" }, { "move" : "Rd7" }, { "move" : "Qd2" }, { "move" : "Qa5" }, { "move" : "Qxa5" }, { "move" : "Nxa5" }, { "move" : "Nd3" }, { "move" : "Nc6" }, { "move" : "Rac1" }, { "move" : "Rc7" }, { "move" : "Rc3" }, { "move" : "b6" }, { "move" : "Rgc1" }, { "move" : "Kb7" }, { "move" : "Nb4" }, { "move" : "Rhc8" }, { "move" : "Rxc6" }, { "move" : "Rxc6" }, { "move" : "Rxc6" }, { "move" : "Rxc6" }, { "move" : "Nxc6" }, { "move" : "Kxc6" }, { "move" : "Kf3" }]
+
+},
+{
+"Event" : "Zabreb",
+"Site" : "?",
+"Date" : "1970",
+"Round" : "?",
+"White" : "Fischer, Robert J.",
+"Black" : "Marovic, Drazen",
+"Result" : "1-0",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "d3" }, { "move" : "d5" }, { "move" : "Nd2" }, { "move" : "Nd7" }, { "move" : "Ngf3" }, { "move" : "Qc7" }, { "move" : "exd5" }, { "move" : "cxd5" }, { "move" : "d4" }, { "move" : "g6" }, { "move" : "Bd3" }, { "move" : "Bg7" }, { "move" : "O-O" }, { "move" : "e6" }, { "move" : "Re1" }, { "move" : "Ne7" }, { "move" : "Nf1" }, { "move" : "Nc6" }, { "move" : "c3" }, { "move" : "O-O" }, { "move" : "Bg5" }, { "move" : "e5" }, { "move" : "Ne3" }, { "move" : "Nb6" }, { "move" : "dxe5" }, { "move" : "Nxe5" }, { "move" : "Bf4" }, { "move" : "f6" }, { "move" : "a4" }, { "move" : "Qf7" }, { "move" : "a5" }, { "move" : "Nbc4" }, { "move" : "Bxc4" }, { "move" : "dxc4" }, { "move" : "Bxe5" }, { "move" : "fxe5" }, { "move" : "Qe2" }, { "move" : "h6" }, { "move" : "Nxc4" }, { "move" : "Bg4" }, { "move" : "Ncxe5" }, { "move" : "Bxe5" }, { "move" : "Nxe5" }, { "move" : "Bxe2" }, { "move" : "Nxf7" }, { "move" : "Rxf7" }, { "move" : "Rxe2" }, { "move" : "Rd8" }, { "move" : "Rae1" }, { "move" : "Rd5" }, { "move" : "b4" }, { "move" : "Rc7" }, { "move" : "Re3" }, { "move" : "Kf7" }, { "move" : "h4" }, { "move" : "Rd2" }, { "move" : "Rf3+" }, { "move" : "Kg7" }, { "move" : "Re6" }, { "move" : "Rf7" }, { "move" : "Rxf7+" }, { "move" : "Kxf7" }, { "move" : "Re5" }, { "move" : "Rd1+" }, { "move" : "Kh2" }, { "move" : "b6" }, { "move" : "axb6" }, { "move" : "axb6" }, { "move" : "f3" }, { "move" : "Rd3" }, { "move" : "Rb5" }, { "move" : "Rxc3" }, { "move" : "Rxb6" }, { "move" : "h5" }, { "move" : "Rb7+" }, { "move" : "Kf6" }, { "move" : "b5" }, { "move" : "Rb3" }, { "move" : "b6" }, { "move" : "Rb4" }, { "move" : "Kg3" }, { "move" : "Rb2" }, { "move" : "Rb8" }, { "move" : "Kg7" }, { "move" : "f4" }, { "move" : "Rb3+" }, { "move" : "Kf2" }, { "move" : "Kf6" }, { "move" : "Ke2" }, { "move" : "Kg7" }, { "move" : "Kd2" }, { "move" : "Rg3" }, { "move" : "Rc8" }]
+
+},
+{
+"Event" : "?",
+"Site" : "Stockholm",
+"Date" : "1962.??.??",
+"Round" : "4",
+"White" : "Fischer, Robert J.",
+"Black" : "Portisch, Lajos",
+"Result" : "1-0",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "dxe4" }, { "move" : "Nxe4" }, { "move" : "Nd7" }, { "move" : "Bc4" }, { "move" : "Ngf6" }, { "move" : "Neg5" }, { "move" : "Nd5" }, { "move" : "d4" }, { "move" : "h6" }, { "move" : "Ne4" }, { "move" : "N7b6" }, { "move" : "Bb3" }, { "move" : "Bf5" }, { "move" : "Ng3" }, { "move" : "Bh7" }, { "move" : "O-O" }, { "move" : "e6" }, { "move" : "Ne5" }, { "move" : "Nd7" }, { "move" : "c4" }, { "move" : "N5f6" }, { "move" : "Bf4" }, { "move" : "Nxe5" }, { "move" : "Bxe5" }, { "move" : "Bd6" }, { "move" : "Qe2" }, { "move" : "O-O" }, { "move" : "Rad1" }, { "move" : "Qe7" }, { "move" : "Bxd6" }, { "move" : "Qxd6" }, { "move" : "f4" }, { "move" : "c5" }, { "move" : "Qe5" }, { "move" : "Qxe5" }, { "move" : "dxe5" }, { "move" : "Ne4" }, { "move" : "Rd7" }, { "move" : "Nxg3" }, { "move" : "hxg3" }, { "move" : "Be4" }, { "move" : "Ba4" }, { "move" : "Rad8" }, { "move" : "Rfd1" }, { "move" : "Rxd7" }, { "move" : "Rxd7" }, { "move" : "g5" }, { "move" : "Bd1" }, { "move" : "Bc6" }, { "move" : "Rd6" }, { "move" : "Rc8" }, { "move" : "Kf2" }, { "move" : "Kf8" }, { "move" : "Bf3" }, { "move" : "Bxf3" }, { "move" : "gxf3" }, { "move" : "gxf4" }, { "move" : "gxf4" }, { "move" : "Ke7" }, { "move" : "f5" }, { "move" : "exf5" }, { "move" : "Rxh6" }, { "move" : "Rd8" }, { "move" : "Ke2" }, { "move" : "Rg8" }, { "move" : "Kf2" }, { "move" : "Rd8" }, { "move" : "Ke3" }, { "move" : "Rd1" }, { "move" : "b3" }, { "move" : "Re1+" }, { "move" : "Kf4" }, { "move" : "Re2" }, { "move" : "Kxf5" }, { "move" : "Rxa2" }, { "move" : "f4" }, { "move" : "Re2" }, { "move" : "Rh3" }, { "move" : "Re1" }, { "move" : "Rd3" }, { "move" : "Rb1" }, { "move" : "Re3" }, { "move" : "Rb2" }, { "move" : "e6" }, { "move" : "a6" }, { "move" : "exf7+" }, { "move" : "Kxf7" }, { "move" : "Ke5" }, { "move" : "Rd2" }, { "move" : "Rc3" }, { "move" : "b6" }, { "move" : "f5" }, { "move" : "Rd1" }, { "move" : "Rh3" }, { "move" : "b5" }, { "move" : "Rh7+" }, { "move" : "Kg8" }, { "move" : "Rb7" }, { "move" : "bxc4" }, { "move" : "bxc4" }, { "move" : "Rd4" }, { "move" : "Ke6" }, { "move" : "Re4+" }, { "move" : "Kd5" }, { "move" : "Rf4" }, { "move" : "Kxc5" }, { "move" : "Rxf5+" }, { "move" : "Kd6" }, { "move" : "Rf6+" }, { "move" : "Ke5" }, { "move" : "Rf7" }, { "move" : "Rb6" }, { "move" : "Rc7" }, { "move" : "Kd5" }, { "move" : "Kf7" }, { "move" : "Rxa6" }, { "move" : "Ke7" }, { "move" : "Re6+" }, { "move" : "Kd8" }, { "move" : "Rd6+" }, { "move" : "Ke7" }, { "move" : "c5" }, { "move" : "Rc8" }, { "move" : "c6" }, { "move" : "Rc7" }, { "move" : "Rh6" }, { "move" : "Kd8" }, { "move" : "Rh8+" }, { "move" : "Ke7" }, { "move" : "Ra8" }]
+
+},
+{
+"Event" : "?",
+"Site" : "Yugoslavia ct",
+"Date" : "1959.??.??",
+"Round" : "2",
+"White" : "Fischer, Robert J.",
+"Black" : "Keres, Paul",
+"Result" : "0-1",
+
+"Moves":[{ "move" : "e4" }, { "move" : "c6" }, { "move" : "Nc3" }, { "move" : "d5" }, { "move" : "Nf3" }, { "move" : "Bg4" }, { "move" : "h3" }, { "move" : "Bxf3" }, { "move" : "Qxf3" }, { "move" : "Nf6" }, { "move" : "d3" }, { "move" : "e6" }, { "move" : "g3" }, { "move" : "Bb4" }, { "move" : "Bd2" }, { "move" : "d4" }, { "move" : "Nb1" }, { "move" : "Qb6" }, { "move" : "b3" }, { "move" : "a5" }, { "move" : "a3" }, { "move" : "Be7" }, { "move" : "Bg2" }, { "move" : "a4" }, { "move" : "b4" }, { "move" : "Nbd7" }, { "move" : "O-O" }, { "move" : "c5" }, { "move" : "Ra2" }, { "move" : "O-O" }, { "move" : "bxc5" }, { "move" : "Bxc5" }, { "move" : "Qe2" }, { "move" : "e5" }, { "move" : "f4" }, { "move" : "Rfc8" }, { "move" : "h4" }, { "move" : "Rc6" }, { "move" : "Bh3" }, { "move" : "Qc7" }, { "move" : "fxe5" }, { "move" : "Nxe5" }, { "move" : "Bf4" }, { "move" : "Bd6" }, { "move" : "h5" }, { "move" : "Ra5" }, { "move" : "h6" }, { "move" : "Ng6" }, { "move" : "Qf3" }, { "move" : "Rh5" }, { "move" : "Bg4" }, { "move" : "Nxf4" }, { "move" : "Bxh5" }, { "move" : "N4xh5" }, { "move" : "Kg2" }, { "move" : "Ng4" }, { "move" : "Nd2" }, { "move" : "Ne3+" }]
+
+}
+]

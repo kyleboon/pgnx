@@ -1,0 +1,14 @@
+[
+{
+"Event" : "Dover vs Herne Bay, Minor League",
+"Site" : "Margate Chess Club",
+"Date" : "1994.10.10",
+"Round" : "",
+"White" : "Barnes, David J.",
+"Black" : "Horton, Mark",
+"Result" : "1/2-1/2",
+
+"Moves":[{ "move" : "b2b3" }, { "move" : "e7e5" }, { "move" : "Bc1b2" }, { "move" : "d7d6" }, { "move" : "d2d4" }, { "move" : "e5d4" }, { "move" : "Qd1d4" }, { "move" : "Nb8c6" }, { "move" : "Qd4d2" }, { "move" : "Ng8f6" }, { "move" : "Nb1c3" }, { "move" : "Bc8e6" }, { "move" : "e2e4" }, { "move" : "d6d5" }, { "move" : "e4d5" }, { "move" : "Be6d5" }, { "move" : "Qd2e3+" }, { "move" : "Bf8e7" }, { "move" : "Ng1f3" }, { "move" : "e8g8" }, { "move" : "Bf1e2" }, { "move" : "Rf8e8" }, { "move" : "e1c1" }, { "move" : "Be7b4" }, { "move" : "Qe3d3" }, { "move" : "Bb4c3" }, { "move" : "Bb2c3" }, { "move" : "Qd8e7" }, { "move" : "Rh1e1" }, { "move" : "Nf6e4" }, { "move" : "Bc3b2" }, { "move" : "Ra8d8" }, { "move" : "Qd3e3" }, { "move" : "b7b6" }, { "move" : "Be2b5" }, { "move" : "Qe7e6" }, { "move" : "Nf3d4" }, { "move" : "Nc6d4" }, { "move" : "Rd1d4" }, { "move" : "c7c5" }, { "move" : "Rd4e4" }, { "move" : "Bd5e4" }, { "move" : "Bb5e8" }, { "move" : "Rd8e8" }, { "move" : "f2f3" }, { "move" : "Be4d5" }, { "move" : "Qe3e6" }, { "move" : "Re8e6" }, { "move" : "Re1e6" }, { "move" : "Bd5e6" }, { "move" : "Kc1d2" }, { "move" : "Kg8f8" }, { "move" : "Bb2e5" }, { "move" : "b6b5" }, { "move" : "Be5b8", "nags" : ["$2"]  }, { "move" : "a7a6" }, { "move" : "Bb8a7" }, { "move" : "c5c4" }, { "move" : "Kd2c3" }, { "move" : "Kf8e7" }, { "move" : "Kc3d4" }, { "move" : "Ke7d6" }, { "move" : "Ba7c5+" }, { "move" : "Kd6d7" }, { "move" : "Bc5a7" }, { "move" : "Kd7d6" }, { "move" : "Ba7c5+" }, { "move" : "Kd6d7" }, { "move" : "Kd4c3" }, { "move" : "g7g6" }, { "move" : "Bc5d4" }, { "move" : "f7f5" }]
+
+}
+]

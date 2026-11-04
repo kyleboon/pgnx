@@ -227,19 +227,33 @@ type Options struct {
 	// cut main line ends with "*" rather than the game's result.
 	PlyLimit    int
 	HasPlyLimit bool
+
+	// JSON renders each game as pgn-extract's --json object instead of
+	// PGN: the tags as members, then a "Moves" array of one object per
+	// main-line move holding the move as Format spells it and its NAGs
+	// and generated fields (evaluation, FEN, HashCode). Comments,
+	// variations, move numbers and the result token are never emitted,
+	// as the C tool forces them off. The games a Writer writes form one
+	// array: WriteGame opens it before the first game and separates the
+	// games, and Close ends it. EPD and FEN output has no JSON form.
+	JSON bool
 }
 
 // Writer renders games to an underlying io.Writer according to Options.
 type Writer struct {
 	w    io.Writer
 	opts Options
+	// games counts the games written to the open JSON array, so that
+	// WriteGame knows whether to open it or separate the games and Close
+	// whether to end it. Unused outside JSON output.
+	games int
 }
 
 // NewWriter returns a Writer that writes rendered games to w according to
-// opts. The Writer buffers nothing: every tag line and every wrapped
-// movetext line is one Write to w, so w should be buffered (a
-// bufio.Writer the caller flushes when the run is done) when it is a
-// file or a pipe.
+// opts. The Writer buffers nothing beyond one game: every tag line and
+// every wrapped movetext line is one Write to w (a JSON game's "Moves"
+// line is one Write too), so w should be buffered (a bufio.Writer the
+// caller flushes when the run is done) when it is a file or a pipe.
 func NewWriter(w io.Writer, opts Options) *Writer {
 	if opts.Tags == nil {
 		opts.Tags = NewTagRegistry()
@@ -261,6 +275,9 @@ func (w *Writer) WriteGame(g *pgn.Game, r *replay.Result) error {
 	opts := w.opts
 	if r == nil {
 		opts.Format = Source
+	}
+	if opts.JSON {
+		return w.writeJSONGame(g, r, opts)
 	}
 	switch opts.Format {
 	case SAN, Source, LAlg, HAlg, ELAlg, XLAlg, UCI:
@@ -314,9 +331,16 @@ func (w *Writer) writeMovetextGame(g *pgn.Game, r *replay.Result, opts Options) 
 	return err
 }
 
-// writeTag prints one tag line. It is the only place a tag reaches the
-// output, so pgn-extract's quoting (see quoteTagValue) applies everywhere.
+// writeTag prints one tag line: a PGN tag pair, or under JSON output the
+// tag as an object member, with the trailing comma the C tool writes
+// after every one (output.c output_tag). It is the only place a tag
+// reaches the output, so pgn-extract's quoting (see quoteTagValue)
+// applies everywhere.
 func (w *Writer) writeTag(name, value string) error {
+	if w.opts.JSON {
+		_, err := fmt.Fprintf(w.w, "\"%s\" : %s,\n", name, quoteTagValue(value))
+		return err
+	}
 	_, err := fmt.Fprintf(w.w, "[%s %s]\n", name, quoteTagValue(value))
 	return err
 }

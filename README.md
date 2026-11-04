@@ -66,6 +66,9 @@ elements from the output.
 ```sh
 pgnx convert -f uci -o out.pgn games.pgn
 
+# Emit each game as a JSON object (pgn-extract's --json layout) instead of PGN
+pgnx convert --json -o games.json games.pgn
+
 # Add ECO/Opening/Variation tags from an ECO file, splitting the output
 # into A.pgn .. E.pgn (and noeco.pgn) by the first letter of the code
 pgnx convert --eco-file eco.pgn --eco-split 1 games.pgn
