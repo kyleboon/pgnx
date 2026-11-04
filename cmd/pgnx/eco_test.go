@@ -171,3 +171,72 @@ func TestFilterECOSplitRoutesMatchedOnly(t *testing.T) {
 		t.Errorf("A.pgn %q u.pgn %q", a, u)
 	}
 }
+
+// copyGoldenECO copies eco.pgn into the current directory, where
+// --eco-default looks for it.
+func copyGoldenECO(t *testing.T) {
+	t.Helper()
+	data, err := os.ReadFile(goldenECO)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("eco.pgn", data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestConvertECODefaultCurrentDirectory(t *testing.T) {
+	// -e with no file name: with $ECO_FILE unset the C tool reads eco.pgn
+	// from the current directory (argsfile.c USE_ECO_FILE_ARGUMENT).
+	t.Chdir(t.TempDir())
+	t.Setenv("ECO_FILE", "")
+	copyGoldenECO(t)
+	out, errOut, code := runCLI(t, "1. Nf3 *\n", "convert", "--quiet", "--eco-default")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if !strings.Contains(out, "[ECO \"A04\"]\n[Opening \"Reti opening\"]\n") {
+		t.Errorf("classified output:\n%s", out)
+	}
+}
+
+func TestConvertECODefaultEnvironment(t *testing.T) {
+	// $ECO_FILE wins over eco.pgn in the current directory, which here
+	// does not exist. The file has one line that cannot be replayed, so
+	// the skip count on the log names the resolved file, not the flag.
+	t.Chdir(t.TempDir())
+	env := filepath.Join(t.TempDir(), "env.pgn")
+	lines := "[ECO \"A04\"]\n[Opening \"Reti opening\"]\n\n1. Nf3 *\n\n[ECO \"A00\"]\n\n1. e5 *\n"
+	if err := os.WriteFile(env, []byte(lines), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ECO_FILE", env)
+	out, errOut, code := runCLI(t, "1. Nf3 *\n", "convert", "--eco-default")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if !strings.Contains(out, "[ECO \"A04\"]\n[Opening \"Reti opening\"]\n") {
+		t.Errorf("classified output:\n%s", out)
+	}
+	if !strings.Contains(errOut, env+": skipped 1 ECO line that could not be replayed.") {
+		t.Errorf("skip log must name the resolved file: %q", errOut)
+	}
+}
+
+func TestConvertECODefaultErrors(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("ECO_FILE", "")
+	_, errOut, code := runCLI(t, fools, "convert", "--eco-default")
+	if code != 1 || !strings.Contains(errOut, "eco.pgn") {
+		t.Errorf("missing eco.pgn: exit %d err %q", code, errOut)
+	}
+	t.Setenv("ECO_FILE", filepath.Join(t.TempDir(), "env.pgn"))
+	_, errOut, code = runCLI(t, fools, "convert", "--eco-default")
+	if code != 1 || !strings.Contains(errOut, "env.pgn") {
+		t.Errorf("missing $ECO_FILE: exit %d err %q", code, errOut)
+	}
+	_, errOut, code = runCLI(t, fools, "convert", "--eco-default", "--eco-file", goldenECO)
+	if code != 1 || !strings.Contains(errOut, "--eco-default") {
+		t.Errorf("both flags: exit %d err %q", code, errOut)
+	}
+}

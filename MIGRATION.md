@@ -127,14 +127,17 @@ classification and ECO-split output are accepted by both `convert` and
 | `-P` | `pgnx filter --exact-order` |
 | `--vanywhere` | `pgnx filter --sequence-anywhere` |
 | `-e FILE` | `pgnx convert --eco-file FILE` / `pgnx filter --eco-file FILE` |
+| `-e` | `pgnx convert --eco-default` / `pgnx filter --eco-default` (`$ECO_FILE`, else `./eco.pgn`) |
 | `-E N` | `pgnx convert --eco-split N` / `pgnx filter --eco-split N` |
 | `-e FILE -TeB1` | `pgnx filter --eco-file FILE --eco B1` (the criterion sees the classified tag) |
 
 Notes:
 
-- `-e` with no file name falls back to `$ECO_FILE` or `./eco.pgn` in the
-  C tool; `--eco-file` always needs a path. A copy of pgn-extract's
-  `eco.pgn` is in the repository at `cmd/pgnx/testdata/golden/eco.pgn`.
+- `--eco-file` always needs a path; `--eco-default` is the C tool's `-e`
+  with no file name, reading `$ECO_FILE` or, when that is unset or
+  empty, `eco.pgn` in the current directory. The two flags are mutually
+  exclusive. A copy of pgn-extract's `eco.pgn` is in the repository at
+  `cmd/pgnx/testdata/golden/eco.pgn`.
 - `--eco-split N` writes to `<prefix>.pgn` (or `noeco.pgn`) in the
   current directory, appending, exactly as `-E` does, and cannot be
   combined with `--output`.
@@ -261,7 +264,6 @@ The following pgn-extract flags have no pgnx equivalent yet:
 
 Also not yet supported, regardless of flag:
 
-- `-e` without a file name (the `eco.pgn`/`$ECO_FILE` default)
 - `pgnx dedupe` — planned as a new subcommand in a later phase, not a
   flag on `convert`
 

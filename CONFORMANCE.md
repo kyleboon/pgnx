@@ -301,8 +301,11 @@ below. Known, intentional differences:
   `Ngf3` in a sequence therefore matches only a game that wrote `Ngf3`,
   even though the `san` output of that game shows `Nf3`. This is parity,
   recorded here because it is easy to mistake for a bug.
-- **No implicit ECO file.** `-e` with no file name uses `$ECO_FILE` or
-  `eco.pgn` in the current directory; `--eco-file` requires a path.
+- **The implicit ECO file is a separate flag.** `-e` with no file name
+  uses `$ECO_FILE` or `eco.pgn` in the current directory; pgnx spells
+  that `--eco-default`, because `--eco-file` with an optional value
+  would make `--eco-file FILE` read FILE as an input. An empty
+  `$ECO_FILE` counts as unset (the C tool tries to open `""` and fails).
 - **ECO diagnostics differ.** The C tool logs every "ECO hash collision"
   (two lines in the ECO file reaching the same position at the same
   ply) and each line it fails to replay as the file is read. pgnx keeps

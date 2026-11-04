@@ -123,8 +123,7 @@ func newRunTo(cmd *cobra.Command, criteria *filter.Options, open func(*run) (des
 		return nil, err
 	}
 	if !quiet {
-		ecoPath, _ := flags.GetString("eco-file")
-		ecoSet.logSkipped(r.logW, ecoPath)
+		ecoSet.logSkipped(r.logW)
 	}
 
 	// One registry shared by every writer, fed every parsed game (matched
