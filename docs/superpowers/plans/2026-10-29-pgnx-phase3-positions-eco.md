@@ -58,7 +58,7 @@ Excluded: dedup targets (Phase 4), test-odds/test-allownullmoves (null moves), t
 
 - [x] **Step 1: Failing tests.** `PlacementKey` equal for two boards differing only in side to move / castling rights / ep square; different after a single move; `Zobrist` still differs in those cases. `replay`: `Positions[i].Placement == FromFEN(Positions[i].FEN).PlacementKey()` for every ply of fools-mate.
 - [x] **Step 2: Implement.**
-- [ ] **Step 3: Test, vet, commit** — `feat(chess,replay): piece-placement key for positional matching`
+- [x] **Step 3: Test, vet, commit** — `feat(chess,replay): piece-placement key for positional matching`
 
 ---
 
@@ -79,7 +79,7 @@ Excluded: dedup targets (Phase 4), test-odds/test-allownullmoves (null moves), t
 
 - [x] **Step 1: Failing tests.** Grammar table: valid 8-rank pattern; 7 ranks → error; empty rank (`//`) → error; `[[` → error; `]` alone → error; `^` outside closure → error; trailing ` w KQkq` ignored; `:kq k` constraint parsed. Matching table on `FromFEN` boards: `*/*/*/*/???pN???/???P????/*/*` matches the position after `1.e4 e5 2.Nf3 d6 3.d4 Ne4`-style knight-on-e4 setups and not without the supporting pawn; digits exact (`8` vs a rank with 7 empties fails); `!`, `A`, `a`, `m`; `[NB]` and `[^P_]`; `*` at both ends and in the middle; a constraint that fails rejects a rank-matching board. Inverse: label `X` → `XI`; the reversed pattern of `*/*/*/*/???Np???/????P???/*/*` matches a Black knight on d5 supported by e6. Trie order: patterns P1, P2 (differ at rank 1), P3 (shares rank 1 with P1, differs at rank 2) — a board matching P2 and P3 yields P3's label (C walk order P1, P3, P2). Duplicate returns `ErrDuplicatePattern` and does not change results.
 - [x] **Step 2: Implement.**
-- [ ] **Step 3: Test, vet, commit** — `feat(filter): FEN pattern matching with labels and material constraints`
+- [x] **Step 3: Test, vet, commit** — `feat(filter): FEN pattern matching with labels and material constraints`
 
 ---
 
@@ -105,7 +105,7 @@ Excluded: dedup targets (Phase 4), test-odds/test-allownullmoves (null moves), t
 
 - [x] **Step 1: Failing tests.** `AddLine("e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 Be3")` gives depth 19 and the game `1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 a6 6.Be3` matches at ply 11 with `{ MATCH }` after `Be3`; a transposition reaching the same position at ply 25 with no limit override does *not* match (depth 19) but does with `MatchPlyLimit: 30`; `AddLine("e4 e5 Qh9")` errors. `AddFEN` of a position with Black to move matches the same placement reached with White to move (and fails under `WhoseMove: BlackToMove`, but still matches via a pattern that happens to fit — whose-move fallthrough). `AddHash("db55d4fcaadc775e")` matches after `5.Nc3` only with limit ≥ 9 (limits 8/9 table). Start-position match (`AddFEN(startpos)`) puts the mark at the front of `PrefixComments`. `StartPly: 8` suppresses a repetition mark that Phase 2 placed at ply 6 and keeps one at ply 10. A match inside a RAV marks the RAV move, matches the game, and yields no label. `AddLabelTag` adds `MatchLabel` only for a non-empty pattern label. The walk stopping at the limit skips `checkResult` (a game with a bad Result and no match is simply unmatched, not `ErrBadResult`).
 - [x] **Step 2: Implement.**
-- [ ] **Step 3: Test, vet, commit** — `feat(filter): positional matching by move line, FEN, hash and pattern`
+- [x] **Step 3: Test, vet, commit** — `feat(filter): positional matching by move line, FEN, hash and pattern`
 
 ---
 
@@ -127,7 +127,7 @@ Excluded: dedup targets (Phase 4), test-odds/test-allownullmoves (null moves), t
 
 - [x] **Step 1: Failing tests.** Parse table (`1. e4 c5 2. Nf3` → 3 moves; `* b6` → whiteAny 1; `e4 c5 !Nf3` → blackDis… check parity: index 2 is White → `whiteDis`; `cxd|cxd4`). `textualMatch("Nc6|Nf3|f3", "f3")` true, `("…", "c6")` false. Straight: Pvars line vs `1.c4 Nf6 2.Nc3 e6 3.d4 Bb4` true, vs `1.d4 Nf6 2.c4 e6 3.Nc3 Bb4` false; permutation: both true. Disallowed: `e4 c5 !Nf3` rejects a game with 2.Nf3 anywhere in the 3-ply window under permutation, and only at index 2 under straight. `*` slack consumed per colour. Game shorter than sequence → false. Anywhere: sequence `Nc3 a6 Be3` matches `… 5.Nc3 a6 6.Be3` only with `anywhere`. Written text: `Ngf3` in the game does not match `Nf3`; `Qxf7#` matches `Qxf7+` only; an unwritten check `Bb5` matches `Bb5` and `Bb5+`.
 - [x] **Step 2: Implement.**
-- [ ] **Step 3: Test, vet, commit** — `feat(filter): move-sequence matching with permutations and anywhere`
+- [x] **Step 3: Test, vet, commit** — `feat(filter): move-sequence matching with permutations and anywhere`
 
 ---
 
@@ -141,9 +141,9 @@ Excluded: dedup targets (Phase 4), test-odds/test-allownullmoves (null moves), t
 - `Criterion` gains `Label string`. `ParseCriterion` accepts `FEN`, `FENPattern`, `FENPatternI` (`taglines.c:183-211`): value quoted as usual; for the two pattern names, the rest of the line after the closing quote (whitespace-trimmed) is the label (empty allowed). `TagMatcher.Add` returns an error for these three names (they are positional, not tag criteria); a helper `func (c Criterion) IsPositional() bool` lets the CLI route them to `PositionCriteria` (`FEN` → `AddFEN`; `FENPattern` → `AddPattern(v, false, label)`; `FENPatternI` → `AddPattern(v, true, label)`).
 - `Evaluate` final order (spec "Evaluation order"); update the doc comment and `doc.go`.
 
-- [ ] **Step 1: Failing tests.** `FEN "…"` parses with `Label == ""`; `FENPatternI "…" Nd4th` parses with label `Nd4th`; `FENPattern "…"   ` (trailing spaces) label empty; `TagMatcher.Add` rejects them. An ordering test: a game that matches a position but fails bounds is unmatched and keeps its position mark; a game failing a sequence is not tested for material (no material mark inserted); ECO criteria still last.
-- [ ] **Step 2: Implement.**
-- [ ] **Step 3: Test, vet, commit** — `feat(filter): positional criteria lines and Phase 3 evaluation order`
+- [x] **Step 1: Failing tests.** `FEN "…"` parses with `Label == ""`; `FENPatternI "…" Nd4th` parses with label `Nd4th`; `FENPattern "…"   ` (trailing spaces) label empty; `TagMatcher.Add` rejects them. An ordering test: a game that matches a position but fails bounds is unmatched and keeps its position mark; a game failing a sequence is not tested for material (no material mark inserted); ECO criteria still last.
+- [x] **Step 2: Implement.**
+- [x] **Step 3: Test, vet, commit** — `feat(filter): positional criteria lines and Phase 3 evaluation order`
 
 ---
 
@@ -161,9 +161,9 @@ Excluded: dedup targets (Phase 4), test-odds/test-allownullmoves (null moves), t
 - `func Apply(g *pgn.Game, e Entry)` — remove every `ECO`, `Opening`, `Variation`, `SubVariation` tag, then append those present in `e`, in that order.
 - `func FilePrefix(ecoTag string, level int) string` — `open_eco_output_file` (`eco.c:314`): empty or non-letter first char → `"noeco"`; else first `level` bytes.
 
-- [ ] **Step 1: Failing tests.** Inline ECO file with: `A00 1.b4`, `A00/Tuebingen 1.b4 Nh6`, a line with Opening but no Variation, a transposition pair (same final position via two orders) and a 2-ply-longer sibling. Classify: `1.b4 Nh6` → Tuebingen (exact beats the 1-ply `A00`); `1.b4 Nf6` → `A00` partial; a game reaching the transposition position by a third order → earliest-loaded; a game 7 plies past the longest line keeps the last match found inside the window; a game with 0 moves → no match. `Apply` removes a stale `Opening` when the entry has none and keeps unrelated tags. `FilePrefix("A13",1)=="A"`, `("A13",2)=="A1"`, `("A13",5)=="A13"`, `("",1)=="noeco"`, `("?",1)=="noeco"`. `Load` on `testdata/golden/eco.pgn` (vendored in Task 9; until then use a temp copy from `~/code/pgn-extract/eco.pgn`) yields 2014 entries minus duplicates, `Skipped == 0`.
-- [ ] **Step 2: Implement.**
-- [ ] **Step 3: Test, vet, commit** — `feat(eco): ECO classification table and tag replacement`
+- [x] **Step 1: Failing tests.** Inline ECO file with: `A00 1.b4`, `A00/Tuebingen 1.b4 Nh6`, a line with Opening but no Variation, a transposition pair (same final position via two orders) and a 2-ply-longer sibling. Classify: `1.b4 Nh6` → Tuebingen (exact beats the 1-ply `A00`); `1.b4 Nf6` → `A00` partial; a game reaching the transposition position by a third order → earliest-loaded; a game 7 plies past the longest line keeps the last match found inside the window; a game with 0 moves → no match. `Apply` removes a stale `Opening` when the entry has none and keeps unrelated tags. `FilePrefix("A13",1)=="A"`, `("A13",2)=="A1"`, `("A13",5)=="A13"`, `("",1)=="noeco"`, `("?",1)=="noeco"`. `Load` on `testdata/golden/eco.pgn` (vendored in Task 9; until then use a temp copy from `~/code/pgn-extract/eco.pgn`) yields 2014 entries minus duplicates, `Skipped == 0`.
+- [x] **Step 2: Implement.**
+- [x] **Step 3: Test, vet, commit** — `feat(eco): ECO classification table and tag replacement`
 
 ---
 
@@ -176,8 +176,8 @@ Excluded: dedup targets (Phase 4), test-odds/test-allownullmoves (null moves), t
 **Interfaces:**
 - `Options.RosterExtras []string` — when `SevenTagRoster` is set, tags named here are emitted (if present on the game) after the seven, in the listed order (`output.c:1531-1539`: ECO, Opening, Variation, SubVariation, then the FEN/SetUp pair the Writer already handles). Ignored when `SevenTagRoster` is false.
 
-- [ ] **Step 1: Failing test.** A game with ECO/Opening/Variation and an `Annotator` tag under `SevenTagRoster` + `RosterExtras{ECO,Opening,Variation,SubVariation}` emits the seven, then the three present ECO tags, not `Annotator`; without `RosterExtras` only the seven.
-- [ ] **Step 2: Implement; commit** — `feat(output): roster extras for ECO tags under --seven-tag-roster`
+- [x] **Step 1: Failing test.** A game with ECO/Opening/Variation and an `Annotator` tag under `SevenTagRoster` + `RosterExtras{ECO,Opening,Variation,SubVariation}` emits the seven, then the three present ECO tags, not `Annotator`; without `RosterExtras` only the seven.
+- [x] **Step 2: Implement; commit** — `feat(output): roster extras for ECO tags under --seven-tag-roster`
 
 ---
 
@@ -195,9 +195,9 @@ Excluded: dedup targets (Phase 4), test-odds/test-allownullmoves (null moves), t
 - Per-game: after replay (and for broken games under `--keep-broken` with a partial result), `eco.Apply(g, entry)` when classification is on and `Classify` matched; then `filter.Evaluate` (filter) or straight to output (convert). With `--eco-split`, the destination writer is chosen per game by `eco.FilePrefix(ecoTag, N)+".pgn"`, opened in append mode on first use and kept open for the run (one `output.Writer` per file, all sharing the run's `TagRegistry` and options; close all at exit). `--seven-tag-roster` with `--eco-file` sets `RosterExtras`.
 - `MIGRATION.md`-visible naming is final here; keep flag help strings citing the C flag.
 
-- [ ] **Step 1: Failing CLI tests** (`runCLI`): `--position "e4 c5"` selects a Sicilian and routes the other to `--unmatched`; `--fen-pattern` with `--mark-matches X` places `{ X }`; `--hash` with a bad value ⇒ exit 1; `--match-ply-limit 5` with a 6-ply `--position` ⇒ exit 1; `--white-to-move --black-to-move` ⇒ exit 1; `--sequence "c4 Nf6 Nc3"` vs `--exact-order`; `--tag-file` containing a `FENPattern` line with a label and `--add-label-tag` adds `MatchLabel`; `convert --eco-file` on a Reti game adds `[ECO "A04"]` (file: temp copy of eco.pgn until Task 9); `--eco-split 1` in a temp cwd creates `A.pgn` and `noeco.pgn` and refuses `--output`; `filter --eco-file … --eco B14` emits only B14 games (the test-Te stand-in).
-- [ ] **Step 2: Implement.** Keep `convert` byte-identical when no ECO flag is given (existing conformance rows guard it).
-- [ ] **Step 3: Test, vet, commit** — `feat: positional, sequence and ECO flags for pgnx filter and convert`
+- [x] **Step 1: Failing CLI tests** (`runCLI`): `--position "e4 c5"` selects a Sicilian and routes the other to `--unmatched`; `--fen-pattern` with `--mark-matches X` places `{ X }`; `--hash` with a bad value ⇒ exit 1; `--match-ply-limit 5` with a 6-ply `--position` ⇒ exit 1; `--white-to-move --black-to-move` ⇒ exit 1; `--sequence "c4 Nf6 Nc3"` vs `--exact-order`; `--tag-file` containing a `FENPattern` line with a label and `--add-label-tag` adds `MatchLabel`; `convert --eco-file` on a Reti game adds `[ECO "A04"]` (file: temp copy of eco.pgn until Task 9); `--eco-split 1` in a temp cwd creates `A.pgn` and `noeco.pgn` and refuses `--output`; `filter --eco-file … --eco B14` emits only B14 games (the test-Te stand-in).
+- [x] **Step 2: Implement.** Keep `convert` byte-identical when no ECO flag is given (existing conformance rows guard it).
+- [x] **Step 3: Test, vet, commit** — `feat: positional, sequence and ECO flags for pgnx filter and convert`
 
 ---
 
@@ -207,11 +207,11 @@ Excluded: dedup targets (Phase 4), test-odds/test-allownullmoves (null moves), t
 - Add: `cmd/pgnx/testdata/golden/eco.pgn` (copied verbatim from `~/code/pgn-extract/eco.pgn`; note its origin and licence in the existing testdata README/comment)
 - Modify: `cmd/pgnx/conformance_test.go`
 
-- [ ] **Step 1:** Add a row per line of the map above with the C command as a comment. Rows needing `--eco-file` pass `filepath.Join("testdata","golden","eco.pgn")`.
-- [ ] **Step 2:** `TestGoldenConformanceUnmatched` gains the test-x two-output case (or a sibling table). Add `TestGoldenConformanceAppendRuns` for test-matchplylimit and test-startply (four `--append` runs into one file, compared once), modelled on `TestGoldenConformanceAppend`. Add `TestGoldenConformanceECOSplit` running `convert --eco-file … --eco-split 1` in a temp cwd and comparing `A.pgn`, `B.pgn`, `E.pgn` (assert no other `*.pgn` was created).
-- [ ] **Step 3:** Update the "Phase 3+" exclusion comment: remove what is now covered, leave Phase 4/null-move/transform/argsfile targets with reasons; note test-Te's missing oracle.
-- [ ] **Step 4:** Run and triage every failure against the C source first. Likely trouble spots, in order: mark-comment placement when a variation precedes the mainline move (comment goes on the RAV move, not the mainline), prefix-comment ordering for a start-position match, `{ match }` wrapping, ECO tag order under the default roster (`wellKnownTagOrder` already has ECO/Opening/Variation/SubVariation after `Result`; verify against test-e-out), the `--append` runs sharing one `TagRegistry` per process in the test (each C run is a separate process — run each pgnx invocation as a separate `runCLI` call), `noeco.pgn` creation when no game lacks an ECO (C creates files only on write).
-- [ ] **Step 5: Commit** — `test: golden conformance rows for positional, sequence and ECO matching`
+- [x] **Step 1:** Add a row per line of the map above with the C command as a comment. Rows needing `--eco-file` pass `filepath.Join("testdata","golden","eco.pgn")`.
+- [x] **Step 2:** `TestGoldenConformanceUnmatched` gains the test-x two-output case (or a sibling table). Add `TestGoldenConformanceAppendRuns` for test-matchplylimit and test-startply (four `--append` runs into one file, compared once), modelled on `TestGoldenConformanceAppend`. Add `TestGoldenConformanceECOSplit` running `convert --eco-file … --eco-split 1` in a temp cwd and comparing `A.pgn`, `B.pgn`, `E.pgn` (assert no other `*.pgn` was created).
+- [x] **Step 3:** Update the "Phase 3+" exclusion comment: remove what is now covered, leave Phase 4/null-move/transform/argsfile targets with reasons; note test-Te's missing oracle.
+- [x] **Step 4:** Run and triage every failure against the C source first. Likely trouble spots, in order: mark-comment placement when a variation precedes the mainline move (comment goes on the RAV move, not the mainline), prefix-comment ordering for a start-position match, `{ match }` wrapping, ECO tag order under the default roster (`wellKnownTagOrder` already has ECO/Opening/Variation/SubVariation after `Result`; verify against test-e-out), the `--append` runs sharing one `TagRegistry` per process in the test (each C run is a separate process — run each pgnx invocation as a separate `runCLI` call), `noeco.pgn` creation when no game lacks an ECO (C creates files only on write).
+- [x] **Step 5: Commit** — `test: golden conformance rows for positional, sequence and ECO matching`
 
 ---
 
