@@ -139,38 +139,77 @@ func fenCharFromPiece(p Piece) rune {
 	return ch
 }
 
-// parseCastling parses the FEN castling-availability field. It accepts the
-// standard "KQkq" notation (which implies rook start files 7 and 0) and
-// Shredder-FEN style file letters (A-H/a-h), which record the actual rook
-// starting file for Chess960 positions. "-" means no castling rights.
-// The board's piece placement must already be parsed so the king squares
-// are available for classifying Shredder letters.
+// parseCastling parses the FEN castling-availability field: "-" for no
+// rights, or letters naming each right. K/Q/k/q (standard FEN, and X-FEN
+// for Chess960) grant the right for the outermost rook on that wing of
+// the king's back rank, as pgn-extract's find_rook_starting_position
+// does; A-H/a-h (Shredder-FEN) name the castling rook's file, a file
+// greater than the king's being a kingside right and a smaller one
+// queenside. The two styles may be mixed, as the C tool mixes them when
+// it writes a field (see castlingFEN). A letter equal to the king's file,
+// a right given twice, or a right for a side whose king is not on the
+// board is an error. The board's piece placement must already be parsed
+// so the kings and rooks can be found.
 func parseCastling(field string, b *Board) (CastlingRights, error) {
 	if field == "-" {
 		return CastlingRights{}, nil
 	}
-	// KQkq is the standard notation; ABCDEFGHabcdefgh (Shredder-FEN) records
-	// actual rook files for Chess960. A field cannot mix the two styles.
-	if strings.ContainsAny(field, "ABCDEFGHabcdefgh") {
-		return parseShredderCastling(field, b)
-	}
-
 	var c CastlingRights
 	for _, ch := range field {
-		switch ch {
-		case 'K':
-			c.WhiteKRookFile, c.WhiteKingside = outermostRook(b, White, true)
-		case 'Q':
-			c.WhiteQRookFile, c.WhiteQueenside = outermostRook(b, White, false)
-		case 'k':
-			c.BlackKRookFile, c.BlackKingside = outermostRook(b, Black, true)
-		case 'q':
-			c.BlackQRookFile, c.BlackQueenside = outermostRook(b, Black, false)
+		var err error
+		switch {
+		case ch == 'K' || ch == 'Q' || (ch >= 'A' && ch <= 'H'):
+			err = grantCastling(b, White, ch, &c.WhiteKingside, &c.WhiteQueenside, &c.WhiteKRookFile, &c.WhiteQRookFile)
+		case ch == 'k' || ch == 'q' || (ch >= 'a' && ch <= 'h'):
+			err = grantCastling(b, Black, ch-'a'+'A', &c.BlackKingside, &c.BlackQueenside, &c.BlackKRookFile, &c.BlackQRookFile)
 		default:
-			return CastlingRights{}, fmt.Errorf("fen: bad castling char %q", ch)
+			err = fmt.Errorf("fen: bad castling char %q", ch)
+		}
+		if err != nil {
+			return CastlingRights{}, err
 		}
 	}
 	return c, nil
+}
+
+// grantCastling records the right one uppercase castling letter (K, Q or
+// a file letter A-H) gives color, in that color's fields of a
+// CastlingRights.
+func grantCastling(b *Board, color Color, letter rune, kingside, queenside *bool, kFile, qFile *int) error {
+	kingSq := b.KingSquare(color)
+	if b.PieceAt(kingSq) != (Piece{Type: King, Color: color}) {
+		return fmt.Errorf("fen: castling rights for side with no king")
+	}
+	var file int
+	var isKingside bool
+	switch letter {
+	case 'K', 'Q':
+		isKingside = letter == 'K'
+		var ok bool
+		if file, ok = outermostRook(b, color, isKingside); !ok {
+			// No rook on that wing: the right is dropped, as the C tool
+			// drops it.
+			return nil
+		}
+	default:
+		file = int(letter - 'A')
+		if file == kingSq.File {
+			return fmt.Errorf("fen: castling rook file %c equals king file", 'a'+file)
+		}
+		isKingside = file > kingSq.File
+	}
+	if isKingside {
+		if *kingside {
+			return fmt.Errorf("fen: duplicate kingside castling right")
+		}
+		*kingside, *kFile = true, file
+		return nil
+	}
+	if *queenside {
+		return fmt.Errorf("fen: duplicate queenside castling right")
+	}
+	*queenside, *qFile = true, file
+	return nil
 }
 
 // outermostRook finds the rook of the given colour nearest the h-file
@@ -197,56 +236,6 @@ func outermostRook(b *Board, color Color, kingside bool) (file int, ok bool) {
 		}
 	}
 	return 0, false
-}
-
-// parseShredderCastling parses Shredder-FEN style castling rights, where
-// each letter names the file of a castling-rook. Uppercase letters are
-// White's rooks, lowercase are Black's. A rook file greater than the
-// king's file is a kingside right; a smaller file is queenside. A letter
-// equal to the king's file is invalid, as is naming a right for a side
-// whose king is not on the board.
-func parseShredderCastling(field string, b *Board) (CastlingRights, error) {
-	var c CastlingRights
-	set := func(color Color, file int, kingside, queenside *bool, kFile, qFile *int) error {
-		kingSq := b.KingSquare(color)
-		if b.PieceAt(kingSq) != (Piece{Type: King, Color: color}) {
-			return fmt.Errorf("fen: castling rights for side with no king")
-		}
-		switch {
-		case file > kingSq.File:
-			if *kingside {
-				return fmt.Errorf("fen: duplicate kingside castling file")
-			}
-			*kingside = true
-			*kFile = file
-		case file < kingSq.File:
-			if *queenside {
-				return fmt.Errorf("fen: duplicate queenside castling file")
-			}
-			*queenside = true
-			*qFile = file
-		default:
-			return fmt.Errorf("fen: castling rook file %c equals king file", 'a'+file)
-		}
-		return nil
-	}
-	for _, ch := range field {
-		var err error
-		switch {
-		case ch >= 'A' && ch <= 'H':
-			err = set(White, int(ch-'A'),
-				&c.WhiteKingside, &c.WhiteQueenside, &c.WhiteKRookFile, &c.WhiteQRookFile)
-		case ch >= 'a' && ch <= 'h':
-			err = set(Black, int(ch-'a'),
-				&c.BlackKingside, &c.BlackQueenside, &c.BlackKRookFile, &c.BlackQRookFile)
-		default:
-			err = fmt.Errorf("fen: bad castling char %q", ch)
-		}
-		if err != nil {
-			return CastlingRights{}, err
-		}
-	}
-	return c, nil
 }
 
 // FEN returns the FEN string for the board.
@@ -300,47 +289,40 @@ func (b *Board) FEN() string {
 	return sb.String()
 }
 
-// castlingFEN renders castling rights. When the rook files match the
-// standard chess start (7 for kingside, 0 for queenside) it emits the usual
-// KQkq notation; otherwise (Chess960) it emits Shredder-FEN file letters.
+// castlingFEN spells the castling field as pgn-extract's
+// build_basic_EPD_string (apply.c) does. A side with both rights is
+// written K and Q (k and q) whatever files its rooks start on: X-FEN,
+// where the letter names the outermost rook on that wing, which is what
+// parseCastling resolves it back to. (The C tool writes both file
+// letters instead when its kingside file is not the greater, which its
+// own Shredder-letter parsing can produce; a CastlingRights always has
+// the kingside file greater, so pgnx has no such case.) A side with one right is written
+// K or Q only when that rook starts on its standard file (h or a);
+// otherwise the right is the rook's file letter, as in Shredder-FEN, so
+// a field may mix the two styles ("Kd"), which parseCastling accepts.
+// (A right for the inner of two rooks on one wing is therefore not
+// round-tripped, as in the C tool.)
 func castlingFEN(c CastlingRights) string {
-	if !c.WhiteKingside && !c.WhiteQueenside && !c.BlackKingside && !c.BlackQueenside {
-		return "-"
-	}
-
-	standard := (!c.WhiteKingside || c.WhiteKRookFile == 7) &&
-		(!c.WhiteQueenside || c.WhiteQRookFile == 0) &&
-		(!c.BlackKingside || c.BlackKRookFile == 7) &&
-		(!c.BlackQueenside || c.BlackQRookFile == 0)
-
 	var sb strings.Builder
-	if standard {
-		if c.WhiteKingside {
-			sb.WriteByte('K')
+	side := func(kingside, queenside bool, kFile, qFile int, k, q byte, a byte) {
+		switch {
+		case kingside && queenside:
+			sb.WriteByte(k)
+			sb.WriteByte(q)
+		case kingside && kFile == 7:
+			sb.WriteByte(k)
+		case kingside:
+			sb.WriteByte(a + byte(kFile))
+		case queenside && qFile == 0:
+			sb.WriteByte(q)
+		case queenside:
+			sb.WriteByte(a + byte(qFile))
 		}
-		if c.WhiteQueenside {
-			sb.WriteByte('Q')
-		}
-		if c.BlackKingside {
-			sb.WriteByte('k')
-		}
-		if c.BlackQueenside {
-			sb.WriteByte('q')
-		}
-		return sb.String()
 	}
-
-	if c.WhiteKingside {
-		sb.WriteByte(byte('A' + c.WhiteKRookFile))
-	}
-	if c.WhiteQueenside {
-		sb.WriteByte(byte('A' + c.WhiteQRookFile))
-	}
-	if c.BlackKingside {
-		sb.WriteByte(byte('a' + c.BlackKRookFile))
-	}
-	if c.BlackQueenside {
-		sb.WriteByte(byte('a' + c.BlackQRookFile))
+	side(c.WhiteKingside, c.WhiteQueenside, c.WhiteKRookFile, c.WhiteQRookFile, 'K', 'Q', 'A')
+	side(c.BlackKingside, c.BlackQueenside, c.BlackKRookFile, c.BlackQRookFile, 'k', 'q', 'a')
+	if sb.Len() == 0 {
+		return "-"
 	}
 	return sb.String()
 }

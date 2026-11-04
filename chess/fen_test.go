@@ -1,6 +1,9 @@
 package chess
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 const startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
@@ -121,6 +124,61 @@ func TestFromFENRejectsBad(t *testing.T) {
 	for _, fen := range []string{"", "x", "8/8/8/8/8/8/8/8", "9/8/8/8/8/8/8/8 w - - 0 1"} {
 		if _, err := FromFEN(fen); err == nil {
 			t.Errorf("FromFEN(%q): want error", fen)
+		}
+	}
+}
+
+// TestCastlingFENSpelling pins the castling field of FEN() to pgn-extract's
+// build_basic_EPD_string (apply.c), checked with pgn-extract --fencomments:
+// a side with both rights is written K/Q (k/q) whatever files its rooks
+// start on (X-FEN: the right names the outermost rook), and a side with
+// one right is written K/Q only when that rook starts on its standard
+// file, otherwise as the rook's file letter (Shredder-FEN).
+func TestCastlingFENSpelling(t *testing.T) {
+	cases := []struct{ in, want string }{
+		// Chess960 start, KQkq in: rooks on d and g, both rights each side.
+		{"nqbrkbrn/pppppppp/8/8/8/8/PPPPPPPP/NQBRKBRN w KQkq - 0 1", "KQkq"},
+		// The same rights given as file letters, in either order.
+		{"nqbrkbrn/pppppppp/8/8/8/8/PPPPPPPP/NQBRKBRN w DGdg - 0 1", "KQkq"},
+		{"nqbrkbrn/pppppppp/8/8/8/8/PPPPPPPP/NQBRKBRN w GDgd - 0 1", "KQkq"},
+		// One right each: White's h-rook is standard, Black's d-rook is not.
+		{"nqbrknbr/pppppppp/8/8/8/8/PPPPPPPP/NQBRKNBR w Kq - 0 1", "Kd"},
+		// One non-standard right each.
+		{"nqbrkbrn/pppppppp/8/8/8/8/PPPPPPPP/NQBRKBRN w Kq - 0 1", "Gd"},
+		// Standard start with standard rights, however spelled.
+		{"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "KQkq"},
+		{"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w HAha - 0 1", "KQkq"},
+		{"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w Kq - 0 1", "Kq"},
+		// Both White rights with one non-standard file still collapse.
+		{"nqbrknbr/pppppppp/8/8/8/8/PPPPPPPP/NQBRKNBR w KQ - 0 1", "KQ"},
+		{"nqbrknbr/pppppppp/8/8/8/8/PPPPPPPP/NQBRKNBR w - - 0 1", "-"},
+	}
+	for _, c := range cases {
+		b, err := FromFEN(c.in)
+		if err != nil {
+			t.Fatalf("FromFEN(%q): %v", c.in, err)
+		}
+		if got := strings.Fields(b.FEN())[2]; got != c.want {
+			t.Errorf("FEN(%q) castling = %q, want %q", c.in, got, c.want)
+		}
+		// What FEN writes, FromFEN reads back to the same rights, mixed
+		// styles ("Kd") included.
+		back, err := FromFEN(b.FEN())
+		if err != nil {
+			t.Errorf("FromFEN(FEN(%q)) = %v", c.in, err)
+		} else if back.Castling != b.Castling {
+			t.Errorf("FEN(%q) round trip: %+v, want %+v", c.in, back.Castling, b.Castling)
+		}
+	}
+}
+
+// TestParseCastlingRejectsBad: a right given twice (in either style), a
+// file letter on the king's file, and a stray character are errors.
+func TestParseCastlingRejectsBad(t *testing.T) {
+	for _, field := range []string{"KK", "KH", "DD", "E", "X", "Kx"} {
+		fen := "nqbrkbrn/pppppppp/8/8/8/8/PPPPPPPP/NQBRKBRN w " + field + " - 0 1"
+		if _, err := FromFEN(fen); err == nil {
+			t.Errorf("FromFEN castling %q: want error", field)
 		}
 	}
 }

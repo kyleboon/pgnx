@@ -223,16 +223,41 @@ differences:
   the criteria (including games held back by `--select-only`/
   `--skip-matching`, as `num_games_matched` does in C) and M is the number
   of games read. It is suppressed by `--quiet` and by `--suppress-matched`.
-- **`--mark-matches FEN` uses pgnx's FEN rendering.** The C tool inserts
-  `get_FEN_string(board)`; pgnx inserts `chess.Board.FEN()`. Both are
-  standard six-field FEN; castling-right spelling for Chess960 positions
-  may differ. (Parsing is not affected: `KQkq` in an input FEN resolves to the
-  outermost rook on the back rank, as `find_rook_starting_position` does.)
-- **Chess960 `Variant` tag is not added.** `consistent_FEN_tags` in the C
-  tool also adds `[Variant "chess 960"]` to a FEN game whose start position
-  looks like a Chess960 setup but has no `Variant` tag. `pipeline.Normalise`
-  adds only the `SetUp "1"` tag. Flagged as a gap (no golden case); revisit with the
-  Chess960 work.
+- **Verified: FEN castling spelling matches for Chess960 positions.**
+  Every FEN pgnx writes (`--mark-matches FEN`, `--fen-comments`, `-F`,
+  `-f epd`, `-f fen`, `--json`, the FEN tag `--drop-ply` adds) comes
+  from `chess.Board.FEN`,
+  whose castling field now follows `build_basic_EPD_string` (apply.c):
+  a side with both rights is `KQ`/`kq` whatever files its rooks start on
+  (X-FEN), and a lone right is `K`/`Q` on the standard file or the rook's
+  file letter otherwise (`Gd` for White's g-rook and Black's d-rook).
+  Checked against the oracle on 2026-11-04 with `--fencomments`,
+  `--markmatches FEN`, `-F` and `-Wepd` on Chess960 starts given as
+  `KQkq`, `DGdg`, `GDgd`, `Kq` and `HAha` (`TestCastlingFENSpelling`),
+  and over the Chess960 games of `twic1036` and `twic1215` with
+  `--fencomments` (identical). `chess.FromFEN` reads a mixed field such
+  as `Kd` back, as the C tool does, so the FEN tag `--drop-ply` writes
+  for a Chess960 game replays.
+  One divergence, where the C tool misreads its input: it assigns the
+  first file letter of a Shredder-FEN castling field to the kingside
+  right and the second to the queenside, so `DGdg` round-trips as
+  `DGdg` where `GDgd` becomes `KQkq`; pgnx reads a letter by its file
+  relative to the king and writes `KQkq` for both. In both tools the
+  `KQ` of a side with both rights names the outermost rooks, so a right
+  for the inner of two rooks on one wing is lost when the other wing's
+  right is also held (a lone such right keeps its file letter).
+- **Verified: the Chess960 `Variant` tag is added.** `pipeline.Normalise`
+  ports `consistent_FEN_tags`/`chess960_setup` (grammar.c): a FEN game
+  with no `Variant` tag whose start is a Chess960 setup (move 1, kings
+  opposite on their home ranks, all four castling rights, full pawn and
+  back ranks with the same piece type on each file for both sides, and
+  not the standard back rank) gets `[Variant "chess 960"]`, emitted in
+  the oracle's tag order (after `ECO`, before `SetUp`/`FEN`, and after
+  the roster under `-7`). Checked against the oracle on 2026-11-04
+  (`TestNormaliseAddsChess960Variant`, `TestConvertAddsChess960Variant`).
+  The C tool logs "Missing Variant Tag for non-standard setup"; pgnx
+  adds the tag silently, as both tools add `SetUp`. Its
+  `--addfencastling` branch is not ported.
 
 ## Positional matching and ECO (Phase 3)
 

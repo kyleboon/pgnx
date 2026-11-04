@@ -125,3 +125,44 @@ func TestNormaliseRejectsInconsistentFENTags(t *testing.T) {
 		t.Error("no SetUp added to a rejected game")
 	}
 }
+
+// Oracle: grammar.c consistent_FEN_tags / chess960_setup, checked with
+// pgn-extract on each case. A FEN game with no Variant tag gets
+// [Variant "chess 960"] when its start looks like a Chess960 setup: move
+// number 1, both kings on their home rank on the same file, all four
+// castling rights, full pawn ranks, a full back rank with the same piece
+// type on each file for both sides, and at least one piece off its
+// standard square. Side to move is not consulted.
+func TestNormaliseAddsChess960Variant(t *testing.T) {
+	const nqbrkbrn = "nqbrkbrn/pppppppp/8/8/8/8/PPPPPPPP/NQBRKBRN"
+	cases := []struct {
+		name string
+		tags []string
+		want string // Variant value; "" when no tag is wanted
+	}{
+		{"960 start", []string{"FEN", nqbrkbrn + " w KQkq - 0 1"}, "chess 960"},
+		{"960 start, black to move", []string{"FEN", nqbrkbrn + " b KQkq - 0 1"}, "chess 960"},
+		{"existing Variant kept", []string{"Variant", "Chess960", "FEN", nqbrkbrn + " w KQkq - 0 1"}, "Chess960"},
+		{"standard start", []string{"FEN", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"}, ""},
+		{"move number 2", []string{"FEN", nqbrkbrn + " w KQkq - 0 2"}, ""},
+		{"a castling right missing", []string{"FEN", nqbrkbrn + " w KQk - 0 1"}, ""},
+		{"no castling rights", []string{"FEN", nqbrkbrn + " w - - 0 1"}, ""},
+		{"pawn missing", []string{"FEN", "nqbrkbrn/ppppppp1/8/8/8/8/PPPPPPPP/NQBRKBRN w KQkq - 0 1"}, ""},
+		{"back ranks differ", []string{"FEN", "nqbrkbrn/pppppppp/8/8/8/8/PPPPPPPP/NQBRKBNR w KQkq - 0 1"}, ""},
+		{"kings on different files", []string{"FEN", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBKQBNR w KQkq - 0 1"}, ""},
+		// Colours swapped on one file: standard squares but not the
+		// standard pieces, so off standard for the C tool too.
+		{"black knight on White's back rank", []string{"FEN", "rNbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RnBQKBNR w KQkq - 0 1"}, "chess 960"},
+		{"no FEN", nil, ""},
+	}
+	for _, c := range cases {
+		g := game("*", c.tags...)
+		if err := Normalise(g); err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		got, has := g.Tag("Variant")
+		if got != c.want || has != (c.want != "") {
+			t.Errorf("%s: Variant = %q,%v want %q", c.name, got, has, c.want)
+		}
+	}
+}

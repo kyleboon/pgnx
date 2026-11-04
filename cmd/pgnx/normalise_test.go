@@ -88,3 +88,53 @@ func TestFilterResultCriterionSeesNormalisedTag(t *testing.T) {
 		t.Errorf("out = %q", out)
 	}
 }
+
+// TestConvertAddsChess960Variant is pinned against pgn-extract --quiet on
+// the same input: a FEN game whose start is a Chess960 setup gets
+// [Variant "chess 960"], emitted in the oracle's tag order (after ECO,
+// before SetUp and FEN); the castling field it carries is unchanged.
+// With -7 the Variant, SetUp and FEN tags follow the roster.
+func TestConvertAddsChess960Variant(t *testing.T) {
+	in := "[Event \"960\"]\n[ECO \"A00\"]\n[Result \"*\"]\n[Custom \"x\"]\n[FEN \"nqbrkbrn/pppppppp/8/8/8/8/PPPPPPPP/NQBRKBRN b KQkq - 0 1\"]\n\n1... e5 *\n"
+	out, errOut, code := runCLI(t, in, "convert", "--quiet")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	want := `[Event "960"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "?"]
+[Black "?"]
+[Result "*"]
+[ECO "A00"]
+[Variant "chess 960"]
+[SetUp "1"]
+[FEN "nqbrkbrn/pppppppp/8/8/8/8/PPPPPPPP/NQBRKBRN b KQkq - 0 1"]
+[Custom "x"]
+
+1... e5 *
+
+`
+	if out != want {
+		t.Errorf("got:\n%s\nwant:\n%s", out, want)
+	}
+	out, _, _ = runCLI(t, in, "convert", "--quiet", "--seven-tag-roster")
+	want = `[Event "960"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "?"]
+[Black "?"]
+[Result "*"]
+[Variant "chess 960"]
+[SetUp "1"]
+[FEN "nqbrkbrn/pppppppp/8/8/8/8/PPPPPPPP/NQBRKBRN b KQkq - 0 1"]
+
+1... e5 *
+
+`
+	if out != want {
+		t.Errorf("-7 got:\n%s\nwant:\n%s", out, want)
+	}
+}

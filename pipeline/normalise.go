@@ -45,8 +45,17 @@ func normaliseResult(g *pgn.Game) {
 
 var errSetUpWithoutFEN = errors.New(`SetUp "1" tag without a FEN tag`)
 
-// consistentFENTags is grammar.c consistent_FEN_tags, minus the Chess960
-// Variant tag it also adds (beads pgnx-chess960-variant).
+// chess960Variant is the Variant tag value the C tool gives a Chess960
+// setup it finds untagged.
+const chess960Variant = "chess 960"
+
+// consistentFENTags is grammar.c consistent_FEN_tags: SetUp "1" without
+// a FEN tag, or a FEN that does not parse, rejects the game; a FEN
+// without SetUp gets SetUp "1"; and a FEN game with no Variant tag
+// whose start is a Chess960 setup (chess960Setup) gets
+// [Variant "chess 960"]. The C tool logs the added Variant; pgnx adds it
+// silently, as it adds SetUp. (The C tool's --addfencastling branch is
+// not ported.)
 func consistentFENTags(g *pgn.Game) error {
 	setup, hasSetup := g.Tag("SetUp")
 	fen, hasFEN := g.Tag("FEN")
@@ -54,12 +63,56 @@ func consistentFENTags(g *pgn.Game) error {
 		return errSetUpWithoutFEN
 	}
 	if hasFEN {
-		if _, err := chess.FromFEN(fen); err != nil {
+		b, err := chess.FromFEN(fen)
+		if err != nil {
 			return fmt.Errorf("invalid FEN tag %q: %w", fen, err)
 		}
 		if !hasSetup {
 			g.SetTag("SetUp", "1")
 		}
+		if _, hasVariant := g.Tag("Variant"); !hasVariant && chess960Setup(b) {
+			g.SetTag("Variant", chess960Variant)
+		}
 	}
 	return nil
+}
+
+// standardBackRank is White's back rank in the standard start.
+var standardBackRank = [8]chess.PieceType{chess.Rook, chess.Knight, chess.Bishop, chess.Queen, chess.King, chess.Bishop, chess.Knight, chess.Rook}
+
+// chess960Setup is grammar.c chess960_setup: whether b looks like the
+// initial position of a Chess960 game. That takes move number 1, both
+// kings on their home rank on the same file, all four castling rights,
+// a full rank of pawns for each side, a full back rank with the same
+// piece type on each file for both sides, and White's back rank not the
+// standard RNBQKBNR (compared as coloured pieces, as the C tool does, so
+// a black piece on White's back rank counts as off standard). Side to
+// move is not consulted.
+func chess960Setup(b *chess.Board) bool {
+	if b.FullmoveNumber != 1 {
+		return false
+	}
+	wk, bk := b.KingSquare(chess.White), b.KingSquare(chess.Black)
+	if wk.Rank != 0 || bk.Rank != 7 || wk.File != bk.File {
+		return false
+	}
+	c := b.Castling
+	if !c.WhiteKingside || !c.WhiteQueenside || !c.BlackKingside || !c.BlackQueenside {
+		return false
+	}
+	offStandard := false
+	for f := 0; f < 8; f++ {
+		if b.PieceAt(chess.Square{File: f, Rank: 1}) != (chess.Piece{Type: chess.Pawn, Color: chess.White}) ||
+			b.PieceAt(chess.Square{File: f, Rank: 6}) != (chess.Piece{Type: chess.Pawn, Color: chess.Black}) {
+			return false
+		}
+		white := b.PieceAt(chess.Square{File: f, Rank: 0})
+		if white.Type == chess.NoPiece || white.Type != b.PieceAt(chess.Square{File: f, Rank: 7}).Type {
+			return false
+		}
+		if white != (chess.Piece{Type: standardBackRank[f], Color: chess.White}) {
+			offStandard = true
+		}
+	}
+	return offStandard
 }
