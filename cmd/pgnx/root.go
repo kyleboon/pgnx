@@ -82,6 +82,7 @@ A -- ends expansion, so file names after it may start with @.`,
 
 	root.AddCommand(newConvertCmd())
 	root.AddCommand(newFilterCmd())
+	root.AddCommand(newDedupeCmd())
 	root.AddCommand(newSplitCmd())
 	root.AddCommand(newValidateCmd())
 	root.AddCommand(newInfoCmd())

@@ -24,23 +24,37 @@ const (
 	// toUnmatched: the run's unmatched destination (filter --unmatched);
 	// nowhere when the run has none.
 	toUnmatched
+	// toDuplicates: the run's duplicates destination (dedupe
+	// --duplicates); nowhere when the run has none.
+	toDuplicates
 )
+
+// decision is a route's verdict on one game: where it is written, and
+// whether the run stops after it. stop is the Selector's decision; it is
+// returned alongside the pipeline's Outcome, never folded into it.
+// comments are written before the game on the target's writer, one
+// comment line each (dedupe's "From:" and "First found in:" lines,
+// grammar.c deal_with_game); they are destination output, not part of
+// the game.
+type decision struct {
+	target   routeTarget
+	stop     bool
+	comments []string
+}
 
 // route is a command's routing decision for one processed game that is
 // not Rejected (a Rejected game goes nowhere, whatever the run was told,
-// so routes never see one): where it is written, and whether the run
-// stops after it. stop is the Selector's decision; it is returned
-// alongside the pipeline's Outcome, never folded into it. it is the
-// game's item from the games iterator: its 1-based number across all
-// inputs and the source it came from.
-type route func(it Item, o pipeline.Outcome) (target routeTarget, stop bool)
+// so routes never see one). it is the game's item from the games
+// iterator: its 1-based number across all inputs and the source it came
+// from.
+type route func(it Item, o pipeline.Outcome) decision
 
 // routeAll is convert's route: every game to the output, never stopping.
-func routeAll(Item, pipeline.Outcome) (routeTarget, bool) { return toOutput, false }
+func routeAll(Item, pipeline.Outcome) decision { return decision{target: toOutput} }
 
 // routeNowhere is validate's route: nothing is written; the game is only
 // reported.
-func routeNowhere(Item, pipeline.Outcome) (routeTarget, bool) { return nowhere, false }
+func routeNowhere(Item, pipeline.Outcome) decision { return decision{target: nowhere} }
 
 // routeBySelector is the route filter and dedupe share: the Selector
 // decides each game on its matched bit (grammar.c deal_with_game's
@@ -50,15 +64,15 @@ func routeNowhere(Item, pipeline.Outcome) (routeTarget, bool) { return nowhere, 
 // whether the game counts as matched: filter passes the outcome's
 // Matched; dedupe folds the duplicate disposition in first.
 func routeBySelector(sel *filter.Selector, suppressMatched bool, matched func(it Item, o pipeline.Outcome) bool) route {
-	return func(it Item, o pipeline.Outcome) (routeTarget, bool) {
+	return func(it Item, o pipeline.Outcome) decision {
 		d := sel.Decide(it.Number, matched(it, o))
 		switch {
 		case d.Emit && !suppressMatched:
-			return toOutput, d.Stop
+			return decision{target: toOutput, stop: d.Stop}
 		case d.ToUnmatched:
-			return toUnmatched, d.Stop
+			return decision{target: toUnmatched, stop: d.Stop}
 		}
-		return nowhere, d.Stop
+		return decision{target: nowhere, stop: d.Stop}
 	}
 }
 
@@ -81,8 +95,9 @@ type run struct {
 	// route decides where each processed game goes.
 	route route
 	// output is the main destination; unmatched is the --unmatched
-	// destination, nil when the command has none.
-	output, unmatched destination
+	// destination and duplicates the --duplicates destination, each nil
+	// when the command has none.
+	output, unmatched, duplicates destination
 	// stdout is the one destination every "-" flag resolves to, so that
 	// games to --output and --unmatched, both "-", stay in input order
 	// and, under --json, form one array; created on first use.
@@ -203,6 +218,21 @@ func (r *run) openUnmatched(flagName string) error {
 	return nil
 }
 
+// openDuplicates opens the file named by the string flag flagName as the
+// run's duplicates destination (dedupe --duplicates). Like the unmatched
+// destination it is one file, never divided by ECO: grammar.c
+// deal_with_game replaces the ECO-selected output file with
+// duplicate_file.
+func (r *run) openDuplicates(flagName string) error {
+	w, err := r.openDestination(flagName, 0)
+	if err != nil {
+		return err
+	}
+	r.duplicates = w
+	r.closers = append(r.closers, w)
+	return nil
+}
+
 // closeDestinations flushes and closes the destinations, last opened
 // first, and returns their close errors joined. A destination that
 // could not be written in full (a full disk shows up at the final
@@ -258,35 +288,43 @@ func (r *run) game(it Item) gameVerdict {
 	if o.Status == pipeline.Rejected {
 		return gameVerdict{Errors: o.Faults()}
 	}
-	target, stop := r.route(it, o)
-	if err := r.write(target, o); err != nil {
-		return gameVerdict{Errors: []error{err}, Stop: stop}
+	d := r.route(it, o)
+	if err := r.write(d, o); err != nil {
+		return gameVerdict{Errors: []error{err}, Stop: d.stop}
 	}
-	return gameVerdict{Errors: o.Faults(), Stop: stop}
+	return gameVerdict{Errors: o.Faults(), Stop: d.stop}
 }
 
 // write sends the games o is emitted as (one, or the main line and one
-// game per variation under --split-variants) to the destination target
-// names, each with the replay the outcome says to emit: none for a
-// Broken game, which the writer then renders in Source format, the only
-// format a broken game is emitted in (CONFORMANCE.md, --keep-broken).
-func (r *run) write(target routeTarget, o pipeline.Outcome) error {
-	var d destination
-	switch target {
+// game per variation under --split-variants) to the destination d
+// names, after d's comment lines, each with the replay the outcome says
+// to emit: none for a Broken game, which the writer then renders in
+// Source format, the only format a broken game is emitted in
+// (CONFORMANCE.md, --keep-broken).
+func (r *run) write(d decision, o pipeline.Outcome) error {
+	var dest destination
+	switch d.target {
 	case toOutput:
-		d = r.output
+		dest = r.output
 	case toUnmatched:
-		d = r.unmatched
+		dest = r.unmatched
+	case toDuplicates:
+		dest = r.duplicates
 	}
-	if d == nil {
+	if dest == nil {
 		return nil
 	}
 	// The destination's writer is chosen once per source game (grammar.c
 	// select_output_file counts matched games, so a split game's parts
 	// stay in one -# file; they share their ECO tag anyway).
-	w, err := d.writerFor(o.Game)
+	w, err := dest.writerFor(o.Game)
 	if err != nil {
 		return err
+	}
+	for _, c := range d.comments {
+		if err := w.WriteComment(c); err != nil {
+			return err
+		}
 	}
 	for _, e := range o.Emissions() {
 		if r.opts.Format == output.CM && !output.CMFromStart(e.Replay) {
