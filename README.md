@@ -208,7 +208,7 @@ the tasks CI runs, so local and CI runs are identical:
 
 ```sh
 mise install          # pinned Go + GoReleaser
-mise run ci           # build, vet, gofmt, go test -race, goreleaser check
+mise run ci           # build, vet, gofmt, go mod tidy -diff, go test -race, goreleaser check
 mise run snapshot     # full release dry-run into dist/ (no tag, no token)
 ```
 

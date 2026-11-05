@@ -45,13 +45,17 @@ fi
 description = "Full test suite with the race detector"
 run = "go test -race ./..."
 
+[tasks.tidy-check]
+description = "Fail if go.mod or go.sum would change under go mod tidy"
+run = "go mod tidy -diff"
+
 [tasks.release-check]
 description = "Validate .goreleaser.yaml"
 run = "goreleaser check"
 
 [tasks.ci]
 description = "Everything CI runs on push and pull request"
-depends = ["build", "vet", "fmt-check", "test", "release-check"]
+depends = ["build", "vet", "fmt-check", "tidy-check", "test", "release-check"]
 
 [tasks.snapshot]
 description = "Build a full release locally into dist/ without a tag or GitHub token"

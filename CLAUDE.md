@@ -10,7 +10,7 @@ pgnx is a Go port of pgn-extract (David J. Barnes' C tool for processing chess P
 
 ```sh
 mise install                        # pinned Go + GoReleaser (mise.toml)
-mise run ci                         # exactly what CI runs: build, vet, gofmt -l, test -race, goreleaser check
+mise run ci                         # exactly what CI runs: build, vet, gofmt -l, go mod tidy -diff, test -race, goreleaser check
 mise run snapshot                   # full release dry-run into dist/, no tag or token needed
 go build ./...                      # build everything
 go build -o pgnx ./cmd/pgnx        # build the CLI binary
