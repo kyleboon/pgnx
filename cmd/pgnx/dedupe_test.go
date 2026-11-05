@@ -252,3 +252,49 @@ func TestDedupeCheckFileErrors(t *testing.T) {
 		t.Errorf("output:\n%s", out)
 	}
 }
+
+// TestDedupeSameSetup: --same-setup (check_duplicate_setup) keeps the
+// first game of each starting position. A game of a seen setup is
+// unmatched before its moves are compared, so it reaches --unmatched,
+// not --duplicates, even when its moves repeat the first game's. The
+// collection is pinned against the C binary by a differential run
+// (CONFORMANCE.md, Phase 4).
+func TestDedupeSameSetup(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "out.pgn")
+	unm := filepath.Join(dir, "unm.pgn")
+	dupes := filepath.Join(dir, "dupes.pgn")
+	_, errOut, code := runCLI(t, "", "dedupe", "--same-setup", "-o", out, "--unmatched", unm, "--duplicates", dupes,
+		filepath.Join("testdata", "same-setup.pgn"))
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	events := func(s string) []string {
+		var ev []string
+		for _, line := range strings.Split(s, "\n") {
+			if strings.HasPrefix(line, "[Event ") {
+				ev = append(ev, strings.TrimSuffix(strings.TrimPrefix(line, `[Event "`), `"]`))
+			}
+		}
+		return ev
+	}
+	if got := events(readFile(t, out)); strings.Join(got, "|") != "Study 1|Study 2: Black to move|Standard start" {
+		t.Errorf("output: %q", got)
+	}
+	if got := events(readFile(t, unm)); strings.Join(got, "|") != "Study 1 again, other clocks, same moves|Standard start again|Study 1 again, other moves" {
+		t.Errorf("unmatched: %q", got)
+	}
+	if d := readFile(t, dupes); d != "" {
+		t.Errorf("duplicates file not empty:\n%s", d)
+	}
+	if !strings.Contains(errOut, "3 games matched out of 6.") {
+		t.Errorf("summary: %q", errOut)
+	}
+}
+
+func TestDedupeFuzzyDepthNegativeIsUsageError(t *testing.T) {
+	_, errOut, code := runCLI(t, gameA, "dedupe", "--fuzzy-depth", "-1")
+	if code != 1 || !strings.Contains(errOut, "--fuzzy-depth") {
+		t.Errorf("exit %d, stderr %q", code, errOut)
+	}
+}

@@ -42,6 +42,12 @@ var dedupeGoldenCases = []struct {
 	// is not ported (an argument file does it; MIGRATION.md), so the
 	// second run is this same command.
 	{"test-checkfile", []string{"--player", "Petrosian"}, []string{"fischer.pgn"}, "test-c-out.pgn", "", []string{"petrosian.pgn"}},
+	// test-fuzzydepth, for N in 0 3 4 5:
+	// pgn-extract -C --fuzzydepth N -dtest-fuzzydepthN-dupes.pgn -otest-fuzzydepthN-unique.pgn --quiet test-fuzzydepth.pgn
+	{"test-fuzzydepth0", []string{"--no-comments", "--fuzzy-depth", "0"}, []string{"test-fuzzydepth.pgn"}, "test-fuzzydepth0-unique.pgn", "test-fuzzydepth0-dupes.pgn", nil},
+	{"test-fuzzydepth3", []string{"--no-comments", "--fuzzy-depth", "3"}, []string{"test-fuzzydepth.pgn"}, "test-fuzzydepth3-unique.pgn", "test-fuzzydepth3-dupes.pgn", nil},
+	{"test-fuzzydepth4", []string{"--no-comments", "--fuzzy-depth", "4"}, []string{"test-fuzzydepth.pgn"}, "test-fuzzydepth4-unique.pgn", "test-fuzzydepth4-dupes.pgn", nil},
+	{"test-fuzzydepth5", []string{"--no-comments", "--fuzzy-depth", "5"}, []string{"test-fuzzydepth.pgn"}, "test-fuzzydepth5-unique.pgn", "test-fuzzydepth5-dupes.pgn", nil},
 }
 
 func TestGoldenConformanceDedupe(t *testing.T) {

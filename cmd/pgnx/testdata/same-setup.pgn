@@ -1,0 +1,32 @@
+[Event "Study 1"]
+[SetUp "1"]
+[FEN "rnbqkb1r/1p3ppp/p2p1n2/4p3/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 7"]
+
+7. Nb3 Be7 *
+
+[Event "Study 1 again, other clocks, same moves"]
+[SetUp "1"]
+[FEN "rnbqkb1r/1p3ppp/p2p1n2/4p3/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 5 40"]
+
+40. Nb3 Be7 *
+
+[Event "Study 2: Black to move"]
+[SetUp "1"]
+[FEN "rnbqkb1r/1p3ppp/p2p1n2/4p3/3NP3/2N5/PPP2PPP/R1BQKB1R b KQkq - 0 7"]
+
+7... Be7 *
+
+[Event "Standard start"]
+
+1. e4 e5 *
+
+[Event "Standard start again"]
+
+1. d4 d5 *
+
+[Event "Study 1 again, other moves"]
+[SetUp "1"]
+[FEN "rnbqkb1r/1p3ppp/p2p1n2/4p3/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 7"]
+
+7. Nf3 Be7 *
+
