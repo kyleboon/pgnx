@@ -30,7 +30,15 @@ colour.`,
 	}
 	addOutputFlags(cmd)
 	addECOFlags(cmd)
+	addCriteriaFlags(cmd)
+	return cmd
+}
 
+// addCriteriaFlags registers the game-selection flags filter and dedupe
+// share: the criteria (tag, length, end-state, material, positional,
+// sequence and result-consistency), the Selector's flags and the
+// --unmatched / --suppress-matched routing. criteriaOptions reads them.
+func addCriteriaFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.StringArray("tag", nil, "tag criterion in -t grammar, e.g. 'WhiteElo >= \"2500\"' (repeatable)")
 	flags.StringArray("tag-file", nil, "file of tag criteria, one per line (repeatable)")
@@ -98,16 +106,14 @@ colour.`,
 
 	flags.Bool("no-bad-results", false, "reject games whose Result tag disagrees with the terminating result")
 	flags.Bool("fix-result-tags", false, "correct the Result tag from the final position and terminating result")
-
-	return cmd
 }
 
-// filterOptions maps the filter flags onto filter.Options and
-// filter.SelectorOptions. It checks only what the flags themselves can
+// criteriaOptions maps the flags addCriteriaFlags registers onto
+// filter.Options and filter.SelectorOptions. It checks only what the flags themselves can
 // get wrong (a value that cannot be mapped, two flags for one setting);
 // the criteria's own invariants are filter's, checked by Validate. Every
 // error it returns is a usage error (exit 1).
-func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions, error) {
+func criteriaOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions, error) {
 	flags := cmd.Flags()
 	getBool := func(name string) bool { v, _ := flags.GetBool(name); return v }
 	getInt := func(name string) int { v, _ := flags.GetInt(name); return v }
@@ -360,7 +366,7 @@ func filterOptions(cmd *cobra.Command) (*filter.Options, filter.SelectorOptions,
 }
 
 func runFilter(cmd *cobra.Command, args []string) error {
-	fopts, selOpts, err := filterOptions(cmd)
+	fopts, selOpts, err := criteriaOptions(cmd)
 	if err != nil {
 		return err
 	}
@@ -368,33 +374,32 @@ func runFilter(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	sel, suppressMatched, err := r.openSelection(selOpts)
+	if err != nil {
+		r.close()
+		return err
+	}
+	// The Selector routes each processed game on the outcome's matched
+	// bit alone.
+	r.route = routeBySelector(sel, suppressMatched, func(_ Item, o pipeline.Outcome) bool { return o.Matched })
+	return r.finish(r.exec(args))
+}
 
-	flags := cmd.Flags()
-	suppressMatched, _ := flags.GetBool("suppress-matched")
+// openSelection does the Selector setup filter and dedupe share once
+// newRun has opened the main destination: the --unmatched destination
+// when named, the Selector from its options, and the summary line
+// counting the Selector's matches (suppressed, along with the matched
+// games, by --suppress-matched). The caller installs the route.
+func (r *run) openSelection(selOpts filter.SelectorOptions) (sel *filter.Selector, suppressMatched bool, err error) {
+	flags := r.cmd.Flags()
+	suppressMatched, _ = flags.GetBool("suppress-matched")
 	if unmatchedPath, _ := flags.GetString("unmatched"); unmatchedPath != "" {
 		if err := r.openUnmatched("unmatched"); err != nil {
-			r.close()
-			return err
+			return nil, false, err
 		}
 	}
-
-	// The Selector routes each processed game: matched games to the
-	// output unless --suppress-matched, the rest to --unmatched, and its
-	// stop-after decision ends the run.
-	sel := filter.NewSelector(selOpts)
-	r.route = func(n int, o pipeline.Outcome) (routeTarget, bool) {
-		d := sel.Decide(n, o.Matched)
-		switch {
-		case d.Emit && !suppressMatched:
-			return toOutput, d.Stop
-		case d.ToUnmatched:
-			return toUnmatched, d.Stop
-		}
-		return nowhere, d.Stop
-	}
-	// The summary counts the Selector's matches, and --suppress-matched
-	// suppresses it along with the matched games.
+	sel = filter.NewSelector(selOpts)
 	r.matched = sel.Matched
 	r.quiet = r.quiet || suppressMatched
-	return r.finish(r.exec(args))
+	return sel, suppressMatched, nil
 }

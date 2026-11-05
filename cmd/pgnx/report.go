@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"io"
 	"iter"
-
-	"github.com/kyleboon/pgnx/pgn"
 )
 
 // gameVerdict is a command's verdict on one game, distinct from the
@@ -75,11 +73,11 @@ func (rep *runReport) record(it Item, v gameVerdict) {
 // each drives fn over every game of seq (the games iterator), recording
 // each verdict, and stops reading as soon as a verdict says so. Err
 // items go straight to the report.
-func (rep *runReport) each(seq iter.Seq[Item], fn func(n int, g *pgn.Game) gameVerdict) {
+func (rep *runReport) each(seq iter.Seq[Item], fn func(it Item) gameVerdict) {
 	for it := range seq {
 		var v gameVerdict
 		if it.Err == nil {
-			v = fn(it.Number, it.Game)
+			v = fn(it)
 		}
 		rep.record(it, v)
 		if v.Stop {

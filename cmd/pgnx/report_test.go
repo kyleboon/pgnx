@@ -201,9 +201,9 @@ func TestReportEachStopsWhenAsked(t *testing.T) {
 	var log bytes.Buffer
 	rep := newRunReport(&log, &log)
 	var seen []int
-	rep.each(seq, func(n int, g *pgn.Game) gameVerdict {
-		seen = append(seen, n)
-		return gameVerdict{Stop: n == 2}
+	rep.each(seq, func(it Item) gameVerdict {
+		seen = append(seen, it.Number)
+		return gameVerdict{Stop: it.Number == 2}
 	})
 	if len(seen) != 2 || seen[0] != 1 || seen[1] != 2 {
 		t.Errorf("fn saw games %v, want [1 2]", seen)

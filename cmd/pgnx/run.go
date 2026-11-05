@@ -7,7 +7,6 @@ import (
 
 	"github.com/kyleboon/pgnx/filter"
 	"github.com/kyleboon/pgnx/output"
-	"github.com/kyleboon/pgnx/pgn"
 	"github.com/kyleboon/pgnx/pipeline"
 	"github.com/spf13/cobra"
 )
@@ -31,16 +30,37 @@ const (
 // not Rejected (a Rejected game goes nowhere, whatever the run was told,
 // so routes never see one): where it is written, and whether the run
 // stops after it. stop is the Selector's decision; it is returned
-// alongside the pipeline's Outcome, never folded into it. n is the game's
-// 1-based number across all inputs.
-type route func(n int, o pipeline.Outcome) (target routeTarget, stop bool)
+// alongside the pipeline's Outcome, never folded into it. it is the
+// game's item from the games iterator: its 1-based number across all
+// inputs and the source it came from.
+type route func(it Item, o pipeline.Outcome) (target routeTarget, stop bool)
 
 // routeAll is convert's route: every game to the output, never stopping.
-func routeAll(int, pipeline.Outcome) (routeTarget, bool) { return toOutput, false }
+func routeAll(Item, pipeline.Outcome) (routeTarget, bool) { return toOutput, false }
 
 // routeNowhere is validate's route: nothing is written; the game is only
 // reported.
-func routeNowhere(int, pipeline.Outcome) (routeTarget, bool) { return nowhere, false }
+func routeNowhere(Item, pipeline.Outcome) (routeTarget, bool) { return nowhere, false }
+
+// routeBySelector is the route filter and dedupe share: the Selector
+// decides each game on its matched bit (grammar.c deal_with_game's
+// first_game / select-only / skip-matching / stop-after bookkeeping),
+// matched games go to the output unless suppressMatched, the rest to
+// --unmatched, and its stop-after decision ends the run. matched reports
+// whether the game counts as matched: filter passes the outcome's
+// Matched; dedupe folds the duplicate disposition in first.
+func routeBySelector(sel *filter.Selector, suppressMatched bool, matched func(it Item, o pipeline.Outcome) bool) route {
+	return func(it Item, o pipeline.Outcome) (routeTarget, bool) {
+		d := sel.Decide(it.Number, matched(it, o))
+		switch {
+		case d.Emit && !suppressMatched:
+			return toOutput, d.Stop
+		case d.ToUnmatched:
+			return toUnmatched, d.Stop
+		}
+		return nowhere, d.Stop
+	}
+}
 
 // run is one invocation of a command that sends games through the
 // pipeline: the setup convert and filter share (newRun) and the per-game
@@ -231,13 +251,14 @@ func (r *run) finish(err error) error {
 // faults (the reason a Rejected game is emitted nowhere; a Broken game's
 // replay failure and any warnings of a game that was emitted) or the
 // failure of writing it, and the route's stop.
-func (r *run) game(n int, g *pgn.Game) gameVerdict {
+func (r *run) game(it Item) gameVerdict {
+	g := it.Game
 	r.tags.Observe(g)
 	o := r.pipe.Process(g)
 	if o.Status == pipeline.Rejected {
 		return gameVerdict{Errors: o.Faults()}
 	}
-	target, stop := r.route(n, o)
+	target, stop := r.route(it, o)
 	if err := r.write(target, o); err != nil {
 		return gameVerdict{Errors: []error{err}, Stop: stop}
 	}

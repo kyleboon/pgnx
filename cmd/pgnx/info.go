@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/kyleboon/pgnx/pgn"
 	"github.com/spf13/cobra"
 )
 
@@ -49,7 +48,8 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	// unreadable input fails the run.
 	rep := newRunReport(logW, logW)
 	rep.ioOnly = true
-	rep.each(games(args, cmd.InOrStdin(), parserOptions(cmd)), func(n int, g *pgn.Game) gameVerdict {
+	rep.each(games(args, cmd.InOrStdin(), parserOptions(cmd)), func(it Item) gameVerdict {
+		g := it.Game
 		plies += len(g.Moves)
 		switch g.Result {
 		case "1-0":
