@@ -968,3 +968,124 @@ the C tool every one of those lists is printed in source order anyway.
   TWIC (`scripts/twicdiff.sh`, 2026-11-03): 744/749 identical, the same
   5 issues as the 2026-10-31 run, all the documented missing-result
   class.
+
+## Duplicate detection (Phase 4: `pgnx dedupe`, 2026-11-05, beads `pgnx-phase4`)
+
+pgn-extract's duplicate family is ported as the `dedupe` subcommand: `-D`
+(the default disposition), `-d FILE` (`--duplicates`), `-U`
+(`--only-duplicates`), `-c FILE` (`--check-file`), `--fuzzydepth N`
+(`--fuzzy-depth`) and `--deletesamesetup` (`--same-setup`), composing with
+every `filter` flag as the C flags compose with every criterion. The golden
+targets `test-duplicates`, `test-noduplicates`, `test-nounique`, `test-ZZ`,
+`test-checkfile`, `test-fuzzydepth` (depths 0, 3, 4, 5) and `test-AA` (the
+argsfile target, through a translated argument file) are rows in
+`cmd/pgnx/dedupe_conformance_test.go` and byte-match both the unique and the
+duplicates oracle files. The seen-set, the game key and the setup set are
+the `dedup` package (`hashing.c`); the evaluation order is pinned by CLI
+tests: the visit comes after every criterion and before the Selector, so a
+game that fails `--player` never registers, `--first-game` and `--stop-after`
+count only input games, and a dropped duplicate is unmatched (`--unmatched`
+receives it, the summary does not count it).
+
+- **Identity is the placement key, not the weak hash.** The C tool pairs
+  `final_hash_value` and `cumulative_hash_value`, both built from
+  `weak_hash_value`; pgnx pairs `replay.Position.Placement` (Phase 3's
+  placement key) and its sum over the main-line moves. Both are
+  placement-only 64-bit keys whose only observable property here is
+  equality, and the placement key is computed by every replay anyway.
+  `chess.Board.WeakHash` stays what it is, the value behind the emitted
+  `HashCode` tag. Variations never contribute in either tool
+  (`apply_variations` accumulates into a copy of the game).
+- **`-Z` (the on-disk hash table) is not ported.** The seen-set is an
+  in-memory map, one entry per registered game, which is a few words per
+  game as ADR 0003 allows (the whole-corpus run below records the cost).
+  `test-ZZ`'s oracle files are byte-identical to `test-duplicates`'s, so
+  the harness runs it as a second row of the same command.
+- **The list-file form of `-c` is not ported.** The C tool treats a `-c`
+  argument without a `.pgn` suffix as a file naming check files; pgnx's
+  `--check-file` takes PGN files only, and a list is an argument file of
+  `--check-file` lines (MIGRATION.md). `test-checkfile`'s second run
+  (`-cclist.txt`) is therefore the same pgnx command as its first.
+- **The `From:` / `First found in:` lines.** Written into the duplicates
+  file only, before each diverted duplicate, exactly as `deal_with_game`
+  writes them: `{ From: <input> }` when the input differs from the one the
+  last duplicate came from, then `{ First found in: <origin> }`; the input
+  and origin names are the paths as given on the command line, `stdin`
+  and `_stdin_` for standard input (`hashing.c`: "Without a filename,
+  suppressing duplicates on stdin does not work"). `--no-comments`
+  suppresses both, as `-C` does, which every golden target relies on.
+  Three small differences, none reachable by a golden target: under
+  `--json` pgnx writes neither line, where the C tool writes them raw
+  into the array it is building and produces invalid JSON; a name longer
+  than the line width is written on one line by pgnx, where the C tool's
+  `print_str` would wrap it; and under `--suppress-matched` with
+  `--duplicates` the C tool still writes the two lines for the game it
+  then does not write, while pgnx writes nothing.
+- **Identity is computed on the emitted game.** The pipeline hands the
+  route the replay of the transformed game, so with `--drop-ply` or
+  `--drop-before` two games are duplicates when their *remaining* moves
+  are, whereas the C tool hashes the game as parsed (inside
+  `apply_move_list`, before `rewrite_game`). Not a golden case; a
+  combination unlikely to be wanted. ECO classification, `--split-variants`
+  and the mark comments change no position, so they do not affect identity.
+- **Fuzzy identity where the C tool reads uninitialised memory.** Under
+  `--fuzzydepth N` with N > 0 the C tool records `fuzzy_duplicate_hash`
+  only when a move with ply number N is played (`apply.c:1039`); for a
+  game without that ply (fewer than N plies, or a FEN start beyond ply N)
+  the field is whatever the stack slot held, in practice the previous
+  game's value, and both the bucket the game is stored in and the fuzzy
+  comparison use it. pgnx gives such a game no fuzzy key and falls back to
+  its exact pair, so identical short games are duplicates and short games
+  are never confused with long ones. The two tools therefore differ, by
+  design, on inputs with games shorter than the depth:
+  `test-nobadresults.pgn` (one-ply games, all `1. e4`) at depth 10 is
+  eight duplicates in pgnx and none in the C tool;
+  `test-promotion-in.pgn` (one-ply FEN games from move 55) at depth 10 is
+  four duplicates in pgnx and three in the C tool, the C tool pairing
+  different promotions through the stale value; and TWIC issue 1500
+  (8,005 games) at depth 10 is 8,978 duplicates in pgnx against 8,856
+  (the 122 are repeated short records). At depths 0, 3, 4 and 5 over
+  `test-fuzzydepth.pgn`, and at any depth over inputs whose games all
+  reach it, the outputs are identical. A related edge the same way:
+  the C tool records the fuzzy hash only from `--startply` on
+  (`check_for_match`), pgnx regardless of `--start-ply`.
+- **`--same-setup`** (`check_duplicate_setup`) is the one stateful
+  criterion inside the C tool's chain, and sits at the same point in
+  `filter.Evaluate` (ADR 0002, 2026-11-05 amendment): a game that fails a
+  tag criterion never registers its starting position; one that fails a
+  length bound does; a seen setup leaves the game unmatched before its
+  moves are compared, so it reaches `--unmatched` and never the duplicates
+  file even when its moves repeat the first game's. The identity is the
+  full Polyglot hash of the FEN (`generate_zobrist_hash_from_fen`), so the
+  clocks do not count and the side to move does. Differential run against
+  the C binary (`--deletesamesetup -D` vs `dedupe --same-setup`) over
+  `cmd/pgnx/testdata/same-setup.pgn` (output and unmatched files) and TWIC
+  issue 1500: identical.
+- **Differential sweep (2026-11-05)**: `scripts/difftest.sh`'s pairing
+  over every golden `.pgn` input and TWIC issue 1500, nine flag
+  combinations (`-D`; `-d` with and without `-C`; `-U`; `-c petrosian.pgn
+  -D`; `--fuzzydepth 0` and `10` with `-d`; `-D -TpFischer`; `-D -n`),
+  comparing the output and, where written, the duplicates or unmatched
+  file: 502 identical, 11 divergent, of which 8 are `nested-comment.pgn`
+  (the pre-existing parser class above, every combination) and 3 the
+  fuzzy-depth-10 class just described. `-D` alone, `-d`, `-U`, `-c`,
+  `-D -Tp` and `-D -n` are byte-identical on every input.
+- **TWIC corpus, per file (2026-11-05)**: `PGNX_CMD=dedupe C_FLAGS='-D'
+  scripts/twicdiff.sh` over the 749 local issues: 745 identical, 4
+  divergent (twic1182, 1196, 1260, 1469), all four from the five issues
+  of the documented "missing result" grammar-recovery class (the
+  2026-10-31 run above), with that class's effect amplified: the C tool
+  drops the moves of such a game, so the game it keeps has the start
+  position as its only position and the key `(start, 0)`, which every
+  later move-less game shares, and under `-D` those are dropped as its
+  duplicates; pgnx keeps the moves (as documented) and emits each game.
+  The fifth issue of the class, twic1071, is identical under `-D`, its
+  move-less game being the first of its kind in the file. No new class.
+- **TWIC corpus, one process (2026-11-05)**: both tools over all 749
+  issues in a single invocation with `-D`, the one run where the seen-set
+  is large (3,562,665 games emitted by the C tool). Compared game by game:
+  pgnx emits 8 games the C tool drops and 1 game differently, all in the
+  four issues above and all the same move-less class; nothing else
+  differs. Cost: pgnx peak RSS 273 MB in 2,122 s against the C tool's
+  117 MB in 498 s (the throughput gap is `pgnx-perf`'s; the seen-set's
+  share is within ADR 0003's "a few words per game").

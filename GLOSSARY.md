@@ -50,7 +50,7 @@ What the pipeline concludes about one game: its disposition, its reason if any, 
 _Avoid_: result (reserved for the chess result)
 
 **Route**:
-A command's decision for one processed game that was not rejected: which destination it goes to (the output, the unmatched output, or nowhere) and whether the run stops after it. convert routes everything to the output, validate routes nowhere, filter routes by the Selector.
+A command's decision for one processed game that was not rejected: which destination it goes to (the output, the unmatched output, the duplicates output, or nowhere), whether the run stops after it, and any comment lines the destination writes before the game. convert routes everything to the output, validate routes nowhere, filter routes by the Selector, dedupe visits the seen-set and then routes by the Selector.
 _Avoid_: dispatch, callback
 
 **Verdict**:
@@ -74,6 +74,28 @@ _Avoid_: problem, soft error
 **Matched / unmatched game**:
 Whether a game satisfied the run's criteria. A run with no criteria matches every game it does not reject.
 
+### Duplicates
+
+**Duplicate**:
+A game that reaches the same final position through the same sequence of positions as a game registered earlier in the run (or in a check file): its key, the final placement and the sum of the placements after each main-line move, is already in the seen-set. Under fuzzy identity, a game that reaches the same position after a given ply, whatever moves got it there. Variations never count. Only a game that matched the criteria is compared.
+_Avoid_: dupe (fine in flag names, not in prose), repeat, copy
+
+**First occurrence**:
+A visited game whose key was not in the seen-set, which registers it. The origin a later duplicate is reported against, by the source it came from.
+_Avoid_: original (pgn-extract's word, ambiguous with the source file), unique game
+
+**Seen-set**:
+The run-wide table of first occurrences (pgn-extract's hash log). Holds one entry per registered game and the source it came from; the only cross-game state dedupe adds. It is kept in memory; the C tool's on-disk form (`-Z`) is not ported.
+_Avoid_: hash table, cache, index
+
+**Check file**:
+A PGN file whose games seed the seen-set before the inputs are read: they must satisfy the criteria to register, are never written, numbered or counted, and are what a duplicate of one of them is reported as first found in.
+_Avoid_: reference file, baseline, exclusion list
+
+**Same setup**:
+Two games with the same starting position: the same FEN tag position (clocks aside), or both from the standard start. `--same-setup` is the one stateful criterion: it sits inside the criteria chain, after the SetUp-tag filter and before the replay, and drops a game whose setup was seen before any moves are compared.
+_Avoid_: duplicate setup, same FEN (the clocks differ)
+
 ### Positions and counting
 
 **Ply number**:
@@ -88,7 +110,7 @@ _Avoid_: pass move, skip, 0000 (the UCI protocol's spelling, which no output for
 Output that reproduces the game's moves as written, needing no replay. The only format a broken game can be emitted in.
 
 **Destination**:
-Where a command sends emitted games: one output, the unmatched output, or the per-ECO-prefix files of a split run.
+Where a command sends emitted games: one output, the unmatched output, the duplicates output, or the per-ECO-prefix files of a split run. The duplicates output also carries the comment lines naming where each duplicate came from and where it was first found.
 _Avoid_: writer (the thing that renders), sink
 
 **Tag roster**:

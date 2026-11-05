@@ -8,10 +8,13 @@
 #   out-dir   where results go (default twic/diff); it is wiped first
 #
 # Environment:
-#   C_BIN    C pgn-extract binary (default ~/code/pgn-extract/build/bin/pgn-extract)
-#   GO_BIN   pgnx binary (default ./pgnx, built if missing)
-#   FMT      output format (default san)
-#   JOBS     parallel workers (default 8)
+#   C_BIN       C pgn-extract binary (default ~/code/pgn-extract/build/bin/pgn-extract)
+#   GO_BIN      pgnx binary (default ./pgnx, built if missing)
+#   FMT         output format (default san)
+#   JOBS        parallel workers (default 8)
+#   PGNX_CMD    pgnx subcommand to run (default convert)
+#   C_FLAGS     extra arguments for the C binary, verbatim (e.g. '-D')
+#   PGNX_FLAGS  extra arguments for pgnx, verbatim
 #
 # Output (in out-dir):
 #   results.tsv        one row per input: status (OK|DIFF) <tab> file <tab>
@@ -27,18 +30,22 @@ C_BIN="${C_BIN:-$HOME/code/pgn-extract/build/bin/pgn-extract}"
 GO_BIN="${GO_BIN:-./pgnx}"
 FMT="${FMT:-san}"
 JOBS="${JOBS:-8}"
+PGNX_CMD="${PGNX_CMD:-convert}"
+C_FLAGS="${C_FLAGS:-}"
+PGNX_FLAGS="${PGNX_FLAGS:-}"
 
 # Worker mode: scripts/twicdiff.sh --worker <out-dir> <input.pgn>
 if [ "${1:-}" = "--worker" ]; then
   out="$2"; in="$3"; name=$(basename "$in" .pgn)
   c_out="$out/$name.c"; go_out="$out/$name.go"; err="$out/$name.err"
-  # shellcheck disable=SC2086
+  # shellcheck disable=SC2086  # C_FLAGS/PGNX_FLAGS are deliberately word-split.
   case "$FMT" in
-    san) "$C_BIN" --quiet -o"$c_out" "$in" 2>/dev/null ;;
-    *)   "$C_BIN" -W"$FMT" --quiet -o"$c_out" "$in" 2>/dev/null ;;
+    san) "$C_BIN" $C_FLAGS --quiet -o"$c_out" "$in" 2>/dev/null ;;
+    *)   "$C_BIN" $C_FLAGS -W"$FMT" --quiet -o"$c_out" "$in" 2>/dev/null ;;
   esac
   # pgnx exits 2 when some games were rejected; not a differential failure.
-  "$GO_BIN" convert --quiet -f "$FMT" -o "$go_out" "$in" 2>"$err" || [ $? -eq 2 ]
+  # shellcheck disable=SC2086
+  "$GO_BIN" "$PGNX_CMD" $PGNX_FLAGS --quiet -f "$FMT" -o "$go_out" "$in" 2>"$err" || [ $? -eq 2 ]
   rejected=$(LC_ALL=C grep -Ec ': game [0-9]+: ' "$err" | tr -d ' ' || true)
   warnings=$(LC_ALL=C grep -Ec ': game [0-9]+: warning: ' "$err" | tr -d ' ' || true)
   rejected=$(( ${rejected:-0} - ${warnings:-0} ))
@@ -63,7 +70,7 @@ OUT_DIR="${2:-twic/diff}"
 
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
-export C_BIN GO_BIN FMT
+export C_BIN GO_BIN FMT PGNX_CMD C_FLAGS PGNX_FLAGS
 
 start=$(date +%s)
 find "$PGN_DIR" -maxdepth 1 -name '*.pgn' -print0 | sort -z \

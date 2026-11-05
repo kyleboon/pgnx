@@ -96,3 +96,55 @@ func compareOracle(t *testing.T, got, oracle string) {
 		t.Errorf("%s differs from C oracle %s\n--- first divergence ---\n%s", filepath.Base(got), oracle, firstDiff(g, want))
 	}
 }
+
+// TestGoldenConformanceArgsFile mirrors the C Makefile's test-AA:
+//
+//	pgn-extract -C -Aargslist.txt --quiet
+//
+// run from the test directory, the argsfile naming the inputs, the
+// output and the duplicates file by relative path. pgnx reads its own
+// argument-file grammar (ADR 0004), so the row runs the translation
+// infiles/argslist.pgnx.txt (kept beside the original) from a temporary
+// working directory holding copies of the two inputs, and compares both
+// files it writes.
+func TestGoldenConformanceArgsFile(t *testing.T) {
+	infiles, err := filepath.Abs(filepath.Join("testdata", "golden", "infiles"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	outfiles, err := filepath.Abs(filepath.Join("testdata", "golden", "outfiles"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	for _, name := range []string{"fischer.pgn", "petrosian.pgn", "argslist.pgnx.txt"} {
+		b, err := os.ReadFile(filepath.Join(infiles, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, name), b, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Chdir(dir)
+	root := NewRootCmd()
+	var errb bytes.Buffer
+	root.SetErr(&errb)
+	args := []string{"dedupe", "--no-comments", "@argslist.pgnx.txt"}
+	if err := runRoot(root, args); err != nil && !errors.Is(err, errProblems) {
+		t.Fatalf("pgnx %v: %v\n%s", args, err, errb.String())
+	}
+	for _, name := range []string{"test-AA-unique.pgn", "test-AA-dupes.pgn"} {
+		got, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, err := os.ReadFile(filepath.Join(outfiles, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Errorf("%s differs from C oracle\n--- first divergence ---\n%s", name, firstDiff(got, want))
+		}
+	}
+}

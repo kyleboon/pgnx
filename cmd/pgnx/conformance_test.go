@@ -18,9 +18,10 @@ import (
 //
 // Rows cover convert-equivalent behavior (pure move/tag output formatting),
 // from Phase 2 the filter command's selection criteria, and from Phase 3
-// positional/sequence matching and ECO classification. See the "Phase 4+"
-// comment at the bottom of this table for targets deliberately excluded
-// (deduplication and output transforms not yet implemented).
+// positional/sequence matching and ECO classification. Phase 4's
+// duplicate-detection targets, which take several inputs and write two
+// files, are in dedupe_conformance_test.go. See the comment at the bottom
+// of this table for targets deliberately excluded.
 var goldenCases = []struct {
 	name   string
 	args   []string // pgnx args; input/output paths are appended by the runner
@@ -289,13 +290,13 @@ var goldenCases = []struct {
 	// TestGoldenConformanceAppendRuns; test-hash (-#, file splitting) is
 	// in TestGoldenConformanceSplit.
 
-	// Phase 4+ (deliberately excluded from this harness):
+	// Deliberately excluded from this harness:
 	//   test-Te (pgn-extract -e eco.pgn -TeB14 fischer.pgn) has no CMP
 	//   line and no oracle file in the C repo; its behaviour is pinned by
 	//   TestFilterECOCriterionAfterClassification in eco_test.go instead.
-	//   Duplicate detection (Phase 4): test-AA, test-checkfile,
-	//   test-duplicates, test-noduplicates, test-nounique, test-ZZ,
-	//   test-fuzzydepth.
+	//   Duplicate detection (test-AA, test-checkfile, test-duplicates,
+	//   test-noduplicates, test-nounique, test-ZZ, test-fuzzydepth) is in
+	//   dedupe_conformance_test.go.
 	//   Not ported: test-FF-text (-Fpattern, the comment-replacing form of -F, not
 	//   ported; see CONFORMANCE.md).
 	//   Not byte-compared by the C Makefile either: test-r (report mode),

@@ -4,7 +4,7 @@ pgnx is a Go port of [pgn-extract](https://www.cs.kent.ac.uk/people/staff/djb/pg
 David J. Barnes' C tool for searching, filtering, and reformatting chess
 games recorded in [PGN](https://en.wikipedia.org/wiki/Portable_Game_Notation).
 It provides both a reusable Go library (`chess`, `pgn`, `replay`, `filter`,
-`eco`, `pipeline`, `output`) and a CLI (`pgnx`) that replays every game on an internal board
+`eco`, `transform`, `dedup`, `pipeline`, `output`) and a CLI (`pgnx`) that replays every game on an internal board
 with full legality checking, the same semantic depth as the original.
 
 pgnx is licensed under [GPL-3.0](LICENSE), the same license as pgn-extract.
@@ -15,12 +15,14 @@ See [MIGRATION.md](MIGRATION.md) for how old flags map to new invocations,
 and [CONFORMANCE.md](CONFORMANCE.md) for documented behavioral differences
 from the C tool.
 
-**Status:** Phase 3 — core parsing, move replay/validation, output
+**Status:** Phase 4 — core parsing, move replay/validation, output
 formatting (`convert`, `validate`, `info`), game selection (`filter`: tag
 criteria, length, end state, material balance, result consistency,
-positions reached, FEN patterns, move sequences) and ECO classification
-(`--eco-file`, `--eco-split`). Duplicate detection and output-side
-transforms are planned for later phases; see
+positions reached, FEN patterns, move sequences), ECO classification
+(`--eco-file`, `--eco-split`), output-side transforms (`--drop-ply`,
+`--ply-count`, `--split-variants`, `split`) and duplicate detection
+(`dedupe`: drop, divert or keep only duplicates, check files, fuzzy
+positional identity, same-setup suppression). See
 [docs/superpowers/specs](docs/superpowers/specs) for the design specs and
 phasing plan.
 
@@ -49,7 +51,7 @@ go install github.com/kyleboon/pgnx/cmd/pgnx@latest
 
 ## CLI
 
-pgnx has five subcommands. Every one reads PGN from files given as
+pgnx has six subcommands. Every one reads PGN from files given as
 arguments, or from stdin when none are given, and writes to stdout unless
 redirected. An argument `@FILE` is replaced by the arguments in FILE, one
 per line (a flag and its value share a line; `%` starts a comment), so a
@@ -109,6 +111,35 @@ pgnx filter --exact-order --sequence 'c4 Nf6 Nc3 e6 d4 Bb4' games.pgn
 
 # Classify by ECO, then keep only the B9x (Najdorf) games
 pgnx filter --eco-file eco.pgn --eco B9 games.pgn
+```
+
+### `pgnx dedupe`
+
+Detects duplicate games: a game whose moves pass through the same
+positions to the same final position as a game seen earlier in the run.
+It takes every `filter` flag, so criteria apply first and only matched
+games are compared. Duplicates are dropped by default; `--duplicates FILE`
+diverts them instead, each preceded by a `{ First found in: … }` comment
+naming the game's origin; `--only-duplicates` keeps only them.
+
+```sh
+# One copy of every game, duplicates dropped
+pgnx dedupe -o unique.pgn games.pgn more-games.pgn
+
+# Keep the first occurrences in one file and the duplicates in another
+pgnx dedupe -o unique.pgn --duplicates dupes.pgn games.pgn
+
+# Drop the games already in an archive, without writing the archive's games
+pgnx dedupe --check-file archive.pgn -o new.pgn incoming.pgn
+
+# Treat games reaching the same position after 20 plies as duplicates
+pgnx dedupe --fuzzy-depth 20 -o unique.pgn games.pgn
+
+# A collection of studies: one game per starting position
+pgnx dedupe --same-setup -o studies.pgn studies.pgn
+
+# Compose with criteria: Fischer's games, deduplicated
+pgnx dedupe --player Fischer -o fischer.pgn games.pgn
 ```
 
 ### `pgnx validate`

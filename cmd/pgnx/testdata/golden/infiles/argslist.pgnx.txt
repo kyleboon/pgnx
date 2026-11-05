@@ -1,0 +1,20 @@
+% pgnx translation of argslist.txt (pgn-extract's -A argsfile for the C
+% test target test-AA), in pgnx's own argument-file grammar (MIGRATION.md,
+% "Argument files"): ":-X" lines become flags, the ":-t" section one --tag
+% line per criterion, ":-f gamefiles.txt" the files it listed. Paths are
+% relative to the working directory, which the conformance test sets to a
+% directory holding copies of the input files.
+% Strip variations.
+--no-variations
+% Silent mode
+--quiet
+% Duplicates file.
+--duplicates test-AA-dupes.pgn
+% Unique file.
+--output test-AA-unique.pgn
+% Tag criteria
+--tag White "Fischer"
+--tag Black "Petrosian"
+% The game files (gamefiles.txt).
+fischer.pgn
+petrosian.pgn

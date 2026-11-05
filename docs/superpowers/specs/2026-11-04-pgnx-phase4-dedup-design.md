@@ -1,7 +1,7 @@
 # pgnx: Go Port of pgn-extract — Phase 4 Design (duplicate detection: `pgnx dedupe`)
 
 **Date:** 2026-11-04
-**Status:** Draft (plan: [`docs/superpowers/plans/2026-11-04-pgnx-phase4-dedup.md`](../plans/2026-11-04-pgnx-phase4-dedup.md); tracking: beads epic `pgnx-phase4`)
+**Status:** Implemented (2026-11-05; see the plan for the commit range; plan: [`docs/superpowers/plans/2026-11-04-pgnx-phase4-dedup.md`](../plans/2026-11-04-pgnx-phase4-dedup.md); tracking: beads epic `pgnx-phase4`)
 **Module:** `github.com/kyleboon/pgnx`
 **Builds on:** [Phase 1](2026-08-07-pgnx-go-port-design.md), [Phase 2](2026-10-28-pgnx-phase2-filter-design.md), [Phase 3](2026-10-29-pgnx-phase3-positions-eco-design.md) (all complete), ADR 0002 (pipeline), ADR 0003 (streaming), ADR 0004 (argument files)
 

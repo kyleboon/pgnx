@@ -1,6 +1,6 @@
 # 0002: A pipeline package owns pgn-extract's game semantics; the parser preserves the source
 
-Status: accepted (2026-11-02); amended 2026-11-02 (transform stage, see the end)
+Status: accepted (2026-11-02); amended 2026-11-02 (transform stage) and 2026-11-05 (duplicate detection), see the end
 
 pgn-extract corrects a game inside its parser (`grammar.c`: Result and SetUp
 fix-ups, FEN consistency) and judges it in `deal_with_game`. pgnx's `convert`
@@ -49,3 +49,21 @@ selection and classification see the game as parsed, and a game too short
 for `--drop-ply` is Rejected there. Options that change only how a game is
 rendered (`--ply-limit`, the generated comments, `--no-tags`) stay in
 `output.Options`, outside the pipeline, as before.
+
+## Amendment (2026-11-05, beads `pgnx-phase4`)
+
+Duplicate detection (`pgnx dedupe`, the `dedup` package) adds no stage to
+the pipeline and no state to it. The visit of the seen-set is order-
+sensitive, so it lives where this decision puts everything order-sensitive:
+in the command's route, after `Process` and before the Selector, which is
+the position of `previous_occurance` in `deal_with_game`. Check files are
+the same per-game sequence run first, routed nowhere.
+
+One criterion is stateful in the C tool itself: `check_duplicate_setup`
+(`--deletesamesetup`) sits inside the criteria chain, between the SetUp-tag
+filter and the replay. Keeping that order exactly means `filter.Options`
+carries a `SameSetup` hook (`SetupSeen`, implemented by `dedup.SetupSet`)
+that `Evaluate` consults at that point. A nil hook leaves `Evaluate` pure;
+a non-nil one makes `Process` depend on the games processed before it,
+which `Config.Criteria` documents and which a parallel pipeline
+(`pgnx-perf.2`) must respect by evaluating in game order.

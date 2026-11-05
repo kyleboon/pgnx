@@ -1,7 +1,7 @@
 # Migrating from pgn-extract
 
 pgnx does not accept pgn-extract's C flags directly — the CLI is redesigned
-around subcommands (`convert`, `filter`, `split`, `validate`, `info`) rather
+around subcommands (`convert`, `filter`, `dedupe`, `split`, `validate`, `info`) rather
 than one flat flag namespace. This document maps the pgn-extract flags implemented
 so far to their pgnx equivalents, and lists what is not yet ported.
 
@@ -198,6 +198,25 @@ Notes:
 - `--no-tags` with `--seven-tag-roster` or `--roster`, and a negative
   `--ply-limit`, are usage errors (exit 1), as the C tool exits 1 for them.
 
+## Duplicate detection (Phase 4 scope: `pgnx dedupe`)
+
+`pgnx dedupe` accepts every `filter` flag (criteria, Selector, `--unmatched`,
+output, transforms, ECO) plus the flags below. As in pgn-extract, only games
+that satisfy every criterion are compared, and the comparison comes after
+the criteria and before `--first-game`/`--stop-after`. Dropping duplicates
+is the default, so `dedupe` with no dedup flag is `filter -D`.
+
+| pgn-extract | pgnx |
+|---|---|
+| `-D` / `--noduplicates` | `pgnx dedupe` (the default disposition: duplicates are unmatched, so `--unmatched` receives them) |
+| `-d FILE` | `pgnx dedupe --duplicates FILE` (first occurrences go to `--output`; `--no-comments` suppresses the `{ From: … }` / `{ First found in: … }` lines as `-C` does) |
+| `-U` / `--nounique` | `pgnx dedupe --only-duplicates` (with `--duplicates FILE` the duplicates go there and `--output` gets nothing, as in C) |
+| `-c FILE` / `--checkfile FILE` | `pgnx dedupe --check-file FILE` (repeatable; PGN files only, read before the inputs whatever the order). pgn-extract treats a `-c` argument without a `.pgn` suffix as a list of file names; pgnx does not: write the list as an argument file of `--check-file` lines (below) |
+| `--fuzzydepth N` | `pgnx dedupe --fuzzy-depth N` (`0` compares final positions). In C `--fuzzydepth` alone changes nothing, since no disposition is set; in pgnx the default disposition drops the duplicates it finds |
+| `--deletesamesetup` | `pgnx dedupe --same-setup` |
+| `-Z` | not ported: the seen-set is an in-memory table (CONFORMANCE.md); `test-ZZ`'s oracles equal `test-duplicates`'s |
+| `-D` with `-d` (a C usage error) | not expressible: dropping is the default and `--duplicates` replaces it |
+
 ## Argument files
 
 pgn-extract's `-A FILE` reads a file in its own grammar (`argsfile.c`): a
@@ -252,20 +271,24 @@ petrosian.pgn` becomes `pgnx filter @test-FENPattern.txt --add-label-tag
 --mark-matches HERE petrosian.pgn` (`cmd/pgnx/testdata/argfiles/`, golden
 row `test-FENPattern-argfile`).
 
+A `:-f FILE` line (a file listing input files) becomes the listed files as
+bare lines, and a `:-c FILE` line naming a *list* of check files (the
+non-`.pgn` form of `-c`) becomes one `--check-file` line per listed file.
+The C test `argslist.txt` (target `test-AA`: `-C -Aargslist.txt`), with its
+`:-f gamefiles.txt`, is translated in full as
+`cmd/pgnx/testdata/golden/infiles/argslist.pgnx.txt` and run by
+`TestGoldenConformanceArgsFile` as `pgnx dedupe --no-comments
+@argslist.pgnx.txt`.
+
 ## Not yet ported (Phase 4+)
 
 The following pgn-extract flags have no pgnx equivalent yet:
 
-- Duplicate detection (Phase 4): `-D`, `-U`, `-d`, `-c`, `-Z`,
-  `--fuzzydepth`, `--deletesamesetup`
 - `-Fpattern`, `--fencommentformat`, `--quiescent` — the comment-replacing
   form of `-F`, its format string, and the quiescence extension of
   `--plylimit`
 
-Also not yet supported, regardless of flag:
-
-- `pgnx dedupe` — planned as a new subcommand in a later phase, not a
-  flag on `convert`
+Deliberately not ported: `-Z` (see above) and the list-file form of `-c`.
 
 See [CONFORMANCE.md](CONFORMANCE.md) for behavioral differences in flags
 that *are* implemented.
