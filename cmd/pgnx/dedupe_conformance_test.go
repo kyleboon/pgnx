@@ -20,21 +20,28 @@ var dedupeGoldenCases = []struct {
 	inputs      []string
 	oracle      string // the -o file
 	dupesOracle string // the -d file; "" when the row writes none
+	checkFiles  []string
 }{
 	// test-duplicates: pgn-extract -C -dtest-d-dupes.pgn -otest-d-unique.pgn --quiet fischer.pgn petrosian.pgn
-	{"test-duplicates", []string{"--no-comments"}, []string{"fischer.pgn", "petrosian.pgn"}, "test-d-unique.pgn", "test-d-dupes.pgn"},
+	{"test-duplicates", []string{"--no-comments"}, []string{"fischer.pgn", "petrosian.pgn"}, "test-d-unique.pgn", "test-d-dupes.pgn", nil},
 	// test-noduplicates: pgn-extract -D -otest-DD-unique.pgn --quiet fischer.pgn petrosian.pgn
 	// (and the same with --noduplicates). Dropping duplicates is dedupe's
 	// default disposition.
-	{"test-noduplicates", nil, []string{"fischer.pgn", "petrosian.pgn"}, "test-DD-unique.pgn", ""},
+	{"test-noduplicates", nil, []string{"fischer.pgn", "petrosian.pgn"}, "test-DD-unique.pgn", "", nil},
 	// test-nounique: pgn-extract -U -otest-UU-unique.pgn --quiet fischer.pgn petrosian.pgn
 	// (and the same with --nounique)
-	{"test-nounique", []string{"--only-duplicates"}, []string{"fischer.pgn", "petrosian.pgn"}, "test-UU-unique.pgn", ""},
+	{"test-nounique", []string{"--only-duplicates"}, []string{"fischer.pgn", "petrosian.pgn"}, "test-UU-unique.pgn", "", nil},
 	// test-ZZ: pgn-extract -C -Z -dtest-ZZ-dupes.pgn -otest-ZZ-unique.pgn --quiet fischer.pgn petrosian.pgn
 	// -Z (the on-disk hash table) is not ported: pgnx's seen-set is in
 	// memory. The oracles are byte-identical to test-duplicates', so the
 	// row is the same command (CONFORMANCE.md).
-	{"test-ZZ", []string{"--no-comments"}, []string{"fischer.pgn", "petrosian.pgn"}, "test-ZZ-unique.pgn", "test-ZZ-dupes.pgn"},
+	{"test-ZZ", []string{"--no-comments"}, []string{"fischer.pgn", "petrosian.pgn"}, "test-ZZ-unique.pgn", "test-ZZ-dupes.pgn", nil},
+	// test-checkfile: pgn-extract -cpetrosian.pgn -D -TpPetrosian -otest-c-out.pgn --quiet fischer.pgn
+	// and then the same with -cclist.txt, a list file naming
+	// petrosian.pgn, into the same oracle. The list-by-suffix form of -c
+	// is not ported (an argument file does it; MIGRATION.md), so the
+	// second run is this same command.
+	{"test-checkfile", []string{"--player", "Petrosian"}, []string{"fischer.pgn"}, "test-c-out.pgn", "", []string{"petrosian.pgn"}},
 }
 
 func TestGoldenConformanceDedupe(t *testing.T) {
@@ -46,6 +53,9 @@ func TestGoldenConformanceDedupe(t *testing.T) {
 			args := append([]string{"dedupe", "--quiet", "-o", outFile}, c.args...)
 			if c.dupesOracle != "" {
 				args = append(args, "--duplicates", dupesFile)
+			}
+			for _, cf := range c.checkFiles {
+				args = append(args, "--check-file", filepath.Join("testdata", "golden", "infiles", cf))
 			}
 			for _, in := range c.inputs {
 				args = append(args, filepath.Join("testdata", "golden", "infiles", in))

@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/kyleboon/pgnx/dedup"
 	"github.com/kyleboon/pgnx/pipeline"
@@ -46,6 +47,7 @@ seen before, before its moves are compared.`,
 	flags := cmd.Flags()
 	flags.String("duplicates", "", "write duplicate games to FILE instead of dropping them (-d; - for stdout)")
 	flags.Bool("only-duplicates", false, "write only duplicate games; first occurrences are dropped (-U)")
+	flags.StringArray("check-file", nil, "PGN file of games treated as already seen; read before the inputs, never written (-c; repeatable)")
 	flags.Int("fuzzy-depth", 0, "duplicates share the position after ply N by any moves; 0 compares final positions (--fuzzydepth)")
 	flags.Bool("same-setup", false, "drop a game whose starting position has been seen before (--deletesamesetup)")
 	return cmd
@@ -59,6 +61,7 @@ func runDedupe(cmd *cobra.Command, args []string) error {
 	flags := cmd.Flags()
 	dupPath, _ := flags.GetString("duplicates")
 	onlyDuplicates, _ := flags.GetBool("only-duplicates")
+	checkFiles, _ := flags.GetStringArray("check-file")
 	fuzzyDepth, _ := flags.GetInt("fuzzy-depth")
 	sameSetup, _ := flags.GetBool("same-setup")
 	if flags.Changed("fuzzy-depth") && fuzzyDepth < 0 {
@@ -69,6 +72,15 @@ func runDedupe(cmd *cobra.Command, args []string) error {
 	}
 	if unmatchedPath, _ := flags.GetString("unmatched"); dupPath != "" && dupPath == unmatchedPath {
 		return fmt.Errorf("--duplicates %s is the --unmatched file", dupPath)
+	}
+	// lex.c must_open_file: a check file that cannot be opened ends the
+	// run before any game is read.
+	for _, path := range checkFiles {
+		f, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("--check-file: %w", err)
+		}
+		f.Close()
 	}
 	if sameSetup {
 		// The one stateful criterion: it runs inside the chain, at the
@@ -122,6 +134,7 @@ func runDedupe(cmd *cobra.Command, args []string) error {
 	// (grammar.c's last_input_file): the From line is written when it
 	// changes.
 	lastFrom := ""
+	seedCheckFiles(r, checkFiles, log)
 	r.route = func(it Item, o pipeline.Outcome) decision {
 		d := bySelector(it, o)
 		if duplicate && divert && d.target == toOutput {
@@ -137,6 +150,30 @@ func runDedupe(cmd *cobra.Command, args []string) error {
 		return d
 	}
 	return r.finish(r.exec(args))
+}
+
+// seedCheckFiles reads every game of the --check-file files through the
+// run before the first input (lex.c stores CHECKFILEs ahead of the
+// NORMALFILEs whatever the command-line order), registering in log those
+// that satisfy the criteria, as deal_with_game does for a CHECKFILE:
+// the Selector never sees them, nothing is written, and they are neither
+// counted by the summary nor able to fail the run (a game that does not
+// parse or replay is logged and passed over). Their tags are observed, as
+// the C lexer registers tag names from check files first. The run's
+// route is the caller's to set afterwards.
+func seedCheckFiles(r *run, files []string, log *dedup.Log) {
+	if len(files) == 0 {
+		return
+	}
+	r.route = func(it Item, o pipeline.Outcome) decision {
+		if o.Matched {
+			log.Visit(o.Replay, it.Source)
+		}
+		return decision{target: nowhere}
+	}
+	rep := newRunReport(r.logW, r.logW)
+	rep.quiet = true
+	rep.each(games(files, nil, parserOptions(r.cmd)), r.game)
 }
 
 // originName is the name the First found in line gives a source: the

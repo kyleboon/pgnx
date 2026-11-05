@@ -176,3 +176,79 @@ func TestDedupeUsageErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestDedupeCheckFileSeedsTheSeenSet(t *testing.T) {
+	check := writeTemp(t, "check.pgn", gameA)
+	// gameA is already "seen": only gameB comes out, and the check-file
+	// game is neither written nor counted.
+	out, errOut, code := runCLI(t, gameA+gameB, "dedupe", "--check-file", check)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if strings.Count(out, "[White ") != 1 || !strings.Contains(out, `"B"`) {
+		t.Errorf("output:\n%s", out)
+	}
+	if !strings.Contains(errOut, "1 game matched out of 2.") {
+		t.Errorf("summary: %q", errOut)
+	}
+	// The check file is read before the inputs whatever the command-line
+	// order, and a diverted duplicate names it as the origin.
+	dir := t.TempDir()
+	dupes := filepath.Join(dir, "dupes.pgn")
+	in := writeTemp(t, "in.pgn", gameA+gameB)
+	_, _, code = runCLI(t, "", "dedupe", "--quiet", "-o", filepath.Join(dir, "o.pgn"), "--duplicates", dupes, in, "--check-file", check)
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	if d := readFile(t, dupes); !strings.Contains(d, "{ First found in: "+check+" }") || strings.Count(d, "[White ") != 1 {
+		t.Errorf("duplicates:\n%s", d)
+	}
+}
+
+func TestDedupeCheckFileGamesMustSatisfyTheCriteria(t *testing.T) {
+	// deal_with_game runs the criteria on check-file games too: one that
+	// fails them does not seed, so the identical input game is a first
+	// occurrence.
+	check := writeTemp(t, "check.pgn", gameA)
+	out, _, code := runCLI(t, gameA2, "dedupe", "--quiet", "--check-file", check, "--white", "A2")
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	if !strings.Contains(out, `"A2"`) {
+		t.Errorf("output:\n%s", out)
+	}
+}
+
+func TestDedupeCheckFileGamesAreNotNumbered(t *testing.T) {
+	// --first-game and --stop-after count input games only
+	// (num_games_processed is not incremented for a CHECKFILE).
+	check := writeTemp(t, "check.pgn", gameB+gameB+gameB)
+	out, _, code := runCLI(t, gameA+gameA2, "dedupe", "--quiet", "--check-file", check, "--first-game", "1", "--stop-after", "1")
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	if strings.Count(out, "[White ") != 1 || !strings.Contains(out, `[White "A"]`) {
+		t.Errorf("output:\n%s", out)
+	}
+}
+
+func TestDedupeCheckFileErrors(t *testing.T) {
+	// A check file that cannot be opened is a usage error (lex.c
+	// must_open_file); a game in a check file that does not parse is
+	// logged and does not fail the run.
+	_, errOut, code := runCLI(t, gameA, "dedupe", "--check-file", filepath.Join(t.TempDir(), "missing.pgn"))
+	if code != 1 || !strings.Contains(errOut, "missing.pgn") {
+		t.Errorf("missing check file: exit %d, stderr %q", code, errOut)
+	}
+	bad := writeTemp(t, "bad.pgn", "1. e4 e5 2. Ke3 *\n"+gameA)
+	out, errOut, code := runCLI(t, gameA+gameB, "dedupe", "--check-file", bad)
+	if code != 0 {
+		t.Errorf("exit %d, want 0: %s", code, errOut)
+	}
+	if !strings.Contains(errOut, "illegal move") || !strings.Contains(errOut, "1 game matched out of 2.") {
+		t.Errorf("stderr: %q", errOut)
+	}
+	if strings.Count(out, "[White ") != 1 || !strings.Contains(out, `"B"`) {
+		t.Errorf("output:\n%s", out)
+	}
+}
