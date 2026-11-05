@@ -27,6 +27,14 @@ type Options struct {
 	HigherRatedWinner, LowerRatedWinner bool
 	// Setup restricts games by SetUp tag presence.
 	Setup SetupFilter
+	// SameSetup, when non-nil, rejects a game whose starting position
+	// has been offered to it before (--deletesamesetup; hashing.c
+	// check_duplicate_setup). It is consulted after the SetUp-tag filter
+	// and before anything that needs the replay, where the C tool
+	// consults it, with the game's FEN tag or "" for the standard start.
+	// It is the one stateful criterion: Evaluate with a non-nil SameSetup
+	// depends on the games evaluated before it.
+	SameSetup SetupSeen
 
 	// NoBadResults makes Evaluate return ErrBadResult for a game whose
 	// Result tag disagrees with its terminating result. FixResultTags
@@ -88,6 +96,14 @@ type Options struct {
 	// positional match (--markmatches). "FEN" inserts the position's FEN
 	// instead.
 	MarkMatches string
+}
+
+// SetupSeen is the hook behind Options.SameSetup: Seen reports whether
+// the starting position fen describes ("" for the standard start) has
+// been offered before, registering it if not. dedup.SetupSet implements
+// it.
+type SetupSeen interface {
+	Seen(fen string) bool
 }
 
 // AddCriterion adds a parsed -t line to the matcher it belongs to: a
@@ -198,7 +214,7 @@ func (o *Options) SetNMoveRule(n int) error {
 // game before replay, so tag criteria see what the oracle's do.
 //
 //  1. Tag criteria other than ECO, then higher/lower-rated-winner.
-//  2. SetUp-tag filter.
+//  2. SetUp-tag filter, then SameSetup (check_duplicate_setup).
 //  3. ECO classification is not Evaluate's job: the CLI classifies a
 //     replayed game (replacing its ECO/Opening/Variation/SubVariation
 //     tags) before calling Evaluate, which is observably the same as the
@@ -260,6 +276,12 @@ func Evaluate(g *pgn.Game, r *replay.Result, o *Options) (bool, error) {
 	}
 	if _, hasSetup := g.Tag("SetUp"); tagsMatch && ((o.Setup == OnlySetup && !hasSetup) || (o.Setup == NoSetup && hasSetup)) {
 		tagsMatch = false
+	}
+	if tagsMatch && o.SameSetup != nil {
+		fen, _ := g.Tag("FEN")
+		if o.SameSetup.Seen(fen) {
+			tagsMatch = false
+		}
 	}
 
 	// apply_move_list / play_moves. The Result rewrite happens whether

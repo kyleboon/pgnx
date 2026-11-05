@@ -296,6 +296,22 @@ func (w *Writer) WriteGame(g *pgn.Game, r *replay.Result) error {
 	}
 }
 
+// WriteComment writes text as a comment on a line of its own, "{ text }"
+// followed by a newline, the way grammar.c deal_with_game writes the
+// "From:" and "First found in:" lines into the duplicates file through
+// print_str and terminate_line. text is written verbatim. Under
+// Options.JSON nothing is written: the C tool would write the comment
+// raw into the array it is building and break it (CONFORMANCE.md).
+// Whether comments are wanted at all (--no-comments) is the caller's
+// decision.
+func (w *Writer) WriteComment(text string) error {
+	if w.opts.JSON {
+		return nil
+	}
+	_, err := io.WriteString(w.w, "{ "+text+" }\n")
+	return err
+}
+
 // writeMovetextGame renders the tag section, an optional prefix-comment
 // block, and the movetext (via emitMovetext/renderMove) for every
 // movetext-shaped format: SAN, Source, and the long-algebraic family

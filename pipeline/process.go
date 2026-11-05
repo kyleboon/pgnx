@@ -36,7 +36,10 @@ type Config struct {
 	// convert is filter with no criteria by construction. The criteria
 	// stage always runs, since the replay-time tag rewrites (apply.c
 	// play_moves: an invalid Result tag becomes "*") happen there in the
-	// C tool.
+	// C tool. Criteria with a non-nil SameSetup (--same-setup) are the
+	// one exception to Process being order-independent: that hook
+	// remembers the starting positions it has seen, so Process must then
+	// be called in game order, from one goroutine.
 	Criteria *filter.Options
 
 	// Transform is the run's output-side rewrites (transform.Options):
