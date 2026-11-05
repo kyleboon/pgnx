@@ -1021,13 +1021,18 @@ receives it, the summary does not count it).
   `print_str` would wrap it; and under `--suppress-matched` with
   `--duplicates` the C tool still writes the two lines for the game it
   then does not write, while pgnx writes nothing.
-- **Identity is computed on the emitted game.** The pipeline hands the
-  route the replay of the transformed game, so with `--drop-ply` or
-  `--drop-before` two games are duplicates when their *remaining* moves
-  are, whereas the C tool hashes the game as parsed (inside
-  `apply_move_list`, before `rewrite_game`). Not a golden case; a
-  combination unlikely to be wanted. ECO classification, `--split-variants`
-  and the mark comments change no position, so they do not affect identity.
+- **Identity is computed on the game as parsed**, as the C tool hashes
+  it inside `apply_move_list` before `rewrite_game`: the route visits
+  `pipeline.Outcome.SourceReplay`, the replay the criteria judged, so
+  `--drop-ply`/`--drop-before` do not change a game's identity and a game
+  is visited once, on its own replay, before `--split-variants` splits it
+  (pinned by `TestDedupeIdentityIsTheGameAsParsed`). ECO classification
+  and the mark comments change no position.
+- **The `From:` line on a repeated input.** pgnx writes it when the
+  source *name* changes; the C tool compares `current_input_file`
+  pointers, which differ for the same file named twice in a row, so it
+  writes the line again where pgnx does not. Not reachable by a golden
+  target.
 - **Fuzzy identity where the C tool reads uninitialised memory.** Under
   `--fuzzydepth N` with N > 0 the C tool records `fuzzy_duplicate_hash`
   only when a move with ply number N is played (`apply.c:1039`); for a

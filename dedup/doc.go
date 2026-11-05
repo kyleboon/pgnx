@@ -21,5 +21,5 @@
 // dedup never mutates a game and writes nothing; the command that owns
 // a Log decides what a duplicate means for routing. Log and SetupSet are
 // not safe for concurrent use: a run visits its games in order. dedup
-// imports chess, pgn and replay only.
+// imports chess and replay only.
 package dedup

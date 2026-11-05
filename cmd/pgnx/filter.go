@@ -381,7 +381,9 @@ func runFilter(cmd *cobra.Command, args []string) error {
 	}
 	// The Selector routes each processed game on the outcome's matched
 	// bit alone.
-	r.route = routeBySelector(sel, suppressMatched, func(_ Item, o pipeline.Outcome) bool { return o.Matched })
+	r.route = func(it Item, o pipeline.Outcome) decision {
+		return decideBySelector(sel, suppressMatched, it.Number, o.Matched)
+	}
 	return r.finish(r.exec(args))
 }
 
@@ -394,7 +396,7 @@ func (r *run) openSelection(selOpts filter.SelectorOptions) (sel *filter.Selecto
 	flags := r.cmd.Flags()
 	suppressMatched, _ = flags.GetBool("suppress-matched")
 	if unmatchedPath, _ := flags.GetString("unmatched"); unmatchedPath != "" {
-		if err := r.openUnmatched("unmatched"); err != nil {
+		if err := r.openSide("unmatched", &r.unmatched); err != nil {
 			return nil, false, err
 		}
 	}

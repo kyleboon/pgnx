@@ -108,8 +108,18 @@ type Outcome struct {
 	Game *pgn.Game
 
 	// Replay is the game's replay: complete when Status is OK, partial
-	// (the plies before the failure) when Broken, nil when Rejected.
+	// (the plies before the failure) when Broken, nil when Rejected. It
+	// is the replay of the game as emitted: after a transform that
+	// changes the moves (--drop-ply, --drop-before, --split-variants) it
+	// is the fresh replay of what Game now holds.
 	Replay *replay.Result
+
+	// SourceReplay is the replay of the game as parsed, before any
+	// transform: what the criteria judged, complete or partial like
+	// Replay, nil when Rejected. The same Result as Replay unless a
+	// transform changed the moves. Duplicate detection reads it, as the
+	// C tool hashes a game inside apply_move_list, before rewrite_game.
+	SourceReplay *replay.Result
 
 	// Status is the disposition.
 	Status Status
@@ -218,7 +228,7 @@ func (p *Pipeline) Process(g *pgn.Game) Outcome {
 		}
 		o.Status, o.Reason = Broken, replayErr
 	}
-	o.Replay = r
+	o.Replay, o.SourceReplay = r, r
 
 	// Classification precedes the criteria so ECO criteria see the new
 	// tags (the C tool classifies inside apply_move_list, before

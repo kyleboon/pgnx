@@ -67,11 +67,17 @@ func runDedupe(cmd *cobra.Command, args []string) error {
 	if flags.Changed("fuzzy-depth") && fuzzyDepth < 0 {
 		return errors.New("--fuzzy-depth cannot be negative")
 	}
-	if outPath, _ := flags.GetString("output"); dupPath != "" && dupPath == outPath {
-		return fmt.Errorf("--duplicates %s is the --output file", dupPath)
-	}
-	if unmatchedPath, _ := flags.GetString("unmatched"); dupPath != "" && dupPath == unmatchedPath {
-		return fmt.Errorf("--duplicates %s is the --unmatched file", dupPath)
+	if dupPath != "" {
+		// "" and "-" both name stdout for --output; "-" does for the
+		// others.
+		outPath, _ := flags.GetString("output")
+		unmatchedPath, _ := flags.GetString("unmatched")
+		switch {
+		case dupPath == outPath, dupPath == "-" && outPath == "":
+			return fmt.Errorf("--duplicates %s is the --output destination", dupPath)
+		case dupPath == unmatchedPath:
+			return fmt.Errorf("--duplicates %s is the --unmatched file", dupPath)
+		}
 	}
 	// lex.c must_open_file: a check file that cannot be opened ends the
 	// run before any game is read.
@@ -98,45 +104,40 @@ func runDedupe(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if dupPath != "" {
-		if err := r.openDuplicates("duplicates"); err != nil {
+		if err := r.openSide("duplicates", &r.duplicates); err != nil {
 			r.close()
 			return err
 		}
 	}
 
-	log := dedup.NewLog(dedup.Options{Fuzzy: flags.Changed("fuzzy-depth"), FuzzyDepth: fuzzyDepth})
+	seen := dedup.NewLog(dedup.Options{Fuzzy: flags.Changed("fuzzy-depth"), FuzzyDepth: fuzzyDepth})
 	divert := r.duplicates != nil
 
-	// The visit (hashing.c previous_occurance) happens once all criteria
-	// have passed and before the Selector's bookkeeping, which is the C
-	// order; the disposition then says whether the game counts as
-	// matched (grammar.c deal_with_game: a dropped duplicate, or a first
-	// occurrence under -U, leaves game_matches false).
-	var (
-		duplicate bool
-		origin    string
-	)
-	bySelector := routeBySelector(sel, suppressMatched, func(it Item, o pipeline.Outcome) bool {
-		duplicate, origin = false, ""
-		if !o.Matched {
-			return false
-		}
-		origin, duplicate = log.Visit(o.Replay, it.Source)
-		switch {
-		case duplicate && !divert && !onlyDuplicates:
-			return false // -D: dropped
-		case !duplicate && onlyDuplicates:
-			return false // -U: only duplicates are kept
-		}
-		return true
-	})
 	// lastFrom is the input the last diverted duplicate came from
 	// (grammar.c's last_input_file): the From line is written when it
 	// changes.
 	lastFrom := ""
-	seedCheckFiles(r, checkFiles, log)
+	seedCheckFiles(r, checkFiles, seen)
 	r.route = func(it Item, o pipeline.Outcome) decision {
-		d := bySelector(it, o)
+		// The visit (hashing.c previous_occurance) happens once all
+		// criteria have passed and before the Selector's bookkeeping,
+		// which is the C order; the disposition then says whether the
+		// game counts as matched (grammar.c deal_with_game: a dropped
+		// duplicate, or a first occurrence under -U, leaves game_matches
+		// false). The game as parsed is what is compared (SourceReplay):
+		// the C tool hashes it inside apply_move_list, before
+		// rewrite_game drops any plies.
+		matched, duplicate, origin := o.Matched, false, ""
+		if matched {
+			origin, duplicate = seen.Visit(o.SourceReplay, it.Source)
+			switch {
+			case duplicate && !divert && !onlyDuplicates:
+				matched = false // -D: dropped
+			case !duplicate && onlyDuplicates:
+				matched = false // -U: only duplicates are kept
+			}
+		}
+		d := decideBySelector(sel, suppressMatched, it.Number, matched)
 		if duplicate && divert && d.target == toOutput {
 			d.target = toDuplicates
 			if !r.opts.NoComments {
@@ -154,20 +155,20 @@ func runDedupe(cmd *cobra.Command, args []string) error {
 
 // seedCheckFiles reads every game of the --check-file files through the
 // run before the first input (lex.c stores CHECKFILEs ahead of the
-// NORMALFILEs whatever the command-line order), registering in log those
+// NORMALFILEs whatever the command-line order), registering in seen those
 // that satisfy the criteria, as deal_with_game does for a CHECKFILE:
 // the Selector never sees them, nothing is written, and they are neither
 // counted by the summary nor able to fail the run (a game that does not
 // parse or replay is logged and passed over). Their tags are observed, as
 // the C lexer registers tag names from check files first. The run's
 // route is the caller's to set afterwards.
-func seedCheckFiles(r *run, files []string, log *dedup.Log) {
+func seedCheckFiles(r *run, files []string, seen *dedup.Log) {
 	if len(files) == 0 {
 		return
 	}
 	r.route = func(it Item, o pipeline.Outcome) decision {
 		if o.Matched {
-			log.Visit(o.Replay, it.Source)
+			seen.Visit(o.SourceReplay, it.Source)
 		}
 		return decision{target: nowhere}
 	}
@@ -180,7 +181,7 @@ func seedCheckFiles(r *run, files []string, log *dedup.Log) {
 // input file, or "_stdin_" for standard input (hashing.c
 // previous_occurance: with no file name there is nothing to report).
 func originName(source string) string {
-	if source == "stdin" {
+	if source == stdinSource {
 		return "_stdin_"
 	}
 	return source

@@ -18,7 +18,7 @@ func readFile(t *testing.T, path string) string {
 	t.Helper()
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return ""
+		t.Fatal(err)
 	}
 	return string(b)
 }
@@ -296,5 +296,35 @@ func TestDedupeFuzzyDepthNegativeIsUsageError(t *testing.T) {
 	_, errOut, code := runCLI(t, gameA, "dedupe", "--fuzzy-depth", "-1")
 	if code != 1 || !strings.Contains(errOut, "--fuzzy-depth") {
 		t.Errorf("exit %d, stderr %q", code, errOut)
+	}
+}
+
+// TestDedupeIdentityIsTheGameAsParsed: the C tool hashes a game inside
+// apply_move_list, before rewrite_game drops plies, so two games whose
+// remainders coincide after --drop-ply are duplicates only if the whole
+// games are. ruy and ruyTransposed reach one position by different
+// routes: identical after dropping four plies, distinct as parsed.
+func TestDedupeIdentityIsTheGameAsParsed(t *testing.T) {
+	ruy := "[White \"X\"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bb5 *\n"
+	ruyTransposed := "[White \"Y\"]\n\n1. Nf3 Nc6 2. e4 e5 3. Bb5 *\n"
+	out, errOut, code := runCLI(t, ruy+ruyTransposed, "dedupe", "--drop-ply", "4")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if strings.Count(out, "[White ") != 2 {
+		t.Errorf("want both games emitted:\n%s", out)
+	}
+}
+
+func TestDedupeDuplicatesToStdoutWithOutputOnStdoutIsUsageError(t *testing.T) {
+	for _, args := range [][]string{
+		{"dedupe", "--duplicates", "-"},
+		{"dedupe", "-o", "-", "--duplicates", "-"},
+		{"dedupe", "--unmatched", "-", "--duplicates", "-", "-o", "x.pgn"},
+	} {
+		_, errOut, code := runCLI(t, gameA, args...)
+		if code != 1 || !strings.Contains(errOut, "--duplicates") {
+			t.Errorf("%v: exit %d, stderr %q", args, code, errOut)
+		}
 	}
 }

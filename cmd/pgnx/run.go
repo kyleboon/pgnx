@@ -56,24 +56,22 @@ func routeAll(Item, pipeline.Outcome) decision { return decision{target: toOutpu
 // reported.
 func routeNowhere(Item, pipeline.Outcome) decision { return decision{target: nowhere} }
 
-// routeBySelector is the route filter and dedupe share: the Selector
-// decides each game on its matched bit (grammar.c deal_with_game's
-// first_game / select-only / skip-matching / stop-after bookkeeping),
-// matched games go to the output unless suppressMatched, the rest to
-// --unmatched, and its stop-after decision ends the run. matched reports
-// whether the game counts as matched: filter passes the outcome's
-// Matched; dedupe folds the duplicate disposition in first.
-func routeBySelector(sel *filter.Selector, suppressMatched bool, matched func(it Item, o pipeline.Outcome) bool) route {
-	return func(it Item, o pipeline.Outcome) decision {
-		d := sel.Decide(it.Number, matched(it, o))
-		switch {
-		case d.Emit && !suppressMatched:
-			return decision{target: toOutput, stop: d.Stop}
-		case d.ToUnmatched:
-			return decision{target: toUnmatched, stop: d.Stop}
-		}
-		return decision{target: nowhere, stop: d.Stop}
+// decideBySelector is the decision filter and dedupe share: the Selector
+// records game n with its matched bit (grammar.c deal_with_game's
+// first_game / select-only / skip-matching / stop-after bookkeeping);
+// a game it emits goes to the output unless suppressMatched, the rest
+// to --unmatched, and its stop-after decision ends the run. filter
+// passes the outcome's Matched; dedupe folds the duplicate disposition
+// in first.
+func decideBySelector(sel *filter.Selector, suppressMatched bool, n int, matched bool) decision {
+	d := sel.Decide(n, matched)
+	switch {
+	case d.Emit && !suppressMatched:
+		return decision{target: toOutput, stop: d.Stop}
+	case d.ToUnmatched:
+		return decision{target: toUnmatched, stop: d.Stop}
 	}
+	return decision{target: nowhere, stop: d.Stop}
 }
 
 // run is one invocation of a command that sends games through the
@@ -205,30 +203,18 @@ func newReportOnlyRun(allowNullMoves bool) *run {
 	}
 }
 
-// openUnmatched opens the file named by the string flag flagName as the
-// run's unmatched destination. Unmatched games are never divided by ECO
-// (grammar.c select_output_file routes only matched games through -E).
-func (r *run) openUnmatched(flagName string) error {
+// openSide opens the file named by the string flag flagName as one of
+// the run's side destinations, dst being &r.unmatched (filter
+// --unmatched) or &r.duplicates (dedupe --duplicates). A side
+// destination is one file, never divided by ECO: grammar.c
+// select_output_file routes only matched games through -E, and
+// deal_with_game replaces its choice with duplicate_file.
+func (r *run) openSide(flagName string, dst *destination) error {
 	w, err := r.openDestination(flagName, 0)
 	if err != nil {
 		return err
 	}
-	r.unmatched = w
-	r.closers = append(r.closers, w)
-	return nil
-}
-
-// openDuplicates opens the file named by the string flag flagName as the
-// run's duplicates destination (dedupe --duplicates). Like the unmatched
-// destination it is one file, never divided by ECO: grammar.c
-// deal_with_game replaces the ECO-selected output file with
-// duplicate_file.
-func (r *run) openDuplicates(flagName string) error {
-	w, err := r.openDestination(flagName, 0)
-	if err != nil {
-		return err
-	}
-	r.duplicates = w
+	*dst = w
 	r.closers = append(r.closers, w)
 	return nil
 }

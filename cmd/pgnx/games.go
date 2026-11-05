@@ -14,10 +14,14 @@ func openLogFile(path string) (*os.File, error) {
 	return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 }
 
+// stdinSource is the Source of a game read from standard input, the name
+// the C lexer gives it (lex.c: current_input_file = "stdin").
+const stdinSource = "stdin"
+
 // Item is one step of the games iterator: a parsed game, or the failure
 // of a source.
 type Item struct {
-	// Source is the file the item came from, or "stdin".
+	// Source is the file the item came from, or stdinSource.
 	Source string
 	// Number is the game's 1-based number across all sources. On an Err
 	// item it is the number of games yielded so far.
@@ -45,7 +49,7 @@ func games(files []string, stdin io.Reader, opts pgn.ParserOptions) iter.Seq[Ite
 	return func(yield func(Item) bool) {
 		n := 0
 		if len(files) == 0 {
-			scanGames("stdin", stdin, opts, &n, yield)
+			scanGames(stdinSource, stdin, opts, &n, yield)
 			return
 		}
 		for _, path := range files {
