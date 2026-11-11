@@ -17,6 +17,7 @@ go build -o pgnx ./cmd/pgnx        # build the CLI binary
 go test ./...                      # full test suite (fast, a few seconds)
 go test ./pgn -run TestName        # single test
 go test ./chess -run TestPerft -v  # move-generation perft suite
+mise run bench                     # move-generation and replay benchmarks with allocs/op and allocs/ply (not in ci)
 go vet ./...
 
 # Differential test against the C implementation (requires the C binary,
