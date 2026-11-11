@@ -27,11 +27,47 @@ const legalMovesHint = 64
 // it back as moves[:0] generates allocation-free once it has grown.
 func (b *Board) AppendLegalMoves(moves []Move) []Move {
 	start := len(moves)
-	moves = b.appendPseudoLegalMoves(moves)
-	// Filter in place: every pseudo-legal move whose making leaves the
-	// mover's king unattacked is kept, compacted towards start. The
-	// legality probe is a stack copy of the board, so no candidate
-	// allocates.
+	return b.keepLegal(b.appendPseudoLegalMoves(moves), start)
+}
+
+// AppendLegalMovesTo appends the legal moves of the side to move by which
+// a piece of type pt reaches to, and returns the extended slice: the
+// candidates a SAN move naming that piece and destination can denote. It
+// looks outward from to, as pgn-extract's map.c find_knight_moves,
+// find_bishop_moves and find_pawn_moves do, so it never visits more than
+// the squares a piece of that type could arrive from; a pawn's push,
+// double push, capture and en passant capture origins are all
+// considered, and a pawn reaching the last rank is expanded into its
+// promotions. Castling is never among the moves, even when the king's
+// castling destination is to. The candidates pass the same
+// leave-king-in-check filter as AppendLegalMoves and allocate nothing
+// when moves has spare capacity.
+func (b *Board) AppendLegalMovesTo(pt PieceType, to Square, moves []Move) []Move {
+	start := len(moves)
+	color := b.SideToMove
+	switch pt {
+	case Pawn:
+		moves = b.findPawnMoves(to, color, moves)
+	case Knight:
+		moves = b.findDeltaMoves(to, Knight, color, knightDeltas, moves)
+	case King:
+		moves = b.findDeltaMoves(to, King, color, kingDeltas, moves)
+	case Rook:
+		moves = b.findSliderMoves(to, Rook, color, rookDirs, moves)
+	case Bishop:
+		moves = b.findSliderMoves(to, Bishop, color, bishopDirs, moves)
+	case Queen:
+		moves = b.findSliderMoves(to, Queen, color, rookDirs, moves)
+		moves = b.findSliderMoves(to, Queen, color, bishopDirs, moves)
+	}
+	return b.keepLegal(moves, start)
+}
+
+// keepLegal filters moves[start:] in place to the pseudo-legal moves
+// whose making leaves the mover's king unattacked, compacting them
+// towards start, and returns the shortened slice. The legality probe is
+// a stack copy of the board, so no candidate allocates.
+func (b *Board) keepLegal(moves []Move, start int) []Move {
 	mover := b.SideToMove
 	w := start
 	for i := start; i < len(moves); i++ {
@@ -44,6 +80,95 @@ func (b *Board) AppendLegalMoves(moves []Move) []Move {
 		}
 	}
 	return moves[:w]
+}
+
+// findDeltaMoves appends the moves to to of color's pieces of type pt
+// that move by fixed deltas (knight, king): one from each delta's origin
+// square that holds such a piece, provided to is not occupied by a piece
+// of the same color.
+func (b *Board) findDeltaMoves(to Square, pt PieceType, color Color, deltas [][2]int, moves []Move) []Move {
+	if target := b.PieceAt(to); target.Type != NoPiece && target.Color == color {
+		return moves
+	}
+	for _, d := range deltas {
+		from := Square{File: to.File - d[0], Rank: to.Rank - d[1]}
+		if b.pieceIs(from, pt, color) {
+			moves = append(moves, Move{From: from, To: to})
+		}
+	}
+	return moves
+}
+
+// findSliderMoves appends the moves to to of color's sliding pieces of
+// type pt: along each direction the first piece met, if it is such a
+// piece, has a clear ray to to. Nothing is found when to holds a piece of
+// the same color.
+func (b *Board) findSliderMoves(to Square, pt PieceType, color Color, dirs [][2]int, moves []Move) []Move {
+	if target := b.PieceAt(to); target.Type != NoPiece && target.Color == color {
+		return moves
+	}
+	for _, d := range dirs {
+		from := Square{File: to.File + d[0], Rank: to.Rank + d[1]}
+		for from.Valid() {
+			p := b.PieceAt(from)
+			if p.Type == NoPiece {
+				from = Square{File: from.File + d[0], Rank: from.Rank + d[1]}
+				continue
+			}
+			if p.Type == pt && p.Color == color {
+				moves = append(moves, Move{From: from, To: to})
+			}
+			break
+		}
+	}
+	return moves
+}
+
+// findPawnMoves appends the moves to to of color's pawns: the single or
+// double push when to is empty, the diagonal captures when to holds an
+// enemy piece or is the en passant square, with the same rules and
+// promotion expansion as genPawnMoves.
+func (b *Board) findPawnMoves(to Square, color Color, moves []Move) []Move {
+	dir, startRank, lastRank, epRank := pawnGeometry(color)
+
+	target := b.PieceAt(to)
+	if target.Type == NoPiece {
+		// Pushes: the pawn one square back, or two squares back from
+		// its starting rank with the square between empty.
+		one := Square{File: to.File, Rank: to.Rank - dir}
+		if one.Valid() {
+			switch {
+			case b.pieceIs(one, Pawn, color):
+				moves = addPawnMove(one, to, lastRank, moves)
+			case b.PieceAt(one).Type == NoPiece && to.Rank == startRank+2*dir:
+				two := Square{File: to.File, Rank: startRank}
+				if b.pieceIs(two, Pawn, color) {
+					moves = append(moves, Move{From: two, To: to})
+				}
+			}
+		}
+		if !(b.HasEP && to == b.EPSquare && to.Rank == epRank) {
+			return moves
+		}
+		// En passant: the capturing pawns sit diagonally behind to.
+		for _, df := range [2]int{-1, 1} {
+			from := Square{File: to.File + df, Rank: to.Rank - dir}
+			if b.pieceIs(from, Pawn, color) {
+				moves = append(moves, Move{From: from, To: to})
+			}
+		}
+		return moves
+	}
+	if target.Color == color {
+		return moves
+	}
+	for _, df := range [2]int{-1, 1} {
+		from := Square{File: to.File + df, Rank: to.Rank - dir}
+		if b.pieceIs(from, Pawn, color) {
+			moves = addPawnMove(from, to, lastRank, moves)
+		}
+	}
+	return moves
 }
 
 // stackMoveBuffer is the size of the move buffer hasLegalMove keeps on the
@@ -145,22 +270,7 @@ func (b *Board) genSliderMoves(from Square, color Color, dirs [][2]int, moves []
 // genPawnMoves appends single/double pushes, diagonal captures, en passant
 // captures, and promotion expansions for the pawn on sq.
 func (b *Board) genPawnMoves(sq Square, color Color, moves []Move) []Move {
-	dir := 1
-	startRank := 1
-	lastRank := 7
-	// The rank an en passant capture lands on: White's sixth, Black's
-	// third. map.c generate_pawn_moves "rejects ep attempts for the
-	// colour that has just moved" with the same rule, which matters once
-	// a null move passes the turn without clearing the square ("1. e4
-	// --" leaves e3 set with White to move): White's d2/f2 pawns must
-	// not capture onto it.
-	epRank := 5
-	if color == Black {
-		dir = -1
-		startRank = 6
-		lastRank = 0
-		epRank = 2
-	}
+	dir, startRank, lastRank, epRank := pawnGeometry(color)
 
 	// Single push.
 	one := Square{File: sq.File, Rank: sq.Rank + dir}
@@ -193,6 +303,20 @@ func (b *Board) genPawnMoves(sq Square, color Color, moves []Move) []Move {
 		}
 	}
 	return moves
+}
+
+// pawnGeometry returns the ranks color's pawns move by: the direction
+// they advance in, the rank they start on, the rank they promote on, and
+// the rank an en passant capture lands on (White's sixth, Black's third).
+// map.c generate_pawn_moves "rejects ep attempts for the colour that has
+// just moved" with that last rule, which matters once a null move passes
+// the turn without clearing the square ("1. e4 --" leaves e3 set with
+// White to move): White's d2/f2 pawns must not capture onto it.
+func pawnGeometry(color Color) (dir, startRank, lastRank, epRank int) {
+	if color == Black {
+		return -1, 6, 0, 2
+	}
+	return 1, 1, 7, 5
 }
 
 // addPawnMove appends the pawn move from->to (or, if the destination is on

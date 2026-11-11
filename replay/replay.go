@@ -126,25 +126,46 @@ func (p Position) PlyNumber() int {
 }
 
 // replayer is the state one replay of a game shares across its plies and
-// variations: a single buffer the legal moves of a position are generated
-// into, which SAN decoding, SAN rendering and mate detection all read, so
-// no ply generates more than once and no generation allocates once the
-// buffer has grown. The buffer is handed down to variation replays, which
-// overwrite it; a line therefore reads it only before replaying a move's
-// variations, and only the first of a move's variations finds the parent's
-// list in it.
+// variations: a single buffer the moves of a position are generated into,
+// which SAN decoding, SAN rendering and mate detection all read, so no
+// ply generates more than once and no generation allocates once the
+// buffer has grown. The buffer holds either every legal move of a
+// position (mate detection after a check, castling text and bare
+// long-algebraic notation need them all) or only the candidates a SAN
+// move names, the side to move's pieces of one type that can reach one
+// square, as pgn-extract's map.c finds them. The buffer is handed down to
+// variation replays, which overwrite it; a line therefore reads it only
+// before replaying a move's variations, and only the first of a move's
+// variations finds the parent's list in it.
 type replayer struct {
 	buf []chess.Move
 
-	// fresh reports that buf holds the legal moves of the board the next
-	// ply is played from: the position was generated for mate detection
-	// after a checking move, or a move's first variation is starting from
-	// its parent's position.
-	fresh bool
+	// holds says what buf holds for the board the next ply is played
+	// from: nothing of use, its legal moves, or the candidates of the
+	// piece type and destination in target.
+	holds  bufferContents
+	target moveTarget
 
-	// generations counts calls of the legal-move generator, the cost
+	// full counts calls of the full legal-move generator and targeted
+	// calls of the candidate generator, the costs
 	// TestReplayGeneratesLegalMovesOncePerPosition bounds per ply.
-	generations int
+	full, targeted int
+}
+
+// bufferContents says what a replayer's buffer holds for the position
+// the next ply is played from.
+type bufferContents uint8
+
+const (
+	holdsStale    bufferContents = iota // some other position's moves
+	holdsLegal                          // every legal move
+	holdsTargeted                       // the candidates of one moveTarget
+)
+
+// moveTarget is the piece type and destination square a SAN move names.
+type moveTarget struct {
+	piece chess.PieceType
+	to    chess.Square
 }
 
 func newReplayer() *replayer {
@@ -159,12 +180,37 @@ const moveBufferHint = 128
 // legalMoves returns the legal moves of b, generating them into the shared
 // buffer unless it already holds them.
 func (rp *replayer) legalMoves(b *chess.Board) []chess.Move {
-	if !rp.fresh {
+	if rp.holds != holdsLegal {
 		rp.buf = b.AppendLegalMoves(rp.buf[:0])
-		rp.generations++
-		rp.fresh = true
+		rp.full++
+		rp.holds = holdsLegal
 	}
 	return rp.buf
+}
+
+// candidates returns legal moves of b that include every move of a piece
+// of type pt to to: the position's legal moves when the buffer already
+// holds them, else only those candidates, generated into the buffer unless
+// it holds them from the ply's decoding. Callers filter by piece type and
+// destination, as the list may be the wider one.
+func (rp *replayer) candidates(b *chess.Board, pt chess.PieceType, to chess.Square) []chess.Move {
+	if rp.holds == holdsLegal {
+		return rp.buf
+	}
+	t := moveTarget{piece: pt, to: to}
+	if rp.holds != holdsTargeted || rp.target != t {
+		rp.buf = b.AppendLegalMovesTo(pt, to, rp.buf[:0])
+		rp.targeted++
+		rp.holds = holdsTargeted
+		rp.target = t
+	}
+	return rp.buf
+}
+
+// invalidate records that the buffer no longer describes the board the
+// next ply is played from.
+func (rp *replayer) invalidate() {
+	rp.holds = holdsStale
 }
 
 // replayLine replays moves in sequence against b (which is mutated in place),
@@ -207,9 +253,8 @@ func (rp *replayer) replayLine(moves []*pgn.Move, b *chess.Board, allowNull bool
 			m = chess.NullMove
 			san = append(san, NullMoveSAN...)
 		} else {
-			legal := rp.legalMoves(b)
 			var err error
-			m, err = decodeSAN(mv.SAN, b, legal)
+			m, err = decodeSAN(mv.SAN, b, rp)
 			if err != nil {
 				return r, &IllegalMoveError{
 					Ply:    i + 1,
@@ -217,7 +262,7 @@ func (rp *replayer) replayLine(moves []*pgn.Move, b *chess.Board, allowNull bool
 					Reason: err.Error(),
 				}
 			}
-			san = appendSAN(san, m, b, legal)
+			san = appendSAN(san, m, b, rp)
 			piece = b.PieceAt(m.From)
 			captured, enPassant = capturedPieceType(m, b)
 		}
@@ -231,7 +276,7 @@ func (rp *replayer) replayLine(moves []*pgn.Move, b *chess.Board, allowNull bool
 			variations = make([]*Result, len(vars))
 			for vi, v := range vars {
 				vr, verr := rp.replayLine(v.Moves, b.Copy(), true)
-				rp.fresh = false
+				rp.invalidate()
 				if verr != nil {
 					variations[vi] = nil
 					continue
@@ -241,7 +286,7 @@ func (rp *replayer) replayLine(moves []*pgn.Move, b *chess.Board, allowNull bool
 		}
 
 		b.Apply(m)
-		rp.fresh = false
+		rp.invalidate()
 
 		// As apply.c play_moves: a check test first, and only a checking
 		// move is tested for mate, by generating the checked side's legal

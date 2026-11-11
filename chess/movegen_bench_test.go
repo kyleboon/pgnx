@@ -37,6 +37,27 @@ func BenchmarkAppendLegalMoves(b *testing.B) {
 	}
 }
 
+// BenchmarkAppendLegalMovesTo measures the targeted generator a SAN move
+// naming its piece and destination needs, on the moves replay asks for
+// most: a knight, a bishop and a pawn reaching one square.
+func BenchmarkAppendLegalMovesTo(b *testing.B) {
+	board := mustFromFEN(generatorFENs[1].fen)
+	for _, c := range []struct {
+		name string
+		pt   PieceType
+		to   string
+	}{{"knight", Knight, "d5"}, {"bishop", Bishop, "c4"}, {"pawn", Pawn, "d5"}} {
+		b.Run(c.name, func(b *testing.B) {
+			to := MustSquare(c.to)
+			buf := board.AppendLegalMovesTo(c.pt, to, nil)
+			b.ReportAllocs()
+			for b.Loop() {
+				buf = board.AppendLegalMovesTo(c.pt, to, buf[:0])
+			}
+		})
+	}
+}
+
 // BenchmarkIsStalemate measures the no-check fast path of the mate checks,
 // which replay runs after every ply.
 func BenchmarkIsStalemate(b *testing.B) {

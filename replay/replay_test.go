@@ -348,18 +348,27 @@ func TestReplayNullMoveInVariationAlwaysAllowed(t *testing.T) {
 // that list rather than generating again. A variation starts from its
 // parent's position, so its first ply reuses the parent's list too.
 func TestReplayGeneratesLegalMovesOncePerPosition(t *testing.T) {
+	// full counts generations of every legal move of a position, which
+	// only mate detection after a check, castling text and bare
+	// long-algebraic notation need; targeted counts generations of the
+	// candidates a SAN move names, one per ply unless the full list of
+	// the position is already in the buffer.
 	cases := []struct {
-		name        string
-		moves       string
-		plies, want int
+		name           string
+		moves          string
+		plies          int
+		full, targeted int
 	}{
-		{"quiet plies", "1. e4 e5 2. Nf3 Nc6", 4, 4},
-		{"check, then the checked side's reply", "1. e4 d5 2. Bb5+ c6", 4, 4},
-		{"mate", "1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7#", 7, 8},
-		{"variation from the parent's position", "1. e4 (1. d4 d5) 1... e5", 4, 3},
-		// The first sibling overwrites the parent's list, so the second
-		// generates its own; a checking first move primes the reply.
-		{"sibling variations", "1. e4 (1. d4 d5) (1. c4 c5 2. Qa4+ Nc6) 1... e5", 8, 7},
+		{"quiet plies", "1. e4 e5 2. Nf3 Nc6", 4, 0, 4},
+		// The mate test after Bb5+ generates every reply, which c6 reads.
+		{"check, then the checked side's reply", "1. e4 d5 2. Bb5+ c6", 4, 1, 3},
+		{"mate", "1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7#", 7, 1, 7},
+		{"castling text", "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. O-O", 7, 1, 6},
+		{"bare long-algebraic notation", "1. e2e4 e7e5 2. Nf3", 3, 2, 1},
+		{"variation from the parent's position", "1. e4 (1. d4 d5) 1... e5", 4, 0, 4},
+		// The siblings generate their own candidates; the second's
+		// check primes the full list its reply reads.
+		{"sibling variations", "1. e4 (1. d4 d5) (1. e3 d5 2. Bb5+ c6) 1... e5", 8, 1, 7},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -372,8 +381,9 @@ func TestReplayGeneratesLegalMovesOncePerPosition(t *testing.T) {
 			if n, ok := countPlies(r); !ok || n != c.plies {
 				t.Fatalf("replayed %d plies (every variation ok: %v), want %d", n, ok, c.plies)
 			}
-			if rp.generations != c.want {
-				t.Errorf("generations = %d, want %d", rp.generations, c.want)
+			if rp.full != c.full || rp.targeted != c.targeted {
+				t.Errorf("generations = %d full, %d targeted; want %d full, %d targeted",
+					rp.full, rp.targeted, c.full, c.targeted)
 			}
 		})
 	}

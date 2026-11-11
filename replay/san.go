@@ -1,6 +1,8 @@
 // Package replay decodes and regenerates Standard Algebraic Notation (SAN)
-// move text against a chess.Board, by filtering the board's legal moves
-// rather than fully re-implementing SAN's grammar.
+// move text against a chess.Board, by filtering the legal moves the text
+// can denote (those of the piece type it names to the square it names,
+// or every legal move when it names no piece) rather than fully
+// re-implementing SAN's grammar.
 package replay
 
 import (
@@ -53,12 +55,16 @@ var promotionLetters = map[byte]chess.PieceType{
 }
 
 // decodeSAN parses text (SAN or long-algebraic move notation) and returns
-// the unique move among legal, the legal moves of b, that it identifies.
-// It strips trailing annotation characters, handles castling, and
-// otherwise filters legal by piece type, destination, promotion piece,
-// and any from-file/from-rank disambiguation hints present in text. It
-// allocates nothing on the way to a move.
-func decodeSAN(text string, b *chess.Board, legal []chess.Move) (chess.Move, error) {
+// the unique legal move of b that it identifies, reading the moves from
+// rp's buffer. It strips trailing annotation characters, handles castling,
+// and otherwise filters the candidates by piece type, destination,
+// promotion piece, and any from-file/from-rank disambiguation hints
+// present in text. A move naming its piece (or a pawn move) and a
+// destination needs only the candidates of that piece type to that
+// square; castling text and bare long-algebraic notation, whose
+// from-square alone names the piece, read every legal move. It allocates
+// nothing on the way to a move.
+func decodeSAN(text string, b *chess.Board, rp *replayer) (chess.Move, error) {
 	orig := text
 	s := strings.TrimSpace(text)
 
@@ -76,7 +82,7 @@ func decodeSAN(text string, b *chess.Board, legal []chess.Move) (chess.Move, err
 	if side := castleSide(s); side != chess.NoCastle {
 		var match chess.Move
 		found := false
-		for _, m := range legal {
+		for _, m := range rp.legalMoves(b) {
 			if m.Castle == side {
 				if found {
 					return chess.Move{}, fmt.Errorf("ambiguous move %q", orig)
@@ -96,11 +102,17 @@ func decodeSAN(text string, b *chess.Board, legal []chess.Move) (chess.Move, err
 		return chess.Move{}, fmt.Errorf("illegal or unknown move %q", orig)
 	}
 
-	// Step 4: filter the legal moves, keeping the one match or failing
+	// Step 4: filter the candidates, keeping the one match or failing
 	// on the second.
+	var candidates []chess.Move
+	if anyPiece {
+		candidates = rp.legalMoves(b)
+	} else {
+		candidates = rp.candidates(b, pt, dest)
+	}
 	var match chess.Move
 	matches := 0
-	for _, m := range legal {
+	for _, m := range candidates {
 		if m.Castle != chess.NoCastle && !anyPiece {
 			// Castling is normally matched only via O-O/O-O-O text (Step
 			// 2); King moves can't otherwise land on a castle move's
@@ -277,11 +289,11 @@ func parseCore(s string) (pt chess.PieceType, fromFile, fromRank int, dest chess
 }
 
 // appendSAN appends the normalized SAN text for move m on board b to dst
-// and returns the extended slice, computed before m is applied to b;
-// legal is b's legal moves, read for disambiguation. The text has no
-// trailing check/mate suffix (the caller appends that after applying the
-// move).
-func appendSAN(dst []byte, m chess.Move, b *chess.Board, legal []chess.Move) []byte {
+// and returns the extended slice, computed before m is applied to b. The
+// other moves of the same piece type to m.To, which disambiguation must
+// tell m from, are read from rp's buffer. The text has no trailing
+// check/mate suffix (the caller appends that after applying the move).
+func appendSAN(dst []byte, m chess.Move, b *chess.Board, rp *replayer) []byte {
 	if m.Castle == chess.Kingside {
 		return append(dst, "O-O"...)
 	}
@@ -305,7 +317,7 @@ func appendSAN(dst []byte, m chess.Move, b *chess.Board, legal []chess.Move) []b
 	}
 
 	dst = append(dst, pieceSANLetters[mover.Type]...)
-	dst = appendDisambiguation(dst, m, b, mover, legal)
+	dst = appendDisambiguation(dst, m, b, mover, rp.candidates(b, mover.Type, m.To))
 	if capture {
 		dst = append(dst, 'x')
 	}
@@ -332,14 +344,14 @@ func isCapture(m chess.Move, b *chess.Board) bool {
 }
 
 // appendDisambiguation appends the minimal SAN disambiguation prefix for
-// m among legal, b's legal moves: nothing if m.From is the only origin of
-// a same-type, same-color piece reaching m.To; the from-file if that
-// alone distinguishes it; else the from-rank if that alone does; else
-// both.
-func appendDisambiguation(dst []byte, m chess.Move, b *chess.Board, mover chess.Piece, legal []chess.Move) []byte {
+// m among candidates, legal moves of b that include every move of a piece
+// like mover to m.To: nothing if m.From is the only origin of a
+// same-type, same-color piece reaching m.To; the from-file if that alone
+// distinguishes it; else the from-rank if that alone does; else both.
+func appendDisambiguation(dst []byte, m chess.Move, b *chess.Board, mover chess.Piece, candidates []chess.Move) []byte {
 	rivals := 0
 	fileUnique, rankUnique := true, true
-	for _, other := range legal {
+	for _, other := range candidates {
 		if other.Castle != chess.NoCastle || other.To != m.To || other.From == m.From {
 			continue
 		}

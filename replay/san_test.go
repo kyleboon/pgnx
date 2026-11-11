@@ -64,7 +64,7 @@ func TestDecodeSAN(t *testing.T) {
 	}
 	for _, c := range cases {
 		b := board(t, c.fen)
-		m, err := decodeSAN(c.san, b, b.LegalMoves())
+		m, err := decodeSAN(c.san, b, newReplayer())
 		if err != nil {
 			t.Errorf("decodeSAN(%q): %v", c.san, err)
 			continue
@@ -79,7 +79,7 @@ func TestDecodeSANErrors(t *testing.T) {
 	start := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 	for _, san := range []string{"e5", "Nd2xx", "O-O", "Qh4", ""} {
 		b := board(t, start)
-		if _, err := decodeSAN(san, b, b.LegalMoves()); err == nil {
+		if _, err := decodeSAN(san, b, newReplayer()); err == nil {
 			t.Errorf("decodeSAN(%q): want error", san)
 		}
 	}
@@ -88,15 +88,15 @@ func TestDecodeSANErrors(t *testing.T) {
 func TestAppendSAN(t *testing.T) {
 	// both knights reach d2 -> minimal disambiguation is by file
 	b := board(t, "rnbqkb1r/pppppppp/5n2/8/8/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 1")
-	legal := b.LegalMoves()
-	m, _ := decodeSAN("Nbd2", b, legal)
-	if got := string(appendSAN(nil, m, b, legal)); got != "Nbd2" {
+	rp := newReplayer()
+	m, _ := decodeSAN("Nbd2", b, rp)
+	if got := string(appendSAN(nil, m, b, rp)); got != "Nbd2" {
 		t.Errorf("appendSAN = %q, want Nbd2", got)
 	}
 	b2 := board(t, "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2")
-	legal2 := b2.LegalMoves()
-	m2, _ := decodeSAN("exd5", b2, legal2)
-	if got := string(appendSAN(nil, m2, b2, legal2)); got != "exd5" {
+	rp2 := newReplayer()
+	m2, _ := decodeSAN("exd5", b2, rp2)
+	if got := string(appendSAN(nil, m2, b2, rp2)); got != "exd5" {
 		t.Errorf("appendSAN = %q, want exd5", got)
 	}
 }
