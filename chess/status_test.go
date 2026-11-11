@@ -45,3 +45,18 @@ func TestInsufficientMaterial(t *testing.T) {
 		}
 	}
 }
+
+func TestMateChecksAllocateNothingWhenNotInCheck(t *testing.T) {
+	for _, c := range generatorFENs {
+		b := mustFromFEN(c.fen)
+		if b.InCheck(b.SideToMove) {
+			continue
+		}
+		if got := testing.AllocsPerRun(100, func() { b.IsCheckmate() }); got != 0 {
+			t.Errorf("%s: IsCheckmate allocated %v times/op, want 0", c.name, got)
+		}
+		if got := testing.AllocsPerRun(100, func() { b.IsStalemate() }); got != 0 {
+			t.Errorf("%s: IsStalemate allocated %v times/op, want 0", c.name, got)
+		}
+	}
+}
