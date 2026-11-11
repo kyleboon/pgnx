@@ -53,11 +53,12 @@ var promotionLetters = map[byte]chess.PieceType{
 }
 
 // decodeSAN parses text (SAN or long-algebraic move notation) and returns
-// the unique legal move on b that it identifies. It strips trailing
-// annotation characters, handles castling, and otherwise filters
-// b.LegalMoves() by piece type, destination, promotion piece, and any
-// from-file/from-rank disambiguation hints present in text.
-func decodeSAN(text string, b *chess.Board) (chess.Move, error) {
+// the unique move among legal, the legal moves of b, that it identifies.
+// It strips trailing annotation characters, handles castling, and
+// otherwise filters legal by piece type, destination, promotion piece,
+// and any from-file/from-rank disambiguation hints present in text. It
+// allocates nothing on the way to a move.
+func decodeSAN(text string, b *chess.Board, legal []chess.Move) (chess.Move, error) {
 	orig := text
 	s := strings.TrimSpace(text)
 
@@ -73,20 +74,20 @@ func decodeSAN(text string, b *chess.Board) (chess.Move, error) {
 
 	// Step 2: castling.
 	if side := castleSide(s); side != chess.NoCastle {
-		var match *chess.Move
-		for _, m := range b.LegalMoves() {
+		var match chess.Move
+		found := false
+		for _, m := range legal {
 			if m.Castle == side {
-				if match != nil {
+				if found {
 					return chess.Move{}, fmt.Errorf("ambiguous move %q", orig)
 				}
-				mCopy := m
-				match = &mCopy
+				match, found = m, true
 			}
 		}
-		if match == nil {
+		if !found {
 			return chess.Move{}, fmt.Errorf("illegal or unknown move %q", orig)
 		}
-		return *match, nil
+		return match, nil
 	}
 
 	// Step 3: core parse.
@@ -95,9 +96,11 @@ func decodeSAN(text string, b *chess.Board) (chess.Move, error) {
 		return chess.Move{}, fmt.Errorf("illegal or unknown move %q", orig)
 	}
 
-	// Step 4: filter legal moves.
-	var matches []chess.Move
-	for _, m := range b.LegalMoves() {
+	// Step 4: filter the legal moves, keeping the one match or failing
+	// on the second.
+	var match chess.Move
+	matches := 0
+	for _, m := range legal {
 		if m.Castle != chess.NoCastle && !anyPiece {
 			// Castling is normally matched only via O-O/O-O-O text (Step
 			// 2); King moves can't otherwise land on a castle move's
@@ -133,26 +136,24 @@ func decodeSAN(text string, b *chess.Board) (chess.Move, error) {
 		if fromRank != -1 && m.From.Rank != fromRank {
 			continue
 		}
-		matches = append(matches, m)
+		if matches++; matches > 1 {
+			return chess.Move{}, fmt.Errorf("ambiguous move %q", orig)
+		}
+		match = m
 	}
-
-	switch len(matches) {
-	case 0:
+	if matches == 0 {
 		return chess.Move{}, fmt.Errorf("illegal or unknown move %q", orig)
-	case 1:
-		return matches[0], nil
-	default:
-		return chess.Move{}, fmt.Errorf("ambiguous move %q", orig)
 	}
+	return match, nil
 }
 
 // castleSide returns the CastleSide that s denotes, or chess.NoCastle if s
-// is not castling notation.
+// is not castling notation: letter O in either case, or digit 0.
 func castleSide(s string) chess.CastleSide {
-	switch strings.ToUpper(s) {
-	case "O-O", "0-0":
+	switch {
+	case strings.EqualFold(s, "O-O"), s == "0-0":
 		return chess.Kingside
-	case "O-O-O", "0-0-0":
+	case strings.EqualFold(s, "O-O-O"), s == "0-0-0":
 		return chess.Queenside
 	}
 	return chess.NoCastle
@@ -275,41 +276,45 @@ func parseCore(s string) (pt chess.PieceType, fromFile, fromRank int, dest chess
 	return pt, fromFile, fromRank, dest, promo, false, true
 }
 
-// sanFor returns the normalized SAN text for move m on board b, computed
-// before m is applied to b. It does not include a trailing check/mate
-// suffix (the caller appends that after applying the move).
-func sanFor(m chess.Move, b *chess.Board) string {
+// appendSAN appends the normalized SAN text for move m on board b to dst
+// and returns the extended slice, computed before m is applied to b;
+// legal is b's legal moves, read for disambiguation. The text has no
+// trailing check/mate suffix (the caller appends that after applying the
+// move).
+func appendSAN(dst []byte, m chess.Move, b *chess.Board, legal []chess.Move) []byte {
 	if m.Castle == chess.Kingside {
-		return "O-O"
+		return append(dst, "O-O"...)
 	}
 	if m.Castle == chess.Queenside {
-		return "O-O-O"
+		return append(dst, "O-O-O"...)
 	}
 
 	mover := b.PieceAt(m.From)
 	capture := isCapture(m, b)
 
-	var sb strings.Builder
 	if mover.Type == chess.Pawn {
 		if capture {
-			sb.WriteByte(byte('a' + m.From.File))
-			sb.WriteByte('x')
+			dst = append(dst, byte('a'+m.From.File), 'x')
 		}
-		sb.WriteString(m.To.String())
+		dst = appendSquare(dst, m.To)
 		if m.Promotion != chess.NoPiece {
-			sb.WriteByte('=')
-			sb.WriteString(pieceSANLetters[m.Promotion])
+			dst = append(dst, '=')
+			dst = append(dst, pieceSANLetters[m.Promotion]...)
 		}
-		return sb.String()
+		return dst
 	}
 
-	sb.WriteString(pieceSANLetters[mover.Type])
-	sb.WriteString(disambiguation(m, b, mover))
+	dst = append(dst, pieceSANLetters[mover.Type]...)
+	dst = appendDisambiguation(dst, m, b, mover, legal)
 	if capture {
-		sb.WriteByte('x')
+		dst = append(dst, 'x')
 	}
-	sb.WriteString(m.To.String())
-	return sb.String()
+	return appendSquare(dst, m.To)
+}
+
+// appendSquare appends sq in algebraic notation ("e4") to dst.
+func appendSquare(dst []byte, sq chess.Square) []byte {
+	return append(dst, byte('a'+sq.File), byte('1'+sq.Rank))
 }
 
 // isCapture reports whether m, played on b, captures an enemy piece
@@ -326,47 +331,37 @@ func isCapture(m chess.Move, b *chess.Board) bool {
 	return false
 }
 
-// disambiguation computes the minimal SAN disambiguation prefix for m among
-// all legal moves by same-type, same-color pieces that reach m.To: empty if
-// m.From is the only such origin; the from-file if that alone distinguishes
-// it; else the from-rank if that alone distinguishes it; else both.
-func disambiguation(m chess.Move, b *chess.Board, mover chess.Piece) string {
-	var rivals []chess.Square
-	for _, other := range b.LegalMoves() {
-		if other.Castle != chess.NoCastle {
+// appendDisambiguation appends the minimal SAN disambiguation prefix for
+// m among legal, b's legal moves: nothing if m.From is the only origin of
+// a same-type, same-color piece reaching m.To; the from-file if that
+// alone distinguishes it; else the from-rank if that alone does; else
+// both.
+func appendDisambiguation(dst []byte, m chess.Move, b *chess.Board, mover chess.Piece, legal []chess.Move) []byte {
+	rivals := 0
+	fileUnique, rankUnique := true, true
+	for _, other := range legal {
+		if other.Castle != chess.NoCastle || other.To != m.To || other.From == m.From {
 			continue
 		}
-		if other.To != m.To {
+		if p := b.PieceAt(other.From); p.Type != mover.Type || p.Color != mover.Color {
 			continue
 		}
-		if other.From == m.From {
-			continue
-		}
-		p := b.PieceAt(other.From)
-		if p.Type != mover.Type || p.Color != mover.Color {
-			continue
-		}
-		rivals = append(rivals, other.From)
-	}
-	if len(rivals) == 0 {
-		return ""
-	}
-
-	fileUnique := true
-	rankUnique := true
-	for _, r := range rivals {
-		if r.File == m.From.File {
+		rivals++
+		if other.From.File == m.From.File {
 			fileUnique = false
 		}
-		if r.Rank == m.From.Rank {
+		if other.From.Rank == m.From.Rank {
 			rankUnique = false
 		}
 	}
-	if fileUnique {
-		return string(rune('a' + m.From.File))
+	switch {
+	case rivals == 0:
+		return dst
+	case fileUnique:
+		return append(dst, byte('a'+m.From.File))
+	case rankUnique:
+		return append(dst, byte('1'+m.From.Rank))
+	default:
+		return appendSquare(dst, m.From)
 	}
-	if rankUnique {
-		return string(rune('1' + m.From.Rank))
-	}
-	return m.From.String()
 }

@@ -87,7 +87,7 @@ func Game(g *pgn.Game, opts Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return replayMoves(g.Moves, b, opts.AllowNullMoves)
+	return newReplayer().replayLine(g.Moves, b, opts.AllowNullMoves)
 }
 
 // startingBoard returns the board g's replay should start from: the
@@ -125,17 +125,60 @@ func (p Position) PlyNumber() int {
 	return n
 }
 
-// replayMoves replays moves in sequence against b (which is mutated in
-// place), recording a MoveInfo and Position per move plus the leading
-// Position for b's starting state. Variations attached to each move are
-// replayed recursively from a copy of the position before that move; a
-// variation whose own replay fails does not fail the parent replay — it is
-// recorded as a nil *Result. The first illegal move in moves itself stops
-// replay and returns the partial Result together with an *IllegalMoveError
-// whose Ply is the 1-based index of the failing move within moves. A null
-// move is illegal in moves unless allowNull; variations always allow it.
-func replayMoves(moves []*pgn.Move, b *chess.Board, allowNull bool) (*Result, error) {
+// replayer is the state one replay of a game shares across its plies and
+// variations: a single buffer the legal moves of a position are generated
+// into, which SAN decoding, SAN rendering and mate detection all read, so
+// no ply generates more than once and no generation allocates once the
+// buffer has grown. The buffer is handed down to variation replays, which
+// overwrite it; a line therefore reads it only before replaying a move's
+// variations, and only the first of a move's variations finds the parent's
+// list in it.
+type replayer struct {
+	buf []chess.Move
+
+	// fresh reports that buf holds the legal moves of the board the next
+	// ply is played from: the position was generated for mate detection
+	// after a checking move, or a move's first variation is starting from
+	// its parent's position.
+	fresh bool
+
+	// generations counts calls of the legal-move generator, the cost
+	// TestReplayGeneratesLegalMovesOncePerPosition bounds per ply.
+	generations int
+}
+
+func newReplayer() *replayer {
+	return &replayer{buf: make([]chess.Move, 0, moveBufferHint)}
+}
+
+// moveBufferHint is the initial capacity of a replayer's move buffer:
+// enough for the pseudo-legal moves of nearly every position reached in
+// play, so the buffer is rarely regrown.
+const moveBufferHint = 128
+
+// legalMoves returns the legal moves of b, generating them into the shared
+// buffer unless it already holds them.
+func (rp *replayer) legalMoves(b *chess.Board) []chess.Move {
+	if !rp.fresh {
+		rp.buf = b.AppendLegalMoves(rp.buf[:0])
+		rp.generations++
+		rp.fresh = true
+	}
+	return rp.buf
+}
+
+// replayLine replays moves in sequence against b (which is mutated in place),
+// recording a MoveInfo and Position per move plus the leading Position for
+// b's starting state. Variations attached to each move are replayed
+// recursively from a copy of the position before that move; a variation
+// whose own replay fails does not fail the parent replay — it is recorded
+// as a nil *Result. The first illegal move in moves itself stops replay
+// and returns the partial Result together with an *IllegalMoveError whose
+// Ply is the 1-based index of the failing move within moves. A null move
+// is illegal in moves unless allowNull; variations always allow it.
+func (rp *replayer) replayLine(moves []*pgn.Move, b *chess.Board, allowNull bool) (*Result, error) {
 	r := &Result{
+		Moves:     make([]MoveInfo, 0, len(moves)),
 		Positions: make([]Position, 0, len(moves)+1),
 		start:     b.Copy(),
 		final:     b, // mutated below; the last position when replay stops
@@ -145,10 +188,13 @@ func replayMoves(moves []*pgn.Move, b *chess.Board, allowNull bool) (*Result, er
 	for i, mv := range moves {
 		var (
 			m         chess.Move
-			san       string
 			piece     chess.Piece
 			captured  chess.PieceType
 			enPassant bool
+			// The move's SAN, built on the stack and turned into a
+			// string once its check suffix is known.
+			sanBuf [16]byte
+			san    = sanBuf[:0]
 		)
 		if isNullMove(mv.SAN) {
 			if !allowNull {
@@ -158,10 +204,12 @@ func replayMoves(moves []*pgn.Move, b *chess.Board, allowNull bool) (*Result, er
 					Reason: "null move (--) only allowed in variations without --allow-null-moves",
 				}
 			}
-			m, san = chess.NullMove, NullMoveSAN
+			m = chess.NullMove
+			san = append(san, NullMoveSAN...)
 		} else {
+			legal := rp.legalMoves(b)
 			var err error
-			m, err = decodeSAN(mv.SAN, b)
+			m, err = decodeSAN(mv.SAN, b, legal)
 			if err != nil {
 				return r, &IllegalMoveError{
 					Ply:    i + 1,
@@ -169,19 +217,21 @@ func replayMoves(moves []*pgn.Move, b *chess.Board, allowNull bool) (*Result, er
 					Reason: err.Error(),
 				}
 			}
-			san = sanFor(m, b)
+			san = appendSAN(san, m, b, legal)
 			piece = b.PieceAt(m.From)
 			captured, enPassant = capturedPieceType(m, b)
 		}
 
 		// Variations replay from the position before this move, so branch
-		// off a copy of b prior to applying m.
+		// off a copy of b prior to applying m. They share the move buffer:
+		// the first starts with this position's moves in it, and each one
+		// leaves some other position's moves behind.
 		var variations []*Result
 		if vars := mv.Variations(); len(vars) > 0 {
 			variations = make([]*Result, len(vars))
 			for vi, v := range vars {
-				vb := b.Copy()
-				vr, verr := replayMoves(v.Moves, vb, true)
+				vr, verr := rp.replayLine(v.Moves, b.Copy(), true)
+				rp.fresh = false
 				if verr != nil {
 					variations[vi] = nil
 					continue
@@ -191,18 +241,21 @@ func replayMoves(moves []*pgn.Move, b *chess.Board, allowNull bool) (*Result, er
 		}
 
 		b.Apply(m)
+		rp.fresh = false
 
-		sideToMove := b.SideToMove
-		isMate := b.IsCheckmate()
-		isCheck := isMate || b.InCheck(sideToMove)
+		// As apply.c play_moves: a check test first, and only a checking
+		// move is tested for mate, by generating the checked side's legal
+		// moves (which the next ply then reuses).
+		isCheck := b.InCheck(b.SideToMove)
+		isMate := isCheck && len(rp.legalMoves(b)) == 0
 		if isMate {
-			san += "#"
+			san = append(san, '#')
 		} else if isCheck {
-			san += "+"
+			san = append(san, '+')
 		}
 
 		r.Moves = append(r.Moves, MoveInfo{
-			SAN:        san,
+			SAN:        string(san),
 			Move:       m,
 			Piece:      piece,
 			Captured:   captured,

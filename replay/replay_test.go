@@ -340,3 +340,41 @@ func TestReplayNullMoveInVariationAlwaysAllowed(t *testing.T) {
 		t.Errorf("FEN after variation null = %s", got)
 	}
 }
+
+// Generating legal moves is the cost of a ply, so a replay generates each
+// position's legal moves at most once: a quiet ply once, before the move,
+// which decoding and SAN rendering share; a checking ply a second time
+// after it, for mate detection, and the next ply of the line then reuses
+// that list rather than generating again. A variation starts from its
+// parent's position, so its first ply reuses the parent's list too.
+func TestReplayGeneratesLegalMovesOncePerPosition(t *testing.T) {
+	cases := []struct {
+		name        string
+		moves       string
+		plies, want int
+	}{
+		{"quiet plies", "1. e4 e5 2. Nf3 Nc6", 4, 4},
+		{"check, then the checked side's reply", "1. e4 d5 2. Bb5+ c6", 4, 4},
+		{"mate", "1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7#", 7, 8},
+		{"variation from the parent's position", "1. e4 (1. d4 d5) 1... e5", 4, 3},
+		// The first sibling overwrites the parent's list, so the second
+		// generates its own; a checking first move primes the reply.
+		{"sibling variations", "1. e4 (1. d4 d5) (1. c4 c5 2. Qa4+ Nc6) 1... e5", 8, 7},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			g := parseOne(t, c.moves+" *")
+			rp := newReplayer()
+			r, err := rp.replayLine(g.Moves, chess.NewBoard(), false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if n, ok := countPlies(r); !ok || n != c.plies {
+				t.Fatalf("replayed %d plies (every variation ok: %v), want %d", n, ok, c.plies)
+			}
+			if rp.generations != c.want {
+				t.Errorf("generations = %d, want %d", rp.generations, c.want)
+			}
+		})
+	}
+}
