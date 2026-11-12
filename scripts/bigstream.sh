@@ -16,9 +16,11 @@
 #   FMT     output format (default san)
 #
 # Output goes to /dev/null; diagnostics are discarded. Not part of go test:
-# it takes minutes to hours (pgnx streams about 1.4 MB/s at the 2026-11-02
-# baseline, so 2 GB is about 25 minutes). Baseline 2026-11-02 on 222 MB:
-# C 19 s / 3 MB RSS; pgnx 159 s / 15 MB RSS.
+# it takes minutes (pgnx streams about 9 MB/s at the 2026-11-12 baseline,
+# so 2 GB is about 4 minutes). The ADR 0003 baseline slice is the first
+# 100 TWIC issues, 232,960,652 bytes: scripts/bigstream.sh 0.232960652
+#   2026-11-02: C 19 s / 12 MB/s / 3 MB RSS;   pgnx 159 s / 1.4 MB/s / 15 MB RSS
+#   2026-11-12: C 15.7 s / 14.8 MB/s / 2.8 MB RSS; pgnx 24.8 s / 9.4 MB/s / 13.4 MB RSS
 set -euo pipefail
 
 C_BIN="${C_BIN:-$HOME/code/pgn-extract/build/bin/pgn-extract}"

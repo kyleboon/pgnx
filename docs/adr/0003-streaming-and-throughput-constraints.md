@@ -1,6 +1,7 @@
 # 0003: Memory is bounded per game and throughput must match the C tool
 
-Status: accepted (2026-11-02)
+Status: accepted (2026-11-02); amended 2026-11-12 (pgnx-perf.1.6), baseline
+table and follow-up tickets below
 
 pgnx must process PGN inputs of 30 GB and more. Two constraints follow that
 the code cannot show on its own, so they are recorded here and checked by
@@ -18,11 +19,25 @@ stream and reports peak RSS and throughput for both.
 
 2. **Single-threaded throughput matches pgn-extract on the same input.**
    Parallel processing (`--jobs`) is a bonus on top of that, not a way to
-   reach it. Baseline on 2026-11-02 over a 222 MB TWIC slice: pgn-extract
-   12 MB/s at 3 MB RSS; pgnx 1.4 MB/s at 15 MB RSS. The gap is replay
-   generating every legal move for every ply, three times per ply, with a
-   fresh allocation each time (19 GB allocated for a 20 MB input), where the
-   C tool generates only the candidates the SAN names, without allocating.
+   reach it. The baseline is `scripts/bigstream.sh` over the same 232 MB
+   TWIC slice (the first 100 issues, twic1000 to twic1099, 232,960,652
+   bytes, which the script reports as "232 MB" and earlier notes called
+   222 MiB; `scripts/bigstream.sh 0.232960652`), `convert` to `/dev/null`,
+   on an Apple M1, median of three runs; MB/s divides decimal megabytes
+   by wall time, RSS is the peak resident set in MiB:
+
+   | date | pgn-extract | pgnx | ratio | state |
+   |---|---|---|---|---|
+   | 2026-11-02 | 19 s, 12 MB/s, 3 MB RSS | 159 s, 1.4 MB/s, 15 MB RSS | 8.4x | replay generated every legal move three times per ply, allocating each time (19 GB allocated for a 20 MB input) |
+   | 2026-11-12 | 15.7 s, 14.8 MB/s, 2.8 MB RSS | 24.8 s, 9.4 MB/s, 13.4 MB RSS | 1.58x | after pgnx-perf.1: one SAN-directed generation per ply into a reused buffer, no per-ply FEN (832 ns/ply, 1.1 allocs/ply in `BenchmarkGame`) |
+
+   A separate stage-timing run on 2026-11-12 over the same slice (best of
+   three, total 24.6 s) spends 76% of its wall time in replay (18.7 s;
+   parse 3.3 s, output 2.2 s). A sampled profile of a convert run puts
+   two full-board hash scans per ply at 26% and check detection by ray
+   scan at 21% of all sampled user CPU; tickets pgnx-perf.3 and
+   pgnx-perf.4 under the `pgnx-perf` epic carry those two shares, and
+   pgnx-perf.5 to pgnx-perf.7 the allocation, lexer and output remainder.
 
 ## Consequences
 
@@ -30,4 +45,5 @@ stream and reports peak RSS and throughput for both.
 - An `io.Pipe` test guards the "never reads ahead of the current game"
   property in the game iterator; RSS assertions stay out of `go test`.
 - A performance epic, sequenced after the `replay.Position` rework, owns the
-  move-generation redesign and the parallel runner.
+  move-generation redesign (done 2026-11-12), the hashing and check-detection
+  follow-ups, and the parallel runner.
