@@ -131,7 +131,7 @@ func TestDropPlies(t *testing.T) {
 			if (len(g.PrefixComments) > 0) != c.keepPre {
 				t.Errorf("prefix comments kept = %v, want %v", len(g.PrefixComments) > 0, c.keepPre)
 			}
-			if nr == nil || len(nr.Moves) != c.wantLeft || nr.Positions[0].FEN != c.wantFEN {
+			if nr == nil || len(nr.Moves) != c.wantLeft || nr.StartBoard().FEN() != c.wantFEN {
 				t.Errorf("replay not rebuilt from the new start: %+v", nr)
 			}
 		})

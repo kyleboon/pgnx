@@ -303,19 +303,20 @@ func (w *positionWalk) walk(moves []*pgn.Move, r *replay.Result, limit int, pref
 	if r == nil || len(r.Positions) == 0 {
 		return false, "", 0
 	}
-	// Patterns need the board itself; it is walked alongside the
-	// positions by applying the replayed moves, and only when there are
-	// patterns to test.
+	// Patterns, and a FEN mark comment, need the board itself; it is
+	// walked alongside the positions by applying the replayed moves,
+	// and only when there are patterns to test or FENs to write.
 	var b *chess.Board
-	if !w.pc.Patterns.Empty() {
+	if !w.pc.Patterns.Empty() || w.mark == "FEN" {
 		b = r.StartBoard()
 	}
+	board := func() *chess.Board { return b }
 	p0 := r.Positions[0].PlyNumber()
 	if p0 >= w.startPly {
 		if l, ok := w.pc.matches(r.Positions[0], b); ok {
 			matched, label = true, l
 			if w.mark != "" && prefix != nil {
-				*prefix = append([]string{markComment(w.mark, r.Positions[0])}, *prefix...)
+				*prefix = append([]string{markComment(w.mark, board)}, *prefix...)
 			}
 		}
 	}
@@ -350,7 +351,7 @@ func (w *positionWalk) walk(moves []*pgn.Move, r *replay.Result, limit int, pref
 			if l, ok := w.pc.matches(pos, b); ok {
 				matched, label = true, l
 				if w.mark != "" {
-					moves[i].AddComment(markComment(w.mark, pos))
+					moves[i].AddComment(markComment(w.mark, board))
 				}
 			}
 		}

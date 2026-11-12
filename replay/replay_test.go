@@ -35,8 +35,8 @@ func TestReplayFoolsMate(t *testing.T) {
 		t.Errorf("initial hash wrong")
 	}
 	wantFinal := "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3"
-	if r.Positions[4].FEN != wantFinal {
-		t.Errorf("final FEN = %s", r.Positions[4].FEN)
+	if got := r.FinalBoard().FEN(); got != wantFinal {
+		t.Errorf("final FEN = %s", got)
 	}
 }
 
@@ -116,11 +116,12 @@ func TestBoardsOnDemand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	const startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 	start, final := r.StartBoard(), r.FinalBoard()
-	if start.FEN() != r.Positions[0].FEN {
+	if start.FEN() != startFEN {
 		t.Errorf("StartBoard FEN = %s", start.FEN())
 	}
-	if final.FEN() != r.Positions[4].FEN || !final.IsCheckmate() {
+	if final.FEN() != "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3" || !final.IsCheckmate() {
 		t.Errorf("FinalBoard FEN = %s", final.FEN())
 	}
 	// The boards are the caller's to mutate: applying the game's typed
@@ -128,11 +129,11 @@ func TestBoardsOnDemand(t *testing.T) {
 	// returns the start position.
 	for i, mi := range r.Moves {
 		start.Apply(mi.Move)
-		if start.FEN() != r.Positions[i+1].FEN {
-			t.Errorf("after move %d: %s, want %s", i, start.FEN(), r.Positions[i+1].FEN)
+		if start.Zobrist() != r.Positions[i+1].Zobrist {
+			t.Errorf("after move %d: %s, hash %#x want %#x", i, start.FEN(), start.Zobrist(), r.Positions[i+1].Zobrist)
 		}
 	}
-	if r.StartBoard().FEN() != r.Positions[0].FEN {
+	if r.StartBoard().FEN() != startFEN {
 		t.Error("StartBoard was mutated through the returned board")
 	}
 	if (&Result{}).StartBoard() != nil || (&Result{}).FinalBoard() != nil || (*Result)(nil).FinalBoard() != nil {
@@ -149,10 +150,10 @@ func TestBoardsOfPartialReplay(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected replay failure")
 	}
-	if len(r.Positions) != 4 || r.FinalBoard().FEN() != r.Positions[3].FEN {
+	if len(r.Positions) != 4 || r.FinalBoard().FEN() != "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2" {
 		t.Errorf("partial FinalBoard = %s, positions %d", r.FinalBoard().FEN(), len(r.Positions))
 	}
-	if r.StartBoard().FEN() != r.Positions[0].FEN {
+	if r.StartBoard().FEN() != chess.NewBoard().FEN() {
 		t.Errorf("partial StartBoard = %s", r.StartBoard().FEN())
 	}
 }
@@ -166,7 +167,7 @@ func TestVariationBoards(t *testing.T) {
 		t.Fatal(err)
 	}
 	v := r.Moves[1].Variations[0]
-	if v.StartBoard().FEN() != r.Positions[1].FEN || v.FinalBoard().FEN() != v.Positions[2].FEN {
+	if v.StartBoard().FEN() != r.BoardAt(1).FEN() || v.FinalBoard().Zobrist() != v.Positions[2].Zobrist {
 		t.Errorf("variation boards: start %s final %s", v.StartBoard().FEN(), v.FinalBoard().FEN())
 	}
 }
@@ -189,7 +190,7 @@ func TestReplayPlacementKeyPerPly(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, p := range r.Positions {
-		b, err := chess.FromFEN(p.FEN)
+		b, err := chess.FromFEN(r.BoardAt(i).FEN())
 		if err != nil {
 			t.Fatalf("ply %d: %v", i, err)
 		}
@@ -283,8 +284,8 @@ func TestFullmoveClampedInFEN(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := r.Positions[0]
-	if p.FullmoveNumber != 1 || p.FEN != "7k/3P4/7K/8/8/8/8/8 w - - 6 1" {
-		t.Errorf("start position: %+v", p)
+	if p.FullmoveNumber != 1 || r.StartBoard().FEN() != "7k/3P4/7K/8/8/8/8/8 w - - 6 1" {
+		t.Errorf("start position: %+v, FEN %s", p, r.StartBoard().FEN())
 	}
 }
 
@@ -314,10 +315,10 @@ func TestReplayNullMoveMainLineAllowed(t *testing.T) {
 		}
 		// apply.c leaves the board as it was: e3 stays, the clock does
 		// not advance, only the side to move and move number change.
-		if got := r.Positions[2].FEN; got != "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e3 0 2" {
+		if got := r.BoardAt(2).FEN(); got != "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e3 0 2" {
 			t.Errorf("%s: FEN after null = %s", spelling, got)
 		}
-		if got := r.Positions[3].FEN; got != "rnbqkbnr/pppppppp/8/8/3PP3/8/PPP2PPP/RNBQKBNR b KQkq d3 0 2" {
+		if got := r.BoardAt(3).FEN(); got != "rnbqkbnr/pppppppp/8/8/3PP3/8/PPP2PPP/RNBQKBNR b KQkq d3 0 2" {
 			t.Errorf("%s: FEN after 2. d4 = %s", spelling, got)
 		}
 		if r.PlyCount() != 3 {
@@ -336,7 +337,7 @@ func TestReplayNullMoveInVariationAlwaysAllowed(t *testing.T) {
 	if v == nil || len(v.Moves) != 2 || !v.Moves[1].Move.IsNull() {
 		t.Fatalf("variation replay = %+v", v)
 	}
-	if got := v.Positions[2].FEN; got != "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR w KQkq d3 0 2" {
+	if got := v.BoardAt(2).FEN(); got != "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR w KQkq d3 0 2" {
 		t.Errorf("FEN after variation null = %s", got)
 	}
 }
@@ -386,5 +387,41 @@ func TestReplayGeneratesLegalMovesOncePerPosition(t *testing.T) {
 					rp.full, rp.targeted, c.full, c.targeted)
 			}
 		})
+	}
+}
+
+// TestBoardAtMidGame pins the FEN of mid-game positions produced on demand
+// from the typed moves rather than stored per ply: a FEN-start game with
+// Black to move and an en passant square, a double pawn push that sets a
+// new one, and the capture en passant that uses it.
+func TestBoardAtMidGame(t *testing.T) {
+	start := "rnbqkbnr/pppp1ppp/8/4p3/3PP3/8/PPP2PPP/RNBQKBNR b KQkq d3 0 2"
+	g := parseOne(t, "[FEN \""+start+"\"]\n[SetUp \"1\"]\n\n2... exd4 3. c4 dxc3 4. Nxc3 *\n")
+	r, err := Game(g, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		start,
+		"rnbqkbnr/pppp1ppp/8/8/3pP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3",
+		"rnbqkbnr/pppp1ppp/8/8/2PpP3/8/PP3PPP/RNBQKBNR b KQkq c3 0 3",
+		"rnbqkbnr/pppp1ppp/8/8/4P3/2p5/PP3PPP/RNBQKBNR w KQkq - 0 4",
+		"rnbqkbnr/pppp1ppp/8/8/4P3/2N5/PP3PPP/R1BQKBNR b KQkq - 0 4",
+	}
+	if len(r.Positions) != len(want) {
+		t.Fatalf("%d positions, want %d", len(r.Positions), len(want))
+	}
+	for i, w := range want {
+		if got := r.BoardAt(i).FEN(); got != w {
+			t.Errorf("BoardAt(%d).FEN() = %s, want %s", i, got, w)
+		}
+	}
+	// The board is the caller's to mutate; a later call is unaffected.
+	r.BoardAt(2).Apply(r.Moves[2].Move)
+	if got := r.BoardAt(2).FEN(); got != want[2] {
+		t.Errorf("BoardAt(2) after mutating an earlier copy = %s", got)
+	}
+	if r.BoardAt(len(want)) != nil || r.BoardAt(-1) != nil || (*Result)(nil).BoardAt(0) != nil {
+		t.Error("BoardAt out of range should be nil")
 	}
 }

@@ -7,13 +7,27 @@ import (
 )
 
 // markComment returns the text of a --markmatches comment for a position:
-// the literal mark, or the position's FEN when the mark is "FEN"
-// (apply.c create_match_comment).
-func markComment(mark string, pos replay.Position) string {
+// the literal mark, or the position's FEN when the mark is "FEN" (apply.c
+// create_match_comment). board is called only for a FEN mark, so a caller
+// that marks one position passes a replay.Result.BoardAt closure, and
+// one that may mark every ply walks a board alongside the positions and
+// passes that.
+func markComment(mark string, board func() *chess.Board) string {
 	if mark == "FEN" {
-		return pos.FEN
+		return board().FEN()
 	}
 	return mark
+}
+
+// markBoard returns the board a loop over a line's positions walks for
+// its FEN mark comments: r's start board when mark is "FEN", else nil.
+// The caller applies each replayed move to it before testing the
+// position the move reaches.
+func markBoard(mark string, r *replay.Result) *chess.Board {
+	if mark != "FEN" {
+		return nil
+	}
+	return r.StartBoard()
 }
 
 // matchCheckmate reports whether any main-line move delivered mate
@@ -55,9 +69,13 @@ func matchInsufficient(r *replay.Result) bool {
 func matchNMoveRule(g *pgn.Game, r *replay.Result, n int, mark string, startPly, stop int) bool {
 	matched := false
 	p0 := firstPly(r)
+	b := markBoard(mark, r)
 	for i := 0; i < stop && i < len(r.Moves); i++ {
 		if i+1 >= len(r.Positions) || i >= len(g.Moves) {
 			break
+		}
+		if b != nil {
+			b.Apply(r.Moves[i].Move)
 		}
 		if p0+i < startPly {
 			continue
@@ -66,7 +84,7 @@ func matchNMoveRule(g *pgn.Game, r *replay.Result, n int, mark string, startPly,
 		if pos.HalfmoveClock >= 2*n {
 			matched = true
 			if mark != "" {
-				g.Moves[i].AddComment(markComment(mark, pos))
+				g.Moves[i].AddComment(markComment(mark, func() *chess.Board { return b }))
 			}
 		}
 	}
@@ -102,9 +120,13 @@ func matchRepetition(g *pgn.Game, r *replay.Result, n int, mark string, startPly
 	counts[r.Positions[0].Zobrist]++
 	matched := false
 	p0 := firstPly(r)
+	b := markBoard(mark, r)
 	for i := 0; i < stop && i < len(r.Moves); i++ {
 		if i+1 >= len(r.Positions) || i >= len(g.Moves) {
 			break
+		}
+		if b != nil {
+			b.Apply(r.Moves[i].Move)
 		}
 		if p0+i < startPly {
 			continue
@@ -114,7 +136,7 @@ func matchRepetition(g *pgn.Game, r *replay.Result, n int, mark string, startPly
 		if counts[pos.Zobrist] >= n {
 			matched = true
 			if mark != "" {
-				g.Moves[i].AddComment(markComment(mark, pos))
+				g.Moves[i].AddComment(markComment(mark, func() *chess.Board { return b }))
 			}
 		}
 	}

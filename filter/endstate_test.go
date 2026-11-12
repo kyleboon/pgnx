@@ -125,11 +125,34 @@ func TestMatchRepetitionMarks(t *testing.T) {
 	}
 }
 
+// A FEN mark on the N-move rule writes each qualifying ply's own FEN,
+// including plies after ones the start ply skipped.
+func TestMatchNMoveRuleFENMark(t *testing.T) {
+	src := "[FEN \"4k3/8/8/8/8/8/8/4K2R w K - 98 60\"]\n\n60. Kd1 Kd8 61. Ke1 Ke8 *\n"
+	g, r := replayed(t, src)
+	// Ply 119 is the first move; 121 skips Kd1 and Kd8, whose clocks of
+	// 99 and 100 would otherwise mark Kd8 too.
+	if !matchNMoveRule(g, r, 50, "FEN", 121, len(r.Moves)) {
+		t.Fatal("fifty-move rule should apply")
+	}
+	want := [][]string{
+		nil,
+		nil,
+		{"3k4/8/8/8/8/8/8/4K2R b - - 101 61"},
+		{"4k3/8/8/8/8/8/8/4K2R w - - 102 62"},
+	}
+	for i, m := range g.Moves {
+		if got := m.Comments(); strings.Join(got, "|") != strings.Join(want[i], "|") {
+			t.Errorf("ply %d comments = %v, want %v", i+1, got, want[i])
+		}
+	}
+}
+
 func TestMatchRepetitionFENMark(t *testing.T) {
 	src := "1. Nf3 Nf6 2. Ng1 Ng8 3. Nf3 Nf6 4. Ng1 Ng8 *\n"
 	g, r := replayed(t, src)
 	matchRepetition(g, r, 3, "FEN", 1, len(r.Moves))
-	if got := g.Moves[7].Comments(); len(got) != 1 || got[0] != r.Positions[8].FEN {
+	if got := g.Moves[7].Comments(); len(got) != 1 || got[0] != r.BoardAt(8).FEN() {
 		t.Errorf("FEN mark = %v", got)
 	}
 }

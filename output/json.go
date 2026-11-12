@@ -85,8 +85,10 @@ func jsonMoves(b *strings.Builder, g *pgn.Game, r *replay.Result, opts Options) 
 	if r != nil {
 		infos = r.Moves
 	}
+	// The evaluation and the FEN fields need the board after each move;
+	// walk it alongside the typed moves.
 	var board *chess.Board
-	if opts.Evaluation && r != nil {
+	if (opts.Evaluation || opts.FENComments) && r != nil {
 		board = r.StartBoard()
 	}
 	noNAGs := opts.NoNAGs || isUCI(opts.Format)
@@ -125,12 +127,14 @@ func jsonMoves(b *strings.Builder, g *pgn.Game, r *replay.Result, opts Options) 
 		}
 		if board != nil && info != nil {
 			board.Apply(info.Move)
-			fmt.Fprintf(b, `, "evaluation" : "%.2f"`, shannonEvaluation(board))
+			if opts.Evaluation {
+				fmt.Fprintf(b, `, "evaluation" : "%.2f"`, shannonEvaluation(board))
+			}
+			if opts.FENComments {
+				fmt.Fprintf(b, `, "FEN" : "%s"`, board.FEN())
+			}
 		}
 		if r != nil && i+1 < len(r.Positions) {
-			if opts.FENComments {
-				fmt.Fprintf(b, `, "FEN" : "%s"`, r.Positions[i+1].FEN)
-			}
 			if opts.HashComments {
 				fmt.Fprintf(b, `, "HashCode" : "%016x"`, r.Positions[i+1].Zobrist)
 			}
@@ -139,7 +143,7 @@ func jsonMoves(b *strings.Builder, g *pgn.Game, r *replay.Result, opts Options) 
 			// -F: the final position follows the last move's own fields,
 			// with the trailing space the C tool writes after it
 			// (print_move_list).
-			fmt.Fprintf(b, `, "FEN" : "%s" `, r.Positions[len(g.Moves)].FEN)
+			fmt.Fprintf(b, `, "FEN" : "%s" `, r.BoardAt(len(g.Moves)).FEN())
 		}
 		b.WriteString(" }")
 	}

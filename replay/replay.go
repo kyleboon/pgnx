@@ -44,9 +44,13 @@ type MoveInfo struct {
 	Variations []*Result // parallel to the pgn.Move's Variations
 }
 
-// Position is a single position reached during replay.
+// Position is a single position reached during replay: the typed facts
+// a per-ply consumer reads (hashes, clocks, side to move). It carries no
+// FEN text; a consumer that needs the FEN of a position gets a board from
+// Result.BoardAt, and one that needs every ply's FEN walks the typed
+// Moves from StartBoard, as pgn-extract builds FEN components only when
+// an output asks for them (apply.c).
 type Position struct {
-	FEN     string
 	Zobrist uint64
 
 	// Placement is chess.Board.PlacementKey() for the position: a hash of
@@ -342,10 +346,9 @@ func capturedPieceType(m chess.Move, b *chess.Board) (chess.PieceType, bool) {
 	return b.PieceAt(m.To).Type, false
 }
 
-// positionOf snapshots b's current FEN, Zobrist hash and placement key.
+// positionOf snapshots b's Zobrist hash, placement key and clocks.
 func positionOf(b *chess.Board) Position {
 	return Position{
-		FEN:            b.FEN(),
 		Zobrist:        b.Zobrist(),
 		Placement:      b.PlacementKey(),
 		HalfmoveClock:  b.HalfmoveClock,
@@ -375,6 +378,25 @@ func (r *Result) StartBoard() *chess.Board {
 		return nil
 	}
 	return r.start.Copy()
+}
+
+// BoardAt returns a copy of the board of Positions[i], the caller's to
+// mutate: the final board when i is the last position, else the start
+// board with the first i typed Moves applied. It is nil when i is out of
+// range or the Result is empty. A caller that needs the board of every
+// position walks StartBoard itself rather than calling BoardAt per ply.
+func (r *Result) BoardAt(i int) *chess.Board {
+	if r == nil || i < 0 || i >= len(r.Positions) {
+		return nil
+	}
+	if i == len(r.Positions)-1 {
+		return r.FinalBoard()
+	}
+	b := r.StartBoard()
+	for _, m := range r.Moves[:i] {
+		b.Apply(m.Move)
+	}
+	return b
 }
 
 // FinalBoard returns a copy of the board of the last Position reached (for

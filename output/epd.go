@@ -10,12 +10,15 @@ import (
 )
 
 // writePositionGame renders g in EPD or FEN format: one line per position
-// in r.Positions (the initial position plus one per main-line move; unlike
-// movetext rendering, variations are not visited, mirroring the C oracle's
-// print_EPD_move_list/print_FEN_move_list, which walk only current_game->
-// moves). Neither format uses lineWriter wrapping or the Options.No* move-
-// text flags — the C oracle's print_EPD_game/print_FEN_game call fprintf
-// directly, with no equivalent of print_move_list's stripping flags.
+// of the main line (the initial position plus one per main-line move;
+// unlike movetext rendering, variations are not visited, mirroring the C
+// oracle's print_EPD_move_list/print_FEN_move_list, which walk only
+// current_game->moves). The FEN of each position is built on the way by
+// walking r's typed moves from its start board, as the C tool builds FEN
+// components only for these formats (apply.c). Neither format uses
+// lineWriter wrapping or the Options.No* move-text flags — the C oracle's
+// print_EPD_game/print_FEN_game call fprintf directly, with no equivalent
+// of print_move_list's stripping flags.
 func (w *Writer) writePositionGame(g *pgn.Game, r *replay.Result) error {
 	switch w.opts.Format {
 	case EPD:
@@ -38,13 +41,35 @@ func (w *Writer) writeEPDGame(g *pgn.Game, r *replay.Result) error {
 	if !w.opts.NoTags {
 		comment = epdGameComment(g)
 	}
-	for _, pos := range r.Positions {
-		if _, err := fmt.Fprintf(w.w, "%s %s\n", epdFields(pos.FEN), comment); err != nil {
+	err := walkFENs(r, func(fen string) error {
+		_, err := fmt.Fprintf(w.w, "%s %s\n", epdFields(fen), comment)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	_, err = io.WriteString(w.w, "\n")
+	return err
+}
+
+// walkFENs calls fn with the FEN of every position of r's line in order,
+// the start position first, stopping at fn's first error. A nil or empty
+// r has no positions.
+func walkFENs(r *replay.Result, fn func(fen string) error) error {
+	b := r.StartBoard()
+	if b == nil {
+		return nil
+	}
+	if err := fn(b.FEN()); err != nil {
+		return err
+	}
+	for i := range r.Moves {
+		b.Apply(r.Moves[i].Move)
+		if err := fn(b.FEN()); err != nil {
 			return err
 		}
 	}
-	_, err := io.WriteString(w.w, "\n")
-	return err
+	return nil
 }
 
 // writeFENGame renders g as FEN: the same tag section as SAN/Source
@@ -61,15 +86,15 @@ func (w *Writer) writeFENGame(g *pgn.Game, r *replay.Result) error {
 			return err
 		}
 	}
-	positions := r.Positions
 	// print_FEN_move_list tests --plylimit once, against the starting
 	// ply: a start past the limit lists nothing, a start within it lists
 	// every position.
-	if w.opts.HasPlyLimit && len(positions) > 0 && positions[0].PlyNumber() > w.opts.PlyLimit {
-		positions = nil
-	}
-	for _, pos := range positions {
-		if _, err := fmt.Fprintf(w.w, "%s\n", pos.FEN); err != nil {
+	if !(w.opts.HasPlyLimit && len(r.Positions) > 0 && r.Positions[0].PlyNumber() > w.opts.PlyLimit) {
+		err := walkFENs(r, func(fen string) error {
+			_, err := fmt.Fprintf(w.w, "%s\n", fen)
+			return err
+		})
+		if err != nil {
 			return err
 		}
 	}
