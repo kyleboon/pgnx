@@ -293,10 +293,13 @@ func (rp *replayer) replayLine(moves []*pgn.Move, b *chess.Board, allowNull bool
 		rp.invalidate()
 
 		// As apply.c play_moves: a check test first, and only a checking
-		// move is tested for mate, by generating the checked side's legal
-		// moves (which the next ply then reuses).
+		// move is tested for mate. The mate test stops at the checked
+		// side's first legal reply rather than generating them all: in
+		// check most candidates are illegal and each costs a full
+		// legality probe, far more than the one targeted generation the
+		// next ply pays for not finding the list in the buffer.
 		isCheck := b.InCheck(b.SideToMove)
-		isMate := isCheck && len(rp.legalMoves(b)) == 0
+		isMate := isCheck && !b.HasLegalMove()
 		if isMate {
 			san = append(san, '#')
 		} else if isCheck {

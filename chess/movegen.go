@@ -171,17 +171,19 @@ func (b *Board) findPawnMoves(to Square, color Color, moves []Move) []Move {
 	return moves
 }
 
-// stackMoveBuffer is the size of the move buffer hasLegalMove keeps on the
+// stackMoveBuffer is the size of the move buffer HasLegalMove keeps on the
 // stack. No legal position has more than 218 legal moves, and none reached
 // in play has that many pseudo-legal ones, so the buffer is never regrown
 // (and if an unreal position did regrow it, only an allocation would
 // follow, never a wrong answer).
 const stackMoveBuffer = 256
 
-// hasLegalMove reports whether the side to move has at least one legal
+// HasLegalMove reports whether the side to move has at least one legal
 // move. It probes the pseudo-legal moves in generation order and stops at
-// the first legal one, allocating nothing.
-func (b *Board) hasLegalMove() bool {
+// the first legal one, allocating nothing, so a caller that already knows
+// the side to move is in check decides mate without generating every
+// reply (as map.c king_is_in_checkmate stops at the first saving move).
+func (b *Board) HasLegalMove() bool {
 	var buf [stackMoveBuffer]Move
 	mover := b.SideToMove
 	for _, m := range b.appendPseudoLegalMoves(buf[:0]) {
@@ -331,27 +333,53 @@ func addPawnMove(from, to Square, lastRank int, moves []Move) []Move {
 	return append(moves, Move{From: from, To: to})
 }
 
+// CastleMove returns the side to move's castling move to side and whether
+// it is legal: exactly the move AppendLegalMoves lists for that side, if
+// any, found without generating the position's other moves. Castling
+// text names nothing but the side, so this is all a SAN "O-O" or "O-O-O"
+// needs. It allocates nothing.
+func (b *Board) CastleMove(side CastleSide) (Move, bool) {
+	var buf [1]Move
+	moves := b.keepLegal(b.appendCastleMove(b.SideToMove, side, buf[:0]), 0)
+	if len(moves) == 0 {
+		return Move{}, false
+	}
+	return moves[0], true
+}
+
 // genCastleMoves appends the legal castling moves for color, kingside
 // first.
 func (b *Board) genCastleMoves(color Color, moves []Move) []Move {
-	var kRight, qRight bool
-	var kRookFile, qRookFile int
-	if color == White {
-		kRight, qRight = b.Castling.WhiteKingside, b.Castling.WhiteQueenside
-		kRookFile, qRookFile = b.Castling.WhiteKRookFile, b.Castling.WhiteQRookFile
+	moves = b.appendCastleMove(color, Kingside, moves)
+	return b.appendCastleMove(color, Queenside, moves)
+}
+
+// appendCastleMove appends color's castling move to side if color holds
+// the right and the move is pseudo-legal (castleMove's path and
+// attacked-square rules), and returns the extended slice.
+func (b *Board) appendCastleMove(color Color, side CastleSide, moves []Move) []Move {
+	var right bool
+	var rookFile, kingToFile, rookToFile int
+	switch {
+	case color == White && side == Kingside:
+		right, rookFile = b.Castling.WhiteKingside, b.Castling.WhiteKRookFile
+	case color == White:
+		right, rookFile = b.Castling.WhiteQueenside, b.Castling.WhiteQRookFile
+	case side == Kingside:
+		right, rookFile = b.Castling.BlackKingside, b.Castling.BlackKRookFile
+	default:
+		right, rookFile = b.Castling.BlackQueenside, b.Castling.BlackQRookFile
+	}
+	if side == Kingside {
+		kingToFile, rookToFile = 6, 5
 	} else {
-		kRight, qRight = b.Castling.BlackKingside, b.Castling.BlackQueenside
-		kRookFile, qRookFile = b.Castling.BlackKRookFile, b.Castling.BlackQRookFile
+		kingToFile, rookToFile = 2, 3
 	}
-	if kRight {
-		if m, ok := b.castleMove(color, kRookFile, Kingside, 6, 5); ok {
-			moves = append(moves, m)
-		}
+	if !right {
+		return moves
 	}
-	if qRight {
-		if m, ok := b.castleMove(color, qRookFile, Queenside, 2, 3); ok {
-			moves = append(moves, m)
-		}
+	if m, ok := b.castleMove(color, rookFile, side, kingToFile, rookToFile); ok {
+		moves = append(moves, m)
 	}
 	return moves
 }

@@ -61,9 +61,9 @@ var promotionLetters = map[byte]chess.PieceType{
 // promotion piece, and any from-file/from-rank disambiguation hints
 // present in text. A move naming its piece (or a pawn move) and a
 // destination needs only the candidates of that piece type to that
-// square; castling text and bare long-algebraic notation, whose
-// from-square alone names the piece, read every legal move. It allocates
-// nothing on the way to a move.
+// square; castling text asks the board for the one move it names; bare
+// long-algebraic notation, whose from-square alone names the piece,
+// reads every legal move. It allocates nothing on the way to a move.
 func decodeSAN(text string, b *chess.Board, rp *replayer) (chess.Move, error) {
 	orig := text
 	s := strings.TrimSpace(text)
@@ -80,17 +80,10 @@ func decodeSAN(text string, b *chess.Board, rp *replayer) (chess.Move, error) {
 
 	// Step 2: castling.
 	if side := castleSide(s); side != chess.NoCastle {
-		var match chess.Move
-		found := false
-		for _, m := range rp.legalMoves(b) {
-			if m.Castle == side {
-				if found {
-					return chess.Move{}, fmt.Errorf("ambiguous move %q", orig)
-				}
-				match, found = m, true
-			}
-		}
-		if !found {
+		// A position has at most one castling move per side, so the
+		// board's probe finds it without the other legal moves.
+		match, ok := b.CastleMove(side)
+		if !ok {
 			return chess.Move{}, fmt.Errorf("illegal or unknown move %q", orig)
 		}
 		return match, nil

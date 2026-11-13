@@ -46,6 +46,36 @@ func TestInsufficientMaterial(t *testing.T) {
 	}
 }
 
+// TestMateTestAllocatesNothingInCheck covers the in-check path of
+// IsCheckmate, which HasLegalMove decides from a stack buffer: a mate, a
+// check with one saving move, and a check with many.
+func TestMateTestAllocatesNothingInCheck(t *testing.T) {
+	cases := []struct {
+		name string
+		fen  string
+		mate bool
+	}{
+		{"fool's mate", "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3", true},
+		{"back-rank check, one reply", "R5k1/6pp/8/8/8/8/8/6K1 b - - 0 1", false},
+		{"Bb5+ with many replies", "rnbqkbnr/ppp1pppp/8/1B1p4/4P3/8/PPPP1PPP/RNBQK1NR b KQkq - 1 2", false},
+	}
+	for _, c := range cases {
+		b := mustFromFEN(c.fen)
+		if !b.InCheck(b.SideToMove) {
+			t.Fatalf("%s: not in check", c.name)
+		}
+		if got := b.IsCheckmate(); got != c.mate {
+			t.Errorf("%s: IsCheckmate = %v, want %v", c.name, got, c.mate)
+		}
+		if got := testing.AllocsPerRun(100, func() { b.IsCheckmate() }); got != 0 {
+			t.Errorf("%s: IsCheckmate allocated %v times/op, want 0", c.name, got)
+		}
+		if got := testing.AllocsPerRun(100, func() { b.HasLegalMove() }); got != 0 {
+			t.Errorf("%s: HasLegalMove allocated %v times/op, want 0", c.name, got)
+		}
+	}
+}
+
 func TestMateChecksAllocateNothingWhenNotInCheck(t *testing.T) {
 	for _, c := range generatorFENs {
 		b := mustFromFEN(c.fen)
