@@ -38,7 +38,9 @@ func shannonEvaluation(b *chess.Board) float64 {
 // countMoves counts c's legal moves on b as the C tool's find_all_moves
 // does: as if c were to move, with the en passant square usable only by
 // the side actually to move, and the promotion moves to one square
-// counted once.
+// counted once. LegalMoves expands every promotion into the four pieces,
+// so counting the queen promotion alone counts each promoting origin and
+// destination once, whatever order the moves come in.
 func countMoves(b *chess.Board, c chess.Color) int {
 	board := b.Copy()
 	if board.SideToMove != c {
@@ -46,12 +48,10 @@ func countMoves(b *chess.Board, c chess.Color) int {
 		board.HasEP = false
 	}
 	n := 0
-	var lastFrom, lastTo chess.Square
-	for i, m := range board.LegalMoves() {
-		if m.Promotion != chess.NoPiece && i > 0 && m.From == lastFrom && m.To == lastTo {
+	for _, m := range board.LegalMoves() {
+		if m.Promotion != chess.NoPiece && m.Promotion != chess.Queen {
 			continue
 		}
-		lastFrom, lastTo = m.From, m.To
 		n++
 	}
 	return n

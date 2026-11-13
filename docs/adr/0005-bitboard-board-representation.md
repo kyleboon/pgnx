@@ -1,7 +1,6 @@
 # 0005: The chess package represents the board as bitboards behind an unchanged API
 
-Status: proposed (2026-11-13, pgnx-perf.9); accepted when the first code
-commit lands
+Status: accepted (2026-11-13, pgnx-perf.9, with the first code commit)
 
 pgn-extract keeps its board as a two-dimensional array and finds attacks
 and candidate moves by walking it (map.c `king_is_in_check`,
@@ -50,10 +49,16 @@ notice the change; the multiply-add per call is the price of that, and
 - **Slider attacks by classical ray lookups** (ray mask and occupancy,
   first blocker by bit scan) instead of magic bitboards: no large
   tables, a few times slower than magic. Rejected because the parity
-  margin is the point of the rewrite; the magic constants are a
-  published set and the tables are filled at package init. If a cold
-  `pgnx --help` shows the fill above a few milliseconds, the tables
-  fill lazily instead.
+  margin is the point of the rewrite. The magic multipliers are not a
+  transcribed published set but the output of a seeded search,
+  `chess/internal/genmagic` (`go generate ./chess` reproduces
+  `magic_table.go` exactly), and a test checks every table slot against
+  the square geometry, so a wrong constant cannot go unnoticed. The
+  tables (108,000 entries, 860 KB) fill at package init in 1.0 ms,
+  taking a cold `pgnx --help` from 2.7 ms to 3.8 ms on the ADR 0003
+  machine; that is within the few milliseconds this decision allowed,
+  so the fill stays eager. A lazy fill remains the fallback if a
+  caller ever cares about the millisecond.
 
 ## Consequences
 
@@ -67,11 +72,15 @@ notice the change; the multiply-add per call is the price of that, and
   order (an ambiguous SAN is an error, not a first match); the
   evaluation output's promotion dedup counts distinct from/to pairs,
   and move-generation tests compare sets.
-- The mailbox engine is the oracle for the rewrite. It stays under a
-  test-only path until the bitboard engine lands, and a differential
-  test replays every position of the replay bench corpus and the
-  golden corpus with both, comparing legal-move sets, `IsAttacked` on
-  every square for both colours, `InCheck`, `FEN`, `PlacementKey` and
-  `WeakHash`. Perft gains Chess960 positions with known counts, which
-  the suite had none of.
+- The mailbox engine is the oracle for the rewrite. It lives on as
+  `chess/internal/mailbox`, imported only by the chess package's
+  differential test, which replays every position of the replay bench
+  corpus and the golden corpus (main lines and variations,
+  55,050 positions) with both engines and compares the legal-move
+  sets, the targeted candidates for every piece type and square,
+  `IsAttacked` on every square for both colours, `InCheck`, the king
+  squares, the castling moves, the mate and material predicates, `FEN`,
+  and `PlacementKey` and `WeakHash` against a scan of the oracle's
+  squares. Perft gains six Chess960 positions with counts confirmed by
+  Stockfish, which the suite had none of.
 - ADR 0003's baseline table gains a row when the rewrite lands.

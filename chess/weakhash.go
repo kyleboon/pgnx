@@ -30,18 +30,14 @@ func init() {
 // equality, never in value.
 func (b *Board) WeakHash() uint64 {
 	var h uint64
-	for file := 0; file < 8; file++ {
-		for rank := 0; rank < 8; rank++ {
-			p := b.squares[file][rank]
-			if p.Type == NoPiece {
-				continue
-			}
-			colour := 0
-			if p.Color == White {
-				colour = 1
-			}
-			h ^= weakTable[file][rank][p.Type-1][colour]
+	for occ := b.occupied(); occ != 0; occ &= occ - 1 {
+		s := lowest(occ)
+		p := pieceOf(b.mailbox[s])
+		colour := 0
+		if p.Color == White {
+			colour = 1
 		}
+		h ^= weakTable[s&7][s>>3][p.Type-1][colour]
 	}
 	return h
 }

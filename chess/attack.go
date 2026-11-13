@@ -1,5 +1,7 @@
 package chess
 
+// Piece step patterns, used to fill the leaper attack tables and the
+// slider masks at init.
 var (
 	knightDeltas = [][2]int{{1, 2}, {2, 1}, {2, -1}, {1, -2}, {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2}}
 	kingDeltas   = [][2]int{{1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}}
@@ -11,54 +13,29 @@ var (
 // considering knight, king, pawn, and sliding (rook/bishop/queen) attacks.
 // It does not consider whose turn it is to move.
 func (b *Board) IsAttacked(sq Square, by Color) bool {
-	for _, d := range knightDeltas {
-		if b.pieceIs(Square{sq.File + d[0], sq.Rank + d[1]}, Knight, by) {
-			return true
-		}
-	}
-	for _, d := range kingDeltas {
-		if b.pieceIs(Square{sq.File + d[0], sq.Rank + d[1]}, King, by) {
-			return true
-		}
-	}
-	// Pawns: a white pawn on rank r attacks r+1, so look one rank *toward* the attacker.
-	pr := -1
-	if by == White {
-		pr = 1
-	}
-	for _, df := range []int{-1, 1} {
-		if b.pieceIs(Square{sq.File + df, sq.Rank - pr}, Pawn, by) {
-			return true
-		}
-	}
-	if b.rayHits(sq, rookDirs, by, Rook) || b.rayHits(sq, bishopDirs, by, Bishop) {
+	return b.attacked(sqIndex(sq), by)
+}
+
+// attacked is IsAttacked on a bit index: each piece kind's attackers of
+// s are the pieces of that kind on the squares a like piece on s would
+// attack (for a pawn, one of the other colour), a table lookup per kind
+// and a magic lookup per slider line.
+func (b *Board) attacked(s int, by Color) bool {
+	them := b.byColor[by]
+	leapers := knightAttacks[s]&b.byType[Knight] |
+		kingAttacks[s]&b.byType[King] |
+		pawnAttacks[by.Opponent()][s]&b.byType[Pawn]
+	if leapers&them != 0 {
 		return true
 	}
-	return false
-}
-
-func (b *Board) rayHits(sq Square, dirs [][2]int, by Color, slider PieceType) bool {
-	for _, d := range dirs {
-		cur := Square{sq.File + d[0], sq.Rank + d[1]}
-		for cur.Valid() {
-			p := b.PieceAt(cur)
-			if p.Type != NoPiece {
-				if p.Color == by && (p.Type == slider || p.Type == Queen) {
-					return true
-				}
-				break
-			}
-			cur = Square{cur.File + d[0], cur.Rank + d[1]}
-		}
+	occ := b.occupied()
+	if rookAttacks(s, occ)&(b.byType[Rook]|b.byType[Queen])&them != 0 {
+		return true
 	}
-	return false
-}
-
-func (b *Board) pieceIs(sq Square, pt PieceType, c Color) bool {
-	return sq.Valid() && b.PieceAt(sq) == Piece{pt, c}
+	return bishopAttacks(s, occ)&(b.byType[Bishop]|b.byType[Queen])&them != 0
 }
 
 // InCheck reports whether color c's king is currently attacked.
 func (b *Board) InCheck(c Color) bool {
-	return b.IsAttacked(b.KingSquare(c), c.Opponent())
+	return b.attacked(b.kingIndex(c), c.Opponent())
 }

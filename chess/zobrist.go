@@ -91,15 +91,6 @@ func epCapturable(b *Board) bool {
 		capturingRank = 3 // fourth rank
 	}
 
-	for _, df := range [...]int{-1, 1} {
-		f := ep.File + df
-		if f < 0 || f > 7 {
-			continue
-		}
-		p := b.squares[f][capturingRank]
-		if p.Type == Pawn && p.Color == b.SideToMove {
-			return true
-		}
-	}
-	return false
+	beside := (fileMask(ep.File)&^fileA)>>1 | (fileMask(ep.File)&^fileH)<<1
+	return rankMask(capturingRank)&beside&b.pieces(Pawn, b.SideToMove) != 0
 }

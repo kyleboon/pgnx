@@ -38,6 +38,22 @@ func TestPerft(t *testing.T) {
 		// Position 5
 		{"rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", 2, 1486},
 		{"rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", 3, 62379},
+		// Chess960 (Shredder-FEN castling): the first five positions of
+		// the standard Chess960 perft suite and a position whose king and
+		// rook paths overlap, counts confirmed with Stockfish 19
+		// (UCI_Chess960, go perft).
+		{"bqnb1rkr/pp3ppp/3ppn2/2p5/5P2/P2P4/NPP1P1PP/BQ1BNRKR w HFhf - 2 9", 3, 12189},
+		{"bqnb1rkr/pp3ppp/3ppn2/2p5/5P2/P2P4/NPP1P1PP/BQ1BNRKR w HFhf - 2 9", 4, 326672},
+		{"2nnrbkr/p1qppppp/8/1ppb4/6PP/3PP3/PPP2P2/BQNNRBKR w HEhe - 1 9", 3, 18002},
+		{"2nnrbkr/p1qppppp/8/1ppb4/6PP/3PP3/PPP2P2/BQNNRBKR w HEhe - 1 9", 4, 667366},
+		{"b1q1rrkb/pppppppp/3nn3/8/P7/1PPP4/4PPPP/BQNNRKRB w GE - 1 9", 3, 10471},
+		{"b1q1rrkb/pppppppp/3nn3/8/P7/1PPP4/4PPPP/BQNNRKRB w GE - 1 9", 4, 273318},
+		{"qbbnnrkr/2pp2pp/p7/1p2pp2/8/P3PP2/1PPP1KPP/QBBNNR1R w hf - 0 9", 3, 13440},
+		{"qbbnnrkr/2pp2pp/p7/1p2pp2/8/P3PP2/1PPP1KPP/QBBNNR1R w hf - 0 9", 4, 382958},
+		{"1nbbnrkr/p1p1ppp1/3p4/1p3P1p/3Pq2P/8/PPP1P1P1/QNBBNRKR w HFhf - 0 9", 3, 31058},
+		{"1nbbnrkr/p1p1ppp1/3p4/1p3P1p/3Pq2P/8/PPP1P1P1/QNBBNRKR w HFhf - 0 9", 4, 1171749},
+		{"1r2kr2/8/8/8/8/8/8/RK3R2 w FAfb - 0 1", 3, 1337},
+		{"1r2kr2/8/8/8/8/8/8/RK3R2 w FAfb - 0 1", 4, 29701},
 	}
 	for _, c := range cases {
 		b, err := FromFEN(c.fen)
