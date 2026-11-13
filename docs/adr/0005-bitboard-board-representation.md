@@ -1,6 +1,8 @@
 # 0005: The chess package represents the board as bitboards behind an unchanged API
 
-Status: accepted (2026-11-13, pgnx-perf.9, with the first code commit)
+Status: accepted (2026-11-13, pgnx-perf.9, with the first code commit);
+amended in that commit: the magic constants are generated, not published
+(see the considered options)
 
 pgn-extract keeps its board as a two-dimensional array and finds attacks
 and candidate moves by walking it (map.c `king_is_in_check`,
@@ -70,8 +72,8 @@ notice the change; the multiply-add per call is the price of that, and
 - `LegalMoves` order is unspecified except that a pawn's promotions to
   one square are adjacent. Nothing that reaches the output depends on
   order (an ambiguous SAN is an error, not a first match); the
-  evaluation output's promotion dedup counts distinct from/to pairs,
-  and move-generation tests compare sets.
+  evaluation output counts a promotion once by its queen move, whatever
+  the order, and move-generation tests compare sets.
 - The mailbox engine is the oracle for the rewrite. It lives on as
   `chess/internal/mailbox`, imported only by the chess package's
   differential test, which replays every position of the replay bench

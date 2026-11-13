@@ -900,14 +900,3 @@ func fenCharFromPiece(p chess.Piece) rune {
 	}
 	return ch
 }
-
-// Type aliases keep the copied engine source readable.
-type (
-	Square         = chess.Square
-	Piece          = chess.Piece
-	Move           = chess.Move
-	Color          = chess.Color
-	PieceType      = chess.PieceType
-	CastlingRights = chess.CastlingRights
-	CastleSide     = chess.CastleSide
-)
