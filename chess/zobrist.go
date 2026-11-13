@@ -33,28 +33,18 @@ func polyglotKind(p Piece) int {
 	return base
 }
 
-// PlacementKey computes a hash of the piece placement alone: the XOR of
+// PlacementKey returns a hash of the piece placement alone: the XOR of
 // the Polyglot piece-square terms over every occupied square, with no
-// castling, en passant or side-to-move contribution. Two boards with the
-// same pieces on the same squares share a key regardless of whose move it
-// is, which rights remain, or the clock fields.
+// castling, en passant or side-to-move contribution. The board maintains
+// it as pieces are placed and removed, so the call is O(1). Two boards
+// with the same pieces on the same squares share a key regardless of
+// whose move it is, which rights remain, or the clock fields.
 //
 // It is pgnx's stand-in for pgn-extract's weak_hash_value, which drives
 // positional matching (-x, -Tf, -H), ECO classification and duplicate
 // detection in the C tool; only equality of the key is observable.
 func (b *Board) PlacementKey() uint64 {
-	var h uint64
-	for file := 0; file < 8; file++ {
-		for rank := 0; rank < 8; rank++ {
-			p := b.squares[file][rank]
-			if p.Type == NoPiece {
-				continue
-			}
-			kind := polyglotKind(p)
-			h ^= polyglotRandom[64*kind+8*rank+file]
-		}
-	}
-	return h
+	return b.placement
 }
 
 // Zobrist computes the Polyglot-compatible Zobrist hash of the position.

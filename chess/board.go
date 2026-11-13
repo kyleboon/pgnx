@@ -23,6 +23,13 @@ type Board struct {
 
 	squares [8][8]Piece // indexed [file][rank]
 	kings   [3]Square   // indexed by Color
+
+	// placement is the PlacementKey of squares, maintained by setPiece so
+	// that hashing a position never scans the board: the XOR of the
+	// Polyglot piece-square term of every occupied square, 0 for an empty
+	// board (so the zero Board is consistent). pgn-extract keeps its hash
+	// values up to date in the same way as each move is applied (apply.c).
+	placement uint64
 }
 
 // startPositionFEN is the FEN for the standard chess starting position.
@@ -50,15 +57,23 @@ func (b *Board) PieceAt(sq Square) Piece {
 }
 
 // setPiece places p on sq, updating the king-square cache when a king is
-// placed or removed.
+// placed or removed and the placement key for the piece leaving and the
+// piece arriving. It is the only writer of squares, so the key is exact
+// for every board built by FromFEN and every move applied since.
 func (b *Board) setPiece(sq Square, p Piece) {
 	old := b.squares[sq.File][sq.Rank]
-	if old.Type == King && b.kings[old.Color] == sq {
-		b.kings[old.Color] = Square{}
+	if old.Type != NoPiece {
+		b.placement ^= polyglotRandom[64*polyglotKind(old)+8*sq.Rank+sq.File]
+		if old.Type == King && b.kings[old.Color] == sq {
+			b.kings[old.Color] = Square{}
+		}
 	}
 	b.squares[sq.File][sq.Rank] = p
-	if p.Type == King {
-		b.kings[p.Color] = sq
+	if p.Type != NoPiece {
+		b.placement ^= polyglotRandom[64*polyglotKind(p)+8*sq.Rank+sq.File]
+		if p.Type == King {
+			b.kings[p.Color] = sq
+		}
 	}
 }
 

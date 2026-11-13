@@ -343,7 +343,7 @@ func matchMaterial(g *pgn.Game, r *replay.Result, patterns []*MaterialPattern, m
 		}
 		if matched {
 			if mark != "" {
-				addMatchComment(g, moveIdx, markComment(mark, r.Positions[moveIdx+1]))
+				addMatchComment(g, moveIdx, markComment(mark, func() *chess.Board { return r.BoardAt(moveIdx + 1) }))
 			}
 			if addTag {
 				colour := "Black"
@@ -401,7 +401,7 @@ func matchPieceCount(g *pgn.Game, r *replay.Result, target int, mark string) boo
 		}
 	}
 	if mark != "" && moveIdx+1 < len(r.Positions) {
-		addMatchComment(g, moveIdx, markComment(mark, r.Positions[moveIdx+1]))
+		addMatchComment(g, moveIdx, markComment(mark, func() *chess.Board { return r.BoardAt(moveIdx + 1) }))
 	}
 	return true
 }

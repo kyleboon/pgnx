@@ -55,7 +55,7 @@ func (e *emitter) movetext(g *pgn.Game, r *replay.Result) {
 		// -F: the final position, quoted, after the last move's own
 		// annotations and before the result; not subject to
 		// --nocomments (output.c print_move_list).
-		e.comment(`"` + r.Positions[len(g.Moves)].FEN + `"`)
+		e.comment(`"` + r.BoardAt(len(g.Moves)).FEN() + `"`)
 	}
 
 	if !e.opts.NoResults {
@@ -103,10 +103,10 @@ func (e *emitter) line(moves []*pgn.Move, r *replay.Result, startWhite, blackNee
 	if r != nil {
 		infos = r.Moves
 	}
-	// The evaluation needs the board after each move; walk it alongside
-	// the typed moves.
+	// The evaluation and the FEN comments need the board after each
+	// move; walk it alongside the typed moves.
 	var board *chess.Board
-	if opts.Evaluation && r != nil {
+	if (opts.Evaluation || opts.FENComments) && r != nil {
 		board = r.StartBoard()
 	}
 	startPly := firstPly(baseMoveNumber, startWhite)
@@ -183,19 +183,21 @@ func (e *emitter) line(moves []*pgn.Move, r *replay.Result, startWhite, blackNee
 
 // generatedComments writes the comments the run asked pgnx to generate
 // after main-line move i (--evaluation, --fen-comments, --hash-comments),
-// in that order, advancing board for the evaluation; it reports whether
-// it wrote any.
+// in that order, advancing board, which the evaluation and the FEN
+// comment read; it reports whether it wrote any.
 func (e *emitter) generatedComments(board *chess.Board, info *replay.MoveInfo, r *replay.Result, i int) (wrote bool) {
 	if board != nil && info != nil {
 		board.Apply(info.Move)
-		e.comment(fmt.Sprintf("%.2f", shannonEvaluation(board)))
-		wrote = true
-	}
-	if r != nil && i+1 < len(r.Positions) {
-		if e.opts.FENComments {
-			e.comment(r.Positions[i+1].FEN)
+		if e.opts.Evaluation {
+			e.comment(fmt.Sprintf("%.2f", shannonEvaluation(board)))
 			wrote = true
 		}
+		if e.opts.FENComments {
+			e.comment(board.FEN())
+			wrote = true
+		}
+	}
+	if r != nil && i+1 < len(r.Positions) {
 		if e.opts.HashComments {
 			e.comment(fmt.Sprintf("%016x", r.Positions[i+1].Zobrist))
 			wrote = true

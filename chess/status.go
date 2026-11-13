@@ -1,10 +1,10 @@
 package chess
 
 // IsCheckmate reports whether the side to move is in checkmate.
-func (b *Board) IsCheckmate() bool { return b.InCheck(b.SideToMove) && len(b.LegalMoves()) == 0 }
+func (b *Board) IsCheckmate() bool { return b.InCheck(b.SideToMove) && !b.HasLegalMove() }
 
 // IsStalemate reports whether the side to move is in stalemate.
-func (b *Board) IsStalemate() bool { return !b.InCheck(b.SideToMove) && len(b.LegalMoves()) == 0 }
+func (b *Board) IsStalemate() bool { return !b.InCheck(b.SideToMove) && !b.HasLegalMove() }
 
 // InsufficientMaterial reports whether neither side has enough material
 // to force checkmate, using pgn-extract's definition (end.c

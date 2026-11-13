@@ -245,7 +245,7 @@ func dropPlies(g *pgn.Game, r *replay.Result, n int, opts Options) (*replay.Resu
 		g.PrefixComments = nil
 	}
 	g.Moves = g.Moves[n:]
-	g.SetTag("FEN", r.Positions[n].FEN)
+	g.SetTag("FEN", r.BoardAt(n).FEN())
 	g.SetTag("SetUp", "1")
 	if _, ok := g.Tag("PlyCount"); ok || opts.PlyCount {
 		g.SetTag("PlyCount", strconv.Itoa(len(g.Moves)))
