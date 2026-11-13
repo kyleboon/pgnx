@@ -1,6 +1,6 @@
 # 0003: Memory is bounded per game and throughput must match the C tool
 
-Status: accepted (2026-11-02); amended 2026-11-12 (pgnx-perf.1.6), baseline
+Status: accepted (2026-11-02); amended 2026-11-12 (pgnx-perf.1.6) and 2026-11-13 (pgnx-perf.3), baseline
 table and follow-up tickets below
 
 pgnx must process PGN inputs of 30 GB and more. Two constraints follow that
@@ -30,14 +30,16 @@ stream and reports peak RSS and throughput for both.
    |---|---|---|---|---|
    | 2026-11-02 | 19 s, 12 MB/s, 3 MB RSS | 159 s, 1.4 MB/s, 15 MB RSS | 8.4x | replay generated every legal move three times per ply, allocating each time (19 GB allocated for a 20 MB input) |
    | 2026-11-12 | 15.7 s, 14.8 MB/s, 2.8 MB RSS | 24.8 s, 9.4 MB/s, 13.4 MB RSS | 1.58x | after pgnx-perf.1: one SAN-directed generation per ply into a reused buffer, no per-ply FEN (832 ns/ply, 1.1 allocs/ply in `BenchmarkGame`) |
+   | 2026-11-13 | 15.7 s, 14.8 MB/s, 2.9 MB RSS | 19.0 s, 12.3 MB/s, 13.5 MB RSS | 1.21x | after pgnx-perf.3: the board carries its placement key, updated per piece placed or removed, so no per-ply board scan for the hashes (568 ns/ply, 1.1 allocs/ply in `BenchmarkGame`, from 832) |
 
    A separate stage-timing run on 2026-11-12 over the same slice (best of
-   three, total 24.6 s) spends 76% of its wall time in replay (18.7 s;
-   parse 3.3 s, output 2.2 s). A sampled profile of a convert run puts
+   three, total 24.6 s) spent 76% of its wall time in replay (18.7 s;
+   parse 3.3 s, output 2.2 s). A sampled profile of a convert run put
    two full-board hash scans per ply at 26% and check detection by ray
-   scan at 21% of all sampled user CPU; tickets pgnx-perf.3 and
-   pgnx-perf.4 under the `pgnx-perf` epic carry those two shares, and
-   pgnx-perf.5 to pgnx-perf.7 the allocation, lexer and output remainder.
+   scan at 21% of all sampled user CPU; pgnx-perf.3 (done 2026-11-13)
+   removed the hash scans, pgnx-perf.4 under the `pgnx-perf` epic carries
+   the check-detection share, and pgnx-perf.5 to pgnx-perf.7 the
+   allocation, lexer and output remainder.
 
 ## Consequences
 

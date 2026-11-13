@@ -55,7 +55,7 @@ func BenchmarkGame(b *testing.B) {
 	b.ReportMetric(allocs/float64(plies), "allocs/ply")
 }
 
-func loadBenchGames(b *testing.B) []*pgn.Game {
+func loadBenchGames(b testing.TB) []*pgn.Game {
 	b.Helper()
 	f, err := os.Open("testdata/bench.pgn")
 	if err != nil {
