@@ -1,7 +1,7 @@
 # 0003: Memory is bounded per game and throughput must match the C tool
 
 Status: accepted (2026-11-02); amended 2026-11-12 (pgnx-perf.1.6) and 2026-11-13 (pgnx-perf.3,
-pgnx-perf.4), baseline table and follow-up tickets below
+pgnx-perf.4, pgnx-perf.9), baseline table and follow-up tickets below
 
 pgnx must process PGN inputs of 30 GB and more. Two constraints follow that
 the code cannot show on its own, so they are recorded here and checked by
@@ -32,6 +32,7 @@ stream and reports peak RSS and throughput for both.
    | 2026-11-12 | 15.7 s, 14.8 MB/s, 2.8 MB RSS | 24.8 s, 9.4 MB/s, 13.4 MB RSS | 1.58x | after pgnx-perf.1: one SAN-directed generation per ply into a reused buffer, no per-ply FEN (832 ns/ply, 1.1 allocs/ply in `BenchmarkGame`) |
    | 2026-11-13 | 15.7 s, 14.8 MB/s, 2.9 MB RSS | 19.0 s, 12.3 MB/s, 13.5 MB RSS | 1.21x | after pgnx-perf.3: the board carries its placement key, updated per piece placed or removed, so no per-ply board scan for the hashes (568 ns/ply, 1.1 allocs/ply in `BenchmarkGame`, from 832) |
    | 2026-11-13 | 15.7 s, 14.8 MB/s, 2.9 MB RSS | 15.9 s, 14.7 MB/s, 13.7 MB RSS | 1.01x | after pgnx-perf.4: the mate test after a check stops at the checked side's first legal reply and castling text probes its one move, instead of each generating every legal move with a legality probe per candidate (433 ns/ply, 1.1 allocs/ply in `BenchmarkGame`, from 568) |
+   | 2026-11-13 | 15.7 s, 14.8 MB/s, 2.9 MB RSS | 11.3 s, 20.6 MB/s, 14.7 MB RSS | 0.72x | after pgnx-perf.9 (ADR 0005): the board is bitboards, attack tests are table lookups and magic-bitboard slider lookups, and candidate generation is a mask intersection, so no probe walks the board (232 ns/ply, 1.1 allocs/ply in `BenchmarkGame`, from 433) |
 
    A separate stage-timing run on 2026-11-12 over the same slice (best of
    three, total 24.6 s) spent 76% of its wall time in replay (18.7 s;
@@ -41,12 +42,19 @@ stream and reports peak RSS and throughput for both.
    removed the hash scans, and pgnx-perf.4 (done 2026-11-13) the two
    full generations behind most check-detection calls, which took the
    `IsAttacked` share of a sampled convert run from 28.3% (measured
-   after perf.3) to 17.3%. What remains of that share is the mailbox
-   scan itself (84% of calls fall through all 18 knight, king and pawn
-   probes into the eight ray walks), which pgnx-perf.9 under the
-   `pgnx-perf` epic carries as a move to a bitboard representation;
-   pgnx-perf.5 to pgnx-perf.7 carry the allocation, lexer and output
-   remainder.
+   after perf.3) to 17.3%. What remained of that share was the mailbox
+   scan itself (84% of calls fell through all 18 knight, king and pawn
+   probes into the eight ray walks); pgnx-perf.9 (done 2026-11-13, ADR
+   0005) replaced the representation with bitboards, which took the
+   attack-test share of a sampled convert run over the same slice from
+   21.6% to 3.2% (both by the one method: `IsAttacked` plus its helpers
+   among the collapsed leaf samples of a 10 s `sample` of the run, kernel
+   waits excluded) and put pgnx ahead of the C tool for the first time.
+   The top leaf samples are now the SAN suffix trimming in replay
+   (`strings.TrimRight`, 8%), `Board.Apply` and `setPiece` (7.5%
+   together), a map access and tiny allocations in the lexer, and the
+   lexer's rune reads; pgnx-perf.5 to pgnx-perf.7 carry that allocation,
+   lexer and output remainder.
 
 ## Consequences
 

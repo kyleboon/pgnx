@@ -17,40 +17,23 @@ func (b *Board) IsStalemate() bool { return !b.InCheck(b.SideToMove) && !b.HasLe
 // squares. It is ported as-is so --insufficient and --fix-result-tags
 // agree with the oracle.
 func (b *Board) InsufficientMaterial() bool {
-	var counts [3][7]int
-	var bishops []Square
-	for f := 0; f < 8; f++ {
-		for r := 0; r < 8; r++ {
-			p := b.squares[f][r]
-			if p.Type == NoPiece {
-				continue
-			}
-			counts[p.Color][p.Type]++
-			if p.Type == Bishop {
-				bishops = append(bishops, Square{File: f, Rank: r})
-			}
-		}
-	}
-	w, bl := counts[White], counts[Black]
-	if w[Pawn] != 0 || bl[Pawn] != 0 || w[Rook] != 0 || bl[Rook] != 0 || w[Queen] != 0 || bl[Queen] != 0 {
+	if b.byType[Pawn]|b.byType[Rook]|b.byType[Queen] != 0 {
 		return false
 	}
-	if w[Bishop] > 1 || bl[Bishop] > 1 {
+	wB, bB := b.pieces(Bishop, White), b.pieces(Bishop, Black)
+	wN, bN := b.pieces(Knight, White), b.pieces(Knight, Black)
+	if popcount(wB) > 1 || popcount(bB) > 1 {
 		return false
 	}
-	if (w[Bishop] != 0 && w[Knight] != 0) || (bl[Bishop] != 0 && bl[Knight] != 0) {
+	if (wB != 0 && wN != 0) || (bB != 0 && bN != 0) {
 		return false
 	}
-	if (w[Knight] >= 2 && (bl[Bishop] != 0 || bl[Knight] != 0)) ||
-		(bl[Knight] >= 2 && (w[Bishop] != 0 || w[Knight] != 0)) {
+	if (popcount(wN) >= 2 && bB|bN != 0) || (popcount(bN) >= 2 && wB|wN != 0) {
 		return false
 	}
-	if w[Bishop] == 1 && bl[Bishop] == 1 {
-		// Opposite-colour bishops: odd Manhattan parity between them.
-		d := abs(bishops[0].File-bishops[1].File) + abs(bishops[0].Rank-bishops[1].Rank)
-		if d%2 == 1 {
-			return false
-		}
+	if wB != 0 && bB != 0 && (wB&lightSquares != 0) != (bB&lightSquares != 0) {
+		// Opposite-colour bishops.
+		return false
 	}
 	return true
 }

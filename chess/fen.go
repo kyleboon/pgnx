@@ -245,7 +245,7 @@ func (b *Board) FEN() string {
 	for r := 7; r >= 0; r-- {
 		empty := 0
 		for f := 0; f < 8; f++ {
-			p := b.squares[f][r]
+			p := b.PieceAt(Square{File: f, Rank: r})
 			if p.Type == NoPiece {
 				empty++
 				continue

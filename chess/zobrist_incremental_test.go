@@ -13,7 +13,7 @@ func scanPlacementKey(b *Board) uint64 {
 	var h uint64
 	for file := 0; file < 8; file++ {
 		for rank := 0; rank < 8; rank++ {
-			p := b.squares[file][rank]
+			p := b.PieceAt(Square{File: file, Rank: rank})
 			if p.Type == NoPiece {
 				continue
 			}
