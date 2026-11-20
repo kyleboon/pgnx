@@ -18,26 +18,52 @@ type parser struct {
 
 	// pending holds a single pushed-back token, used when a tokTagName
 	// terminates the previous game and must start the next one.
-	pending *token
+	pending     token
+	havePending bool
+
+	// slab is the storage the parser hands out Moves from, a chunk at a
+	// time, so a game's plies cost a couple of allocations rather than one
+	// each. A chunk is never reallocated once a pointer into it is handed
+	// out: when it is full the parser starts a fresh one, and a chunk's
+	// unused tail carries over to the next game, so two consecutive games
+	// may share one chunk (at most moveChunk Moves of extra retention
+	// while both are alive, within ADR 0003's per-game bound).
+	slab []Move
 }
+
+// moveChunk is the number of Moves the parser allocates at once; a little
+// above the typical game's ply count, so most games fit in one chunk.
+const moveChunk = 128
+
+// mainLineHint is the main line's initial pointer capacity, above the
+// typical game's ply count so the slice grows once or not at all.
+const mainLineHint = 96
 
 func newParser(lex *lexer) *parser {
 	return &parser{lex: lex}
 }
 
+// newMove returns a zeroed Move from the slab.
+func (p *parser) newMove() *Move {
+	if len(p.slab) == cap(p.slab) {
+		p.slab = make([]Move, 0, moveChunk)
+	}
+	p.slab = append(p.slab, Move{})
+	return &p.slab[len(p.slab)-1]
+}
+
 // pushBack stashes tok so the next call to nextToken returns it again.
 func (p *parser) pushBack(tok token) {
-	t := tok
-	p.pending = &t
+	p.pending = tok
+	p.havePending = true
 }
 
 // nextToken returns the next token, consuming the pushed-back token first
 // if there is one.
 func (p *parser) nextToken() (token, error) {
-	if p.pending != nil {
-		tok := *p.pending
-		p.pending = nil
-		return tok, nil
+	if p.havePending {
+		p.havePending = false
+		return p.pending, nil
 	}
 	return p.lex.next()
 }
@@ -110,6 +136,11 @@ func (p *parser) parseOneGame() (g *Game, atEOF bool, err error) {
 			tok = valTok
 			continue
 		}
+		if g.Tags == nil {
+			// The seven tag roster plus the Elo and ECO tags most games
+			// carry: one allocation for the typical tag section.
+			g.Tags = make([]Tag, 0, 10)
+		}
 		g.Tags = append(g.Tags, Tag{Name: tagName, Value: valTok.text})
 		tok, err = p.nextToken()
 		if err != nil {
@@ -157,6 +188,9 @@ func (p *parser) parseOneGame() (g *Game, atEOF bool, err error) {
 // variation below it; "" when there is none), and the terminating token
 // so the caller can decide how to react.
 func (p *parser) parseMovetext(g *Game, depth int) (moves []*Move, prefixComments []string, result string, terminator token, err error) {
+	if depth == 0 {
+		moves = make([]*Move, 0, mainLineHint)
+	}
 	var current *Move
 	sawMove := false
 	pendingMoveNumber := 0
@@ -254,7 +288,8 @@ func (p *parser) parseMovetext(g *Game, depth int) (moves []*Move, prefixComment
 			continue
 
 		case tokMove:
-			mv := &Move{SAN: tok.text}
+			mv := p.newMove()
+			mv.SAN = tok.text
 			if haveMoveNumber {
 				mv.MoveNumber = pendingMoveNumber
 				haveMoveNumber = false

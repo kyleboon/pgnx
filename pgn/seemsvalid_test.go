@@ -9,13 +9,13 @@ func TestMoveSeemsValid(t *testing.T) {
 	valid := []string{"e4", "exd5", "e8=Q+", "bxa8=N#", "Nf3", "Nbd7", "N1f3", "Qh4xe1", "Rae1", "R1e1",
 		"e2-e4", "Ng1-f3", "O-O", "O-O-O+", "0-0", "o-o-o", "exd6ep", "exd6e.p.", "Bxe5+"}
 	for _, s := range valid {
-		if !moveSeemsValid(s) {
+		if !moveSeemsValid([]byte(s)) {
 			t.Errorf("moveSeemsValid(%q) = false, want true", s)
 		}
 	}
 	invalid := []string{"", "N", "R", "Q", "-O", "O", "resigns", "e", "Nf", "x4", "Nf3z", "Kx"}
 	for _, s := range invalid {
-		if moveSeemsValid(s) {
+		if moveSeemsValid([]byte(s)) {
 			t.Errorf("moveSeemsValid(%q) = true, want false", s)
 		}
 	}

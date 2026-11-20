@@ -1,7 +1,7 @@
 # 0003: Memory is bounded per game and throughput must match the C tool
 
-Status: accepted (2026-11-02); amended 2026-11-12 (pgnx-perf.1.6) and 2026-11-13 (pgnx-perf.3,
-pgnx-perf.4, pgnx-perf.9), baseline table and follow-up tickets below
+Status: accepted (2026-11-02); amended 2026-11-12 (pgnx-perf.1.6), 2026-11-13 (pgnx-perf.3,
+pgnx-perf.4, pgnx-perf.9) and 2026-11-19 (pgnx-perf.6), baseline table and follow-up tickets below
 
 pgnx must process PGN inputs of 30 GB and more. Two constraints follow that
 the code cannot show on its own, so they are recorded here and checked by
@@ -33,6 +33,7 @@ stream and reports peak RSS and throughput for both.
    | 2026-11-13 | 15.7 s, 14.8 MB/s, 2.9 MB RSS | 19.0 s, 12.3 MB/s, 13.5 MB RSS | 1.21x | after pgnx-perf.3: the board carries its placement key, updated per piece placed or removed, so no per-ply board scan for the hashes (568 ns/ply, 1.1 allocs/ply in `BenchmarkGame`, from 832) |
    | 2026-11-13 | 15.7 s, 14.8 MB/s, 2.9 MB RSS | 15.9 s, 14.7 MB/s, 13.7 MB RSS | 1.01x | after pgnx-perf.4: the mate test after a check stops at the checked side's first legal reply and castling text probes its one move, instead of each generating every legal move with a legality probe per candidate (433 ns/ply, 1.1 allocs/ply in `BenchmarkGame`, from 568) |
    | 2026-11-13 | 15.7 s, 14.8 MB/s, 2.9 MB RSS | 11.3 s, 20.6 MB/s, 14.7 MB RSS | 0.72x | after pgnx-perf.9 (ADR 0005): the board is bitboards, attack tests are table lookups and magic-bitboard slider lookups, and candidate generation is a mask intersection, so no probe walks the board (232 ns/ply, 1.1 allocs/ply in `BenchmarkGame`, from 433) |
+   | 2026-11-19 | 15.7 s, 14.8 MB/s, 2.9 MB RSS | 9.7 s, 24.0 MB/s, 14.0 MB RSS | 0.62x | after pgnx-perf.6: the lexer scans a 64 KB block buffer of bytes instead of runes through `bufio`, a token's text is one sub-slice converted once with tag names, moves, move numbers and NAGs interned, and the parser allocates `Move`s from a per-game chunked slab; a scanner-only pass over the slice went from 3.40 s and 268 allocs/game to 1.84 s and 21 allocs/game (72.8 M to 5.8 M allocations), `BenchmarkScanner` from 263 to 34 allocs/game |
 
    A separate stage-timing run on 2026-11-12 over the same slice (best of
    three, total 24.6 s) spent 76% of its wall time in replay (18.7 s;
@@ -50,11 +51,16 @@ stream and reports peak RSS and throughput for both.
    21.6% to 3.2% (both by the one method: `IsAttacked` plus its helpers
    among the collapsed leaf samples of a 10 s `sample` of the run, kernel
    waits excluded) and put pgnx ahead of the C tool for the first time.
-   The top leaf samples are now the SAN suffix trimming in replay
+   The top leaf samples were then the SAN suffix trimming in replay
    (`strings.TrimRight`, 8%), `Board.Apply` and `setPiece` (7.5%
    together), a map access and tiny allocations in the lexer, and the
-   lexer's rune reads; pgnx-perf.5 to pgnx-perf.7 carry that allocation,
-   lexer and output remainder.
+   lexer's rune reads; pgnx-perf.6 (done 2026-11-19) removed the lexer's
+   share (the scanner-only pass over the slice is 1.84 s from 3.40 s, and
+   lexing and parsing allocate 5.8 M objects over the slice from 72.8 M),
+   and pgnx-perf.5 and pgnx-perf.7 carry the replay-allocation and output
+   remainder. Interning tag values as well was measured and rejected:
+   it halved the remaining allocations but hashing the values cost more
+   time than it saved.
 
 ## Consequences
 
