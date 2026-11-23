@@ -165,17 +165,6 @@ func (l *lexer) peek() (c byte, ok bool) {
 	return 0, false
 }
 
-// ensure buffers at least n unread bytes if the input has them, and
-// reports whether it did.
-func (l *lexer) ensure(n int) bool {
-	for l.end-l.pos < n {
-		if !l.fill() {
-			return false
-		}
-	}
-	return true
-}
-
 // text returns the token scanned so far, buf[start:pos], as a string.
 func (l *lexer) text() string {
 	return string(l.buf[l.start:l.pos])
@@ -496,12 +485,12 @@ func (l *lexer) lexMove() (token, error) {
 	// ("Unknown move text N.") and discarded, and the game carries on.
 	// The check sees the word without its '!'/'?' glyphs, which the C
 	// lexer turns into NAGs before it.
-	core := len(word)
-	for core > 0 && (word[core-1] == '!' || word[core-1] == '?') {
-		core--
+	coreLen := len(word)
+	for coreLen > 0 && (word[coreLen-1] == '!' || word[coreLen-1] == '?') {
+		coreLen--
 	}
 	nullOrZ0 := len(word) >= 2 && ((word[0] == '-' && word[1] == '-') || (word[0] == 'Z' && word[1] == '0'))
-	if !nullOrZ0 && !moveSeemsValid(word[:core]) {
+	if !nullOrZ0 && !moveSeemsValid(word[:coreLen]) {
 		return token{kind: tokStray, text: l.text(), line: line}, nil
 	}
 	return token{kind: tokMove, text: l.internText(), line: line}, nil
@@ -529,10 +518,18 @@ func (l *lexer) consumeMoveTail() {
 }
 
 // matchAhead reports whether the upcoming input matches s exactly; if so it
-// consumes those bytes, otherwise it leaves the input unchanged.
+// consumes those bytes, otherwise it leaves the input unchanged. It compares
+// byte by byte and refills only while the bytes seen so far still match, so
+// a mismatch never waits on the reader: a game ending in the short result
+// "1/2" is yielded without blocking for the next game's bytes (ADR 0003).
 func (l *lexer) matchAhead(s string) bool {
-	if !l.ensure(len(s)) || string(l.buf[l.pos:l.pos+len(s)]) != s {
-		return false
+	for i := 0; i < len(s); i++ {
+		if l.pos+i == l.end && !l.fill() {
+			return false
+		}
+		if l.buf[l.pos+i] != s[i] {
+			return false
+		}
 	}
 	l.pos += len(s)
 	return true

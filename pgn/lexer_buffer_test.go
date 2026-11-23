@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 	"testing/iotest"
+	"time"
 )
 
 // The lexer scans a byte buffer it refills in blocks. These tests feed it
@@ -165,5 +166,56 @@ func TestScannerGamesOwnTheirMoves(t *testing.T) {
 	}
 	if first.Moves[1].SAN != "e5" || first.Moves[0].Variations() != nil {
 		t.Errorf("sibling move changed: %+v", first.Moves[1])
+	}
+}
+
+// TestScannerYieldsGameWithoutReadingAhead is the pgn-level form of ADR
+// 0003's streaming guard: a game whose text is complete is yielded without
+// another Read. The result tokens are the sensitive spot, because the
+// lexer looks past them for a longer spelling ("1/2" may continue as
+// "1/2-1/2", "0-0" as "0-0-0"), and that look must fail on the bytes it
+// has rather than wait for more. Each game is written to an io.Pipe up to
+// its final newline and the writer then blocks until the game has been
+// yielded; a lexer that read ahead would deadlock, and the test time out.
+func TestScannerYieldsGameWithoutReadingAhead(t *testing.T) {
+	games := []string{
+		"[Event \"one\"]\n\n1. e4 e5 1/2\n",
+		"[Event \"two\"]\n\n1. e4 e5 1-0\n",
+		"[Event \"three\"]\n\n1. e4 e5 0-1\n",
+		"[Event \"four\"]\n\n1. e4 e5 1/2-1/2\n",
+		"[Event \"five\"]\n\n1. e4 e5 *\n",
+	}
+	pr, pw := io.Pipe()
+	yielded := make(chan struct{})
+	go func() {
+		defer pw.Close()
+		for _, g := range games {
+			io.WriteString(pw, g)
+			<-yielded
+		}
+	}()
+
+	done := make(chan []string)
+	go func() {
+		var events []string
+		s := NewScanner(pr, ParserOptions{})
+		for s.Next() {
+			event, _ := s.Game().Tag("Event")
+			events = append(events, event)
+			yielded <- struct{}{}
+		}
+		if err := s.Err(); err != nil {
+			t.Error(err)
+		}
+		done <- events
+	}()
+
+	select {
+	case events := <-done:
+		if got := strings.Join(events, ","); got != "one,two,three,four,five" {
+			t.Errorf("events = %s, want one,two,three,four,five", got)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("scanner blocked reading ahead of a complete game")
 	}
 }
