@@ -3,6 +3,7 @@ package replay
 import (
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/kyleboon/pgnx/chess"
@@ -57,9 +58,21 @@ func TestReplayVariations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vs := r.Moves[1].Variations
+	vs := r.Variations(1)
 	if len(vs) != 1 || vs[0] == nil || len(vs[0].Moves) != 2 || vs[0].Moves[0].SAN != "c5" {
 		t.Fatalf("variation replay wrong: %+v", vs)
+	}
+	// A move without variations, an index past the line and a nil or
+	// empty Result have none.
+	if r.Variations(0) != nil || r.Variations(2) != nil || r.Variations(3) != nil || r.Variations(-1) != nil {
+		t.Errorf("variations where there are none: %v %v %v %v", r.Variations(0), r.Variations(2), r.Variations(3), r.Variations(-1))
+	}
+	if (*Result)(nil).Variations(0) != nil || (&Result{}).Variations(0) != nil {
+		t.Error("nil or empty Result should have no variations")
+	}
+	// A variation's own Result answers for its moves the same way.
+	if vs[0].Variations(0) != nil || vs[0].Variations(1) != nil {
+		t.Error("the variation has no nested variations")
 	}
 }
 
@@ -166,7 +179,7 @@ func TestVariationBoards(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	v := r.Moves[1].Variations[0]
+	v := r.Variations(1)[0]
 	if v.StartBoard().FEN() != r.BoardAt(1).FEN() || v.FinalBoard().Zobrist() != v.Positions[2].Zobrist {
 		t.Errorf("variation boards: start %s final %s", v.StartBoard().FEN(), v.FinalBoard().FEN())
 	}
@@ -333,7 +346,7 @@ func TestReplayNullMoveInVariationAlwaysAllowed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	v := r.Moves[0].Variations[0]
+	v := r.Variations(0)[0]
 	if v == nil || len(v.Moves) != 2 || !v.Moves[1].Move.IsNull() {
 		t.Fatalf("variation replay = %+v", v)
 	}
@@ -422,4 +435,83 @@ func TestBoardAtMidGame(t *testing.T) {
 	if r.BoardAt(len(want)) != nil || r.BoardAt(-1) != nil || (*Result)(nil).BoardAt(0) != nil {
 		t.Error("BoardAt out of range should be nil")
 	}
+}
+
+// Replaying a game allocates what its Result holds (the Result, its two
+// slices, its start and final boards and one text holding every ply's
+// SAN) and nothing else, however long the game: the buffer the moves of
+// each position are generated into outlives the game, shared across
+// replays rather than made and dropped per game, and the standard
+// starting position is copied, not parsed.
+func TestGameAllocatesOnlyItsResult(t *testing.T) {
+	for _, moves := range []string{
+		"1. e4 e5 2. Nf3 Nc6 *",
+		"1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 Nb8 10. d4 Nbd7 *",
+	} {
+		g := parseOne(t, moves+"\n")
+		got := testing.AllocsPerRun(100, func() {
+			if _, err := Game(g, Options{}); err != nil {
+				t.Fatal(err)
+			}
+		})
+		if want := 6.0; got > want {
+			t.Errorf("Game allocated %v objects for %d plies, want at most %v", got, len(g.Moves), want)
+		}
+	}
+}
+
+// Game may be called from several goroutines at once (pipeline.Process
+// is); concurrent replays must agree with sequential ones.
+func TestGameConcurrent(t *testing.T) {
+	games := loadBenchGames(t)
+	want := make([]*Result, len(games))
+	for i, g := range games {
+		r, err := Game(g, Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want[i] = r
+	}
+	var wg sync.WaitGroup
+	for w := 0; w < 8; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i, g := range games {
+				r, err := Game(g, Options{})
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				if !sameReplay(r, want[i]) {
+					t.Errorf("game %d: concurrent replay differs", i+1)
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+// sameReplay reports whether a and b replayed the same moves to the same
+// positions, variations included.
+func sameReplay(a, b *Result) bool {
+	if len(a.Moves) != len(b.Moves) || len(a.Positions) != len(b.Positions) {
+		return false
+	}
+	for i := range a.Moves {
+		if a.Moves[i] != b.Moves[i] || a.Positions[i+1] != b.Positions[i+1] {
+			return false
+		}
+		av, bv := a.Variations(i), b.Variations(i)
+		if len(av) != len(bv) {
+			return false
+		}
+		for vi := range av {
+			if (av[vi] == nil) != (bv[vi] == nil) || (av[vi] != nil && !sameReplay(av[vi], bv[vi])) {
+				return false
+			}
+		}
+	}
+	return true
 }

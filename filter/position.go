@@ -334,11 +334,12 @@ func (w *positionWalk) walk(moves []*pgn.Move, r *replay.Result, limit int, pref
 		check := ply >= w.startPly
 
 		if !w.noVariations {
+			vrs := r.Variations(i)
 			for vi, v := range moves[i].Variations() {
-				if vi >= len(r.Moves[i].Variations) || r.Moves[i].Variations[vi] == nil {
+				if vi >= len(vrs) || vrs[vi] == nil {
 					continue
 				}
-				vm, _, _ := w.walk(v.Moves, r.Moves[i].Variations[vi], DefaultPositionalDepth, nil)
+				vm, _, _ := w.walk(v.Moves, vrs[vi], DefaultPositionalDepth, nil)
 				matched = matched || vm
 			}
 		}

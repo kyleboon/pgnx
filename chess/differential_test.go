@@ -50,7 +50,7 @@ func TestBitboardAgreesWithMailboxOracle(t *testing.T) {
 			if r == nil {
 				continue
 			}
-			positions += compareLine(t, path, n, r.StartBoard(), r.Moves)
+			positions += compareLine(t, path, n, r.StartBoard(), r)
 		}
 		if err := sc.Err(); err != nil {
 			t.Fatalf("%s: %v", path, err)
@@ -66,9 +66,10 @@ func TestBitboardAgreesWithMailboxOracle(t *testing.T) {
 // compareLine walks moves from b, comparing both engines at every
 // position and recursing into each move's variations, and returns the
 // number of positions compared. It stops the test at the first mismatch.
-func compareLine(t *testing.T, path string, game int, b *chess.Board, moves []replay.MoveInfo) int {
+func compareLine(t *testing.T, path string, game int, b *chess.Board, r *replay.Result) int {
 	t.Helper()
 	ob := mailbox.FromBoard(b)
+	moves := r.Moves
 	n := 0
 	for i := 0; ; i++ {
 		comparePosition(t, path, game, i, b, ob)
@@ -76,9 +77,9 @@ func compareLine(t *testing.T, path string, game int, b *chess.Board, moves []re
 		if i == len(moves) {
 			return n
 		}
-		for _, v := range moves[i].Variations {
+		for _, v := range r.Variations(i) {
 			if v != nil {
-				n += compareLine(t, path, game, b.Copy(), v.Moves)
+				n += compareLine(t, path, game, b.Copy(), v)
 			}
 		}
 		b.Apply(moves[i].Move)

@@ -40,6 +40,15 @@ func TestDecodeSAN(t *testing.T) {
 		{"r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "O-O", "e1g1"},
 		{"r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "0-0-0", "e1c1"},
 		{"rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq g3 0 2", "Qh4#", "d8h4"},
+		// Trailing annotation glyphs, check marks and en passant markers
+		// are dropped from the text, in any mix and order.
+		{start, "e4!?", "e2e4"},
+		{start, "Nf3+!", "g1f3"},
+		{start, "Sf3??#", "g1f3"},
+		{start, "e2e4!", "e2e4"},
+		{"rnbqkbnr/ppp2ppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3", "exd6e.p.", "e5d6"},
+		{"rnbqkbnr/ppp2ppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3", "exd6ep!", "e5d6"},
+		{"rnbqkbnr/ppp2ppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3", "exd6+e.p.", "e5d6"},
 		// lowercase long-algebraic promotion letters (C oracle: is_piece is
 		// case-insensitive for K/Q/D/R/T/N/S, and 'b' is specially allowed as
 		// a trailing promotion letter per decode.c's "allow a trailing 'b' as
@@ -98,5 +107,21 @@ func TestAppendSAN(t *testing.T) {
 	m2, _ := decodeSAN("exd5", b2, rp2)
 	if got := string(appendSAN(nil, m2, b2, rp2)); got != "exd5" {
 		t.Errorf("appendSAN = %q, want exd5", got)
+	}
+}
+
+// A null move is "--" or "Z0" (lex.c), with any trailing annotation
+// glyphs the text may carry; anything else, a move or a bare glyph, is
+// not one.
+func TestIsNullMove(t *testing.T) {
+	for _, san := range []string{"--", "Z0", "--!?", "Z0+", "--#", "Z0!!"} {
+		if !isNullMove(san) {
+			t.Errorf("isNullMove(%q) = false", san)
+		}
+	}
+	for _, san := range []string{"", "-", "!", "e4", "Z0a", "z0", "---", "Z00"} {
+		if isNullMove(san) {
+			t.Errorf("isNullMove(%q) = true", san)
+		}
 	}
 }
