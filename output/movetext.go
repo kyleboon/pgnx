@@ -165,8 +165,8 @@ func (e *emitter) line(moves []*pgn.Move, r *replay.Result, startWhite, blackNee
 					// starts on the same side to move, and the same
 					// full-move number, as mv.
 					var vr *replay.Result
-					if info != nil && vi < len(info.Variations) {
-						vr = info.Variations[vi]
+					if vrs := r.Variations(i); vi < len(vrs) {
+						vr = vrs[vi]
 					}
 					e.variation(a, vr, isWhite, moveNumberOf(moves, i, startWhite, baseMoveNumber))
 					blackNeedsNumber = true

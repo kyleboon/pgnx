@@ -1,5 +1,7 @@
 package chess
 
+import "sync"
+
 // CastlingRights tracks which castling moves are still available and, for
 // each side, the file the castling rook started on. In standard chess the
 // kingside rook starts on file 7 (h-file) and the queenside rook on file 0
@@ -44,8 +46,15 @@ const startPositionFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0
 
 // NewBoard returns a Board set up in the standard starting position.
 func NewBoard() *Board {
-	return mustFromFEN(startPositionFEN)
+	return startBoard().Copy()
 }
+
+// startBoard is the standard starting position, parsed on first use;
+// NewBoard copies it rather than parsing the FEN for every game
+// replayed. It is parsed lazily, not at package initialisation, because
+// a board's hashes read tables the package's init functions fill. It is
+// never mutated.
+var startBoard = sync.OnceValue(func() *Board { return mustFromFEN(startPositionFEN) })
 
 // mustFromFEN parses a FEN that is known to be valid (e.g. a compile-time
 // constant); it panics on error, which indicates a programmer error rather

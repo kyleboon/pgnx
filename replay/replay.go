@@ -3,6 +3,7 @@ package replay
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/kyleboon/pgnx/chess"
 	"github.com/kyleboon/pgnx/pgn"
@@ -29,19 +30,38 @@ type Result struct {
 	Moves     []MoveInfo // parallel to the source []*pgn.Move
 	Positions []Position // len = len(Moves)+1; [0] is the starting position
 
+	// variations holds the replays of each move's variations, indexed
+	// by the move's position in Moves, parallel to the pgn.Move's
+	// Variations; nil until a move of the line has one, since most games
+	// have none and a slice header per ply would be the largest part of
+	// a MoveInfo. Read through Variations.
+	variations [][]*Result
+
 	start, final *chess.Board // boards of Positions[0] and the last Position
 }
 
-// MoveInfo describes one replayed ply.
+// MoveInfo describes one replayed ply. The replays of the move's
+// variations are Result.Variations(i), not a field, so a MoveInfo stays
+// small: it is allocated once per ply of every game.
 type MoveInfo struct {
-	SAN        string // normalized, with + / # suffix
-	Move       chess.Move
-	Piece      chess.Piece
-	Captured   chess.PieceType // NoPiece if quiet
-	EnPassant  bool            // a pawn capturing en passant (Captured is Pawn)
-	IsCheck    bool
-	IsMate     bool
-	Variations []*Result // parallel to the pgn.Move's Variations
+	SAN       string // normalized, with + / # suffix
+	Move      chess.Move
+	Piece     chess.Piece
+	Captured  chess.PieceType // NoPiece if quiet
+	EnPassant bool            // a pawn capturing en passant (Captured is Pawn)
+	IsCheck   bool
+	IsMate    bool
+}
+
+// Variations returns the replays of the variations of Moves[i], parallel
+// to the source pgn.Move's Variations: a variation that failed to replay
+// is a nil *Result. It is nil when the move has no variations, when i is
+// not an index of Moves, or for an empty Result.
+func (r *Result) Variations(i int) []*Result {
+	if r == nil || i < 0 || i >= len(r.Moves) || i >= len(r.variations) {
+		return nil
+	}
+	return r.variations[i]
 }
 
 // Position is a single position reached during replay: the typed facts
@@ -91,8 +111,18 @@ func Game(g *pgn.Game, opts Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newReplayer().replayLine(g.Moves, b, opts.AllowNullMoves)
+	rp := replayers.Get().(*replayer)
+	defer replayers.Put(rp)
+	rp.reset()
+	return rp.replayLine(g.Moves, b, opts.AllowNullMoves)
 }
+
+// replayers holds replayers between games, so the move buffer each ply
+// generates into is made once per goroutine rather than once per game
+// (it was the largest per-game allocation of a run). Game is called from
+// several goroutines at once, so the state is pooled, never a package
+// variable; a Result keeps no reference into a replayer.
+var replayers = sync.Pool{New: func() any { return newReplayer() }}
 
 // startingBoard returns the board g's replay should start from: the
 // position described by its FEN tag if present, else the standard starting
@@ -176,6 +206,14 @@ func newReplayer() *replayer {
 	return &replayer{buf: make([]chess.Move, 0, moveBufferHint)}
 }
 
+// reset readies a replayer taken from the pool for a new game: its
+// buffer holds another game's moves and its counters another game's
+// generations. The buffer's capacity is kept.
+func (rp *replayer) reset() {
+	rp.holds = holdsStale
+	rp.full, rp.targeted = 0, 0
+}
+
 // moveBufferHint is the initial capacity of a replayer's move buffer:
 // enough for the pseudo-legal moves of nearly every position reached in
 // play, so the buffer is rarely regrown.
@@ -235,6 +273,14 @@ func (rp *replayer) replayLine(moves []*pgn.Move, b *chess.Board, allowNull bool
 	}
 	r.Positions = append(r.Positions, positionOf(b))
 
+	// The SAN of every move of the line is cut from one text, grown once
+	// up front for the usual move length, so a game costs one string
+	// allocation rather than one per ply. A Builder never rewrites what
+	// it has already written, so the SAN strings sliced from its text
+	// stay valid when it grows.
+	var sanText strings.Builder
+	sanText.Grow(len(moves) * sanLengthHint)
+
 	for i, mv := range moves {
 		var (
 			m         chess.Move
@@ -275,9 +321,8 @@ func (rp *replayer) replayLine(moves []*pgn.Move, b *chess.Board, allowNull bool
 		// off a copy of b prior to applying m. They share the move buffer:
 		// the first starts with this position's moves in it, and each one
 		// leaves some other position's moves behind.
-		var variations []*Result
 		if vars := mv.Variations(); len(vars) > 0 {
-			variations = make([]*Result, len(vars))
+			variations := make([]*Result, len(vars))
 			for vi, v := range vars {
 				vr, verr := rp.replayLine(v.Moves, b.Copy(), true)
 				rp.invalidate()
@@ -287,6 +332,10 @@ func (rp *replayer) replayLine(moves []*pgn.Move, b *chess.Board, allowNull bool
 				}
 				variations[vi] = vr
 			}
+			if r.variations == nil {
+				r.variations = make([][]*Result, len(moves))
+			}
+			r.variations[i] = variations
 		}
 
 		b.Apply(m)
@@ -306,21 +355,27 @@ func (rp *replayer) replayLine(moves []*pgn.Move, b *chess.Board, allowNull bool
 			san = append(san, '+')
 		}
 
+		off := sanText.Len()
+		sanText.Write(san)
 		r.Moves = append(r.Moves, MoveInfo{
-			SAN:        string(san),
-			Move:       m,
-			Piece:      piece,
-			Captured:   captured,
-			EnPassant:  enPassant,
-			IsCheck:    isCheck,
-			IsMate:     isMate,
-			Variations: variations,
+			SAN:       sanText.String()[off:],
+			Move:      m,
+			Piece:     piece,
+			Captured:  captured,
+			EnPassant: enPassant,
+			IsCheck:   isCheck,
+			IsMate:    isMate,
 		})
 		r.Positions = append(r.Positions, positionOf(b))
 	}
 
 	return r, nil
 }
+
+// sanLengthHint is the text a line reserves per move for its SAN: most
+// moves are three or four characters ("Nf3", "exd5", "O-O"), a check or a
+// capture by a named piece five, so the text rarely has to grow.
+const sanLengthHint = 5
 
 // NullMoveSAN is how pgn-extract writes a null move in every format
 // (defs.h NULL_MOVE_STRING); it is the SAN of a null MoveInfo.
@@ -330,7 +385,7 @@ const NullMoveSAN = "--"
 // pgn-extract's alternative spelling "Z0" (lex.c), either with trailing
 // annotation glyphs, which the C parser may append and the output drops.
 func isNullMove(san string) bool {
-	switch strings.TrimRight(san, "!?+#") {
+	switch trimAnnotation(san) {
 	case NullMoveSAN, "Z0":
 		return true
 	}

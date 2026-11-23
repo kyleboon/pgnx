@@ -80,8 +80,8 @@ func loadBenchGames(b testing.TB) []*pgn.Game {
 // reports false if any variation failed to replay (recorded as nil).
 func countPlies(r *Result) (int, bool) {
 	n := len(r.Moves)
-	for _, m := range r.Moves {
-		for _, v := range m.Variations {
+	for i := range r.Moves {
+		for _, v := range r.Variations(i) {
 			if v == nil {
 				return 0, false
 			}

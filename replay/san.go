@@ -12,46 +12,77 @@ import (
 	"github.com/kyleboon/pgnx/chess"
 )
 
-// pieceLetters maps the accepted (multilingual) leading piece letters to
-// their PieceType, mirroring the C tool's decode.c:is_piece: K king; Q/D
-// queen; R/T rook; N/S knight; B/L bishop.
-var pieceLetters = map[byte]chess.PieceType{
-	'K': chess.King,
-	'Q': chess.Queen,
-	'D': chess.Queen,
-	'R': chess.Rook,
-	'T': chess.Rook,
-	'N': chess.Knight,
-	'S': chess.Knight,
-	'B': chess.Bishop,
-	'L': chess.Bishop,
+// pieceLetter returns the PieceType an accepted (multilingual) leading
+// piece letter names, mirroring the C tool's decode.c:is_piece: K king;
+// Q/D queen; R/T rook; N/S knight; B/L bishop. A switch rather than a
+// map: it runs once per ply of every game.
+func pieceLetter(c byte) (chess.PieceType, bool) {
+	switch c {
+	case 'K':
+		return chess.King, true
+	case 'Q', 'D':
+		return chess.Queen, true
+	case 'R', 'T':
+		return chess.Rook, true
+	case 'N', 'S':
+		return chess.Knight, true
+	case 'B', 'L':
+		return chess.Bishop, true
+	}
+	return chess.NoPiece, false
 }
 
-// pieceSANLetters maps a PieceType to its canonical (English) SAN letter,
-// used when regenerating SAN text. Pawns have no letter.
-var pieceSANLetters = map[chess.PieceType]string{
-	chess.King:   "K",
-	chess.Queen:  "Q",
-	chess.Rook:   "R",
-	chess.Knight: "N",
-	chess.Bishop: "B",
+// pieceSANLetters is the canonical (English) SAN letter of each
+// PieceType, used when regenerating SAN text; indexed by the type. Pawns
+// have no letter.
+var pieceSANLetters = [...]byte{
+	chess.King:   'K',
+	chess.Queen:  'Q',
+	chess.Rook:   'R',
+	chess.Knight: 'N',
+	chess.Bishop: 'B',
 }
 
-// promotionLetters maps the accepted trailing promotion letters to their
-// PieceType, mirroring decode.c's is_piece (called on the promotion suffix)
-// plus its explicit "allow a trailing 'b' as a Bishop promotion" case.
-// is_piece is case-insensitive only for K/k, Q/q, R/r, N/n; its other
-// Dutch/German letters (D, T, S) are uppercase-only there, since lowercase
-// 'd' is a file letter and must not be captured as a promotion suffix.
-// Lowercase 'b' is separately special-cased in decode.c as a Bishop
-// promotion (but not lowercase 'l'). This covers long-algebraic
+// promotionLetter returns the PieceType an accepted trailing promotion
+// letter names, mirroring decode.c's is_piece (called on the promotion
+// suffix) plus its explicit "allow a trailing 'b' as a Bishop promotion"
+// case. is_piece is case-insensitive only for K/k, Q/q, R/r, N/n; its
+// other Dutch/German letters (D, T, S) are uppercase-only there, since
+// lowercase 'd' is a file letter and must not be captured as a promotion
+// suffix. Lowercase 'b' is separately special-cased in decode.c as a
+// Bishop promotion (but not lowercase 'l'). This covers long-algebraic
 // d7d8r/d7d8n/d7d8b/d7d8q and bare SAN d8q.
-var promotionLetters = map[byte]chess.PieceType{
-	'K': chess.King, 'k': chess.King,
-	'Q': chess.Queen, 'q': chess.Queen, 'D': chess.Queen,
-	'R': chess.Rook, 'r': chess.Rook, 'T': chess.Rook,
-	'N': chess.Knight, 'n': chess.Knight, 'S': chess.Knight,
-	'B': chess.Bishop, 'b': chess.Bishop, 'L': chess.Bishop,
+func promotionLetter(c byte) (chess.PieceType, bool) {
+	switch c {
+	case 'K', 'k':
+		return chess.King, true
+	case 'Q', 'q', 'D':
+		return chess.Queen, true
+	case 'R', 'r', 'T':
+		return chess.Rook, true
+	case 'N', 'n', 'S':
+		return chess.Knight, true
+	case 'B', 'b', 'L':
+		return chess.Bishop, true
+	}
+	return chess.NoPiece, false
+}
+
+// trimAnnotation returns s without its trailing annotation glyphs and
+// check marks (any of ! ? + #), which say nothing about which move it
+// is. It is strings.TrimRight(s, "!?+#") without building the cutset
+// per call, which was the costliest leaf of a replay.
+func trimAnnotation(s string) string {
+	n := len(s)
+	for n > 0 {
+		switch s[n-1] {
+		case '!', '?', '+', '#':
+			n--
+			continue
+		}
+		break
+	}
+	return s[:n]
 }
 
 // decodeSAN parses text (SAN or long-algebraic move notation) and returns
@@ -69,10 +100,10 @@ func decodeSAN(text string, b *chess.Board, rp *replayer) (chess.Move, error) {
 	s := strings.TrimSpace(text)
 
 	// Step 1: strip trailing annotation characters and en-passant markers.
-	s = strings.TrimRight(s, "!?+#")
+	s = trimAnnotation(s)
 	s = strings.TrimSuffix(s, "e.p.")
 	s = strings.TrimSuffix(s, "ep")
-	s = strings.TrimRight(s, "!?+#")
+	s = trimAnnotation(s)
 
 	if s == "" {
 		return chess.Move{}, fmt.Errorf("illegal or unknown move %q", orig)
@@ -185,7 +216,7 @@ func parseCore(s string) (pt chess.PieceType, fromFile, fromRank int, dest chess
 	i := 0
 	// Optional leading piece letter.
 	if i < len(s) {
-		if p, isPiece := pieceLetters[s[i]]; isPiece {
+		if p, isPiece := pieceLetter(s[i]); isPiece {
 			pt = p
 			i++
 		}
@@ -202,7 +233,7 @@ func parseCore(s string) (pt chess.PieceType, fromFile, fromRank int, dest chess
 	promo = chess.NoPiece
 	if len(rest) >= 2 {
 		last := rest[len(rest)-1]
-		if promoPT, isPiece := promotionLetters[last]; isPiece && promoPT != chess.King {
+		if promoPT, isPiece := promotionLetter(last); isPiece && promoPT != chess.King {
 			// Try stripping a promotion suffix of 1, 2 ("=Q"), or 2 ("/Q") chars.
 			switch {
 			case rest[len(rest)-2] == '=' || rest[len(rest)-2] == '/':
@@ -303,13 +334,12 @@ func appendSAN(dst []byte, m chess.Move, b *chess.Board, rp *replayer) []byte {
 		}
 		dst = appendSquare(dst, m.To)
 		if m.Promotion != chess.NoPiece {
-			dst = append(dst, '=')
-			dst = append(dst, pieceSANLetters[m.Promotion]...)
+			dst = append(dst, '=', pieceSANLetters[m.Promotion])
 		}
 		return dst
 	}
 
-	dst = append(dst, pieceSANLetters[mover.Type]...)
+	dst = append(dst, pieceSANLetters[mover.Type])
 	dst = appendDisambiguation(dst, m, b, mover, rp.candidates(b, mover.Type, m.To))
 	if capture {
 		dst = append(dst, 'x')

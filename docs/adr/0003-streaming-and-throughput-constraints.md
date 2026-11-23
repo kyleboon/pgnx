@@ -1,7 +1,8 @@
 # 0003: Memory is bounded per game and throughput must match the C tool
 
 Status: accepted (2026-11-02); amended 2026-11-12 (pgnx-perf.1.6), 2026-11-13 (pgnx-perf.3,
-pgnx-perf.4, pgnx-perf.9) and 2026-11-19 (pgnx-perf.6), baseline table and follow-up tickets below
+pgnx-perf.4, pgnx-perf.9), 2026-11-19 (pgnx-perf.6) and 2026-11-23 (pgnx-perf.5), baseline table and
+follow-up tickets below
 
 pgnx must process PGN inputs of 30 GB and more. Two constraints follow that
 the code cannot show on its own, so they are recorded here and checked by
@@ -34,6 +35,7 @@ stream and reports peak RSS and throughput for both.
    | 2026-11-13 | 15.7 s, 14.8 MB/s, 2.9 MB RSS | 15.9 s, 14.7 MB/s, 13.7 MB RSS | 1.01x | after pgnx-perf.4: the mate test after a check stops at the checked side's first legal reply and castling text probes its one move, instead of each generating every legal move with a legality probe per candidate (433 ns/ply, 1.1 allocs/ply in `BenchmarkGame`, from 568) |
    | 2026-11-13 | 15.7 s, 14.8 MB/s, 2.9 MB RSS | 11.3 s, 20.6 MB/s, 14.7 MB RSS | 0.72x | after pgnx-perf.9 (ADR 0005): the board is bitboards, attack tests are table lookups and magic-bitboard slider lookups, and candidate generation is a mask intersection, so no probe walks the board (232 ns/ply, 1.1 allocs/ply in `BenchmarkGame`, from 433) |
    | 2026-11-19 | 15.7 s, 14.8 MB/s, 2.9 MB RSS | 9.7 s, 24.0 MB/s, 14.0 MB RSS | 0.62x | after pgnx-perf.6: the lexer scans a 64 KB block buffer of bytes instead of runes through `bufio`, a token's text is one sub-slice converted once with tag names, moves, move numbers and NAGs interned, and the parser allocates `Move`s from a per-game chunked slab; a scanner-only pass over the slice (`BenchmarkScannerCorpus` in `pgn`, pointed at the slice by `PGNX_SCAN_CORPUS`, an absolute path) went from 3.40 s and 268 allocs/game to 1.84 s and 21 allocs/game (72.8 M to 5.8 M allocations), `BenchmarkScanner` from 263 to 34 allocs/game |
+   | 2026-11-23 | 15.7 s, 14.8 MB/s, 2.9 MB RSS | 7.8 s, 29.9 MB/s, 14.1 MB RSS | 0.50x | after pgnx-perf.5: a replay allocates only what its `Result` holds: the replayer and its move buffer come from a `sync.Pool` instead of being made per game, a line's SAN strings are sliced from one `strings.Builder` text instead of one string per ply, the replays of a move's variations moved off `MoveInfo` (88 to 64 bytes) into `Result.Variations(i)`, the standard start board is copied rather than parsed from FEN per game, and the SAN suffix trimming and piece-letter maps became byte switches; a convert of the slice allocates 5.33 GB in 24.0 M objects from 7.35 GB in 46.9 M (replay's share 2.52 GB from 4.35 GB), and `BenchmarkGame` went from 100 to 7.4 allocs/game, 1.1 to 0.08 allocs/ply, 18.9 to 11.5 KB/game and 229 to 154 ns/ply |
 
    A separate stage-timing run on 2026-11-12 over the same slice (best of
    three, total 24.6 s) spent 76% of its wall time in replay (18.7 s;
@@ -58,10 +60,16 @@ stream and reports peak RSS and throughput for both.
    share (the scanner-only pass over the slice, `BenchmarkScannerCorpus`,
    is 1.84 s from 3.40 s, and
    lexing and parsing allocate 5.8 M objects over the slice from 72.8 M),
-   and pgnx-perf.5 and pgnx-perf.7 carry the replay-allocation and output
-   remainder. Interning tag values as well was measured and rejected:
-   it halved the remaining allocations but hashing the values cost more
-   time than it saved.
+   and pgnx-perf.7 carries the output remainder. pgnx-perf.5 (done
+   2026-11-23) took the replay allocations out of the per-game path: of
+   the 7.35 GB a convert of the slice allocated, replay owned 4.35 GB
+   (59%): 1.93 GB of `MoveInfo`s, 0.93 GB of `Position`s and 1.36 GB of
+   move buffers made fresh for every game and dropped; afterwards the
+   run allocates 5.33 GB in 24.0 M objects (from 46.9 M), replay 2.52 GB
+   of it, which is the two per-game slices (a 64-byte `MoveInfo` and a
+   40-byte `Position` per ply) and the SAN text. Interning tag values as
+   well was measured and rejected: it halved the remaining allocations
+   but hashing the values cost more time than it saved.
 
 ## Consequences
 

@@ -49,7 +49,7 @@ func checkLineHashes(t *testing.T, r *Result, game int) int {
 			t.Fatalf("game %d position %d (%s): Zobrist %#x, rebuilt %#x", game, i, fen, p.Zobrist, rebuilt.Zobrist())
 		}
 		if i > 0 {
-			for _, v := range r.Moves[i-1].Variations {
+			for _, v := range r.Variations(i - 1) {
 				if v == nil {
 					t.Fatalf("game %d position %d: a variation failed to replay", game, i)
 				}
