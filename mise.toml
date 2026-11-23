@@ -62,8 +62,8 @@ description = "Build a full release locally into dist/ without a tag or GitHub t
 run = "goreleaser release --snapshot --clean --skip=publish"
 
 [tasks.bench]
-description = "Move-generation and replay benchmarks with allocation counts (not part of ci)"
-run = "go test -run '^$' -bench . -benchmem ./chess ./replay"
+description = "Parsing, move-generation and replay benchmarks with allocation counts (not part of ci)"
+run = "go test -run '^$' -bench . -benchmem ./pgn ./chess ./replay"
 
 [tasks.difftest]
 description = "Differential test against the C pgn-extract oracle (needs C_BIN, see scripts/difftest.sh)"

@@ -9,8 +9,9 @@ package pgn
 // never legality. s must not include trailing '!'/'?' glyphs (the C lexer
 // turns those into NAGs before the check ever sees them). The Russian
 // piece letters of the C table are not supported, as pgnx's lexer does not
-// accept those characters in movetext at all.
-func moveSeemsValid(s string) bool {
+// accept those characters in movetext at all. s is the lexer's buffer
+// slice, so no string is built for a word that turns out not to be a move.
+func moveSeemsValid(s []byte) bool {
 	// at returns s[i], or 0 past the end, mirroring the NUL terminator the
 	// C code relies on.
 	at := func(i int) byte {
@@ -156,5 +157,5 @@ func moveSeemsValid(s string) bool {
 		i++
 	}
 	rest := s[min(i, len(s)):]
-	return rest == "" || (pawn && (rest == "ep" || rest == "e.p."))
+	return len(rest) == 0 || (pawn && (string(rest) == "ep" || string(rest) == "e.p."))
 }

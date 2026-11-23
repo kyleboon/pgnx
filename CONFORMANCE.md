@@ -543,9 +543,9 @@ were fixed; the rest are the documented differences above.
   `odds.pgn` tag values (and many TWIC team/player/site tags) contain raw
   Latin-1 bytes (e.g. `0xE7`, `0xE9`). pgn-extract is byte-oriented and
   passes them through; pgnx's lexer used `bufio.Reader.ReadRune`, which
-  substituted U+FFFD. `pgn/lexer.go` now reads and peeks single bytes
-  (`ReadByte`) and appends bytes to token text, so Latin-1 and UTF-8 alike
-  pass through tag values and comments unchanged; bytes >= 0x80 outside
+  substituted U+FFFD. `pgn/lexer.go` now scans a block buffer of raw
+  bytes and takes a token's text as one sub-slice of it, so Latin-1 and
+  UTF-8 alike pass through tag values and comments unchanged; bytes >= 0x80 outside
   strings/comments are skipped as unknown characters, as before. The
   scanner still streams one game at a time. Output wrapping counts bytes
   (`len`), as the C tool does. Covered by `pgn/bytes_test.go`. Tag output
